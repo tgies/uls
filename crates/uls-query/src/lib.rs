@@ -28,10 +28,13 @@
 //! ```
 
 mod engine;
+mod fields;
 mod filter;
 mod output;
 
 pub use engine::QueryEngine;
+pub use fields::{FieldRegistry, FieldDef, FieldType, FilterExpr, FilterOp};
 pub use filter::{SearchFilter, SortOrder};
 pub use output::{OutputFormat, FormatOutput};
 pub use uls_db::models::{License, LicenseStats};
+

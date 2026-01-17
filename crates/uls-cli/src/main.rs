@@ -68,13 +68,45 @@ enum Commands {
         #[arg(long)]
         city: Option<String>,
 
+        /// Filter by ZIP code
+        #[arg(long)]
+        zip: Option<String>,
+
+        /// Filter by FRN
+        #[arg(long)]
+        frn: Option<String>,
+
         /// Filter by operator class (T, G, A, E)
         #[arg(short, long)]
         class: Option<char>,
 
-        /// Only show active licenses
+        /// Filter by license status (A=Active, E=Expired, C=Cancelled)
+        #[arg(long)]
+        status: Option<char>,
+
+        /// Only show active licenses (shortcut for --status A)
         #[arg(long)]
         active: bool,
+
+        /// Licenses granted on or after this date (YYYY-MM-DD)
+        #[arg(long)]
+        granted_after: Option<String>,
+
+        /// Licenses granted on or before this date (YYYY-MM-DD)
+        #[arg(long)]
+        granted_before: Option<String>,
+
+        /// Licenses expiring on or before this date (YYYY-MM-DD)
+        #[arg(long)]
+        expires_before: Option<String>,
+
+        /// Generic filter expressions (repeatable, e.g., --filter "grant_date>2025-01-01")
+        #[arg(long = "filter", short = 'F')]
+        filters: Vec<String>,
+
+        /// Sort order: callsign, -callsign, name, state, granted, expires
+        #[arg(long, default_value = "callsign")]
+        sort: String,
 
         /// Maximum results to return
         #[arg(short, long, default_value = "50")]
@@ -186,12 +218,24 @@ async fn main() -> Result<()> {
             query,
             state,
             city,
+            zip,
+            frn,
             class,
+            status,
             active,
+            granted_after,
+            granted_before,
+            expires_before,
+            filters,
+            sort,
             limit,
             service,
         }) => {
-            commands::search::execute(query, state, city, class, active, limit, &service, &cli.format).await
+            commands::search::execute(
+                query, state, city, zip, frn, class, status, active,
+                granted_after, granted_before, expires_before, filters,
+                &sort, limit, &service, &cli.format
+            ).await
         }
         Some(Commands::Update { service, force, minimal }) => {
             commands::update::execute(&service, force, minimal).await

@@ -5,12 +5,21 @@ use uls_query::{FormatOutput, OutputFormat, QueryEngine, SearchFilter};
 
 use super::auto_update;
 
+#[allow(clippy::too_many_arguments)]
 pub async fn execute(
     query: Option<String>,
     state: Option<String>,
     city: Option<String>,
+    zip: Option<String>,
+    frn: Option<String>,
     class: Option<char>,
+    status: Option<char>,
     active: bool,
+    granted_after: Option<String>,
+    granted_before: Option<String>,
+    expires_before: Option<String>,
+    filters: Vec<String>,
+    sort: &str,
     limit: usize,
     service_override: &str,
     format: &str,
@@ -27,19 +36,32 @@ pub async fn execute(
     let output_format = OutputFormat::from_str(format).unwrap_or_default();
 
     // Require at least one search filter
-    if query.is_none() && state.is_none() && city.is_none() && class.is_none() && !active {
+    let has_filter = query.is_some() 
+        || state.is_some() 
+        || city.is_some() 
+        || zip.is_some()
+        || frn.is_some()
+        || class.is_some() 
+        || status.is_some()
+        || active
+        || granted_after.is_some()
+        || granted_before.is_some()
+        || expires_before.is_some()
+        || !filters.is_empty();
+
+    if !has_filter {
         eprintln!("Error: At least one search filter is required.");
         eprintln!();
         eprintln!("Examples:");
-        eprintln!("  uls search W1*              # Callsign pattern");
-        eprintln!("  uls search \"John Smith\"     # Name search");
-        eprintln!("  uls search --state TX       # By state");
-        eprintln!("  uls search --class E        # By operator class");
-        eprintln!("  uls search --active         # Active licenses only");
+        eprintln!("  uls search W1*                          # Callsign pattern");
+        eprintln!("  uls search \"John Smith\"                 # Name search");
+        eprintln!("  uls search --state TX                   # By state");
+        eprintln!("  uls search --filter \"grant_date>2025-01-01\"  # Generic filter");
+        eprintln!("  uls search --active --sort -grant_date  # Recent grants");
         std::process::exit(1);
     }
 
-    // Build filter
+    // Build filter from convenience args
     let mut filter = if let Some(ref q) = query {
         if q.contains('*') || q.contains('?') {
             SearchFilter::callsign(q)
@@ -61,14 +83,36 @@ pub async fn execute(
         filter.city = Some(c.to_uppercase());
     }
 
+    if let Some(z) = zip {
+        filter.zip_code = Some(z);
+    }
+
+    if let Some(f) = frn {
+        filter.frn = Some(f);
+    }
+
     if let Some(c) = class {
         filter = filter.with_operator_class(c.to_ascii_uppercase());
     }
 
-    if active {
+    if let Some(s) = status {
+        filter.status = Some(s.to_ascii_uppercase());
+    } else if active {
         filter = filter.active_only();
     }
 
+    // Date filters (legacy convenience)
+    filter.granted_after = granted_after;
+    filter.granted_before = granted_before;
+    filter.expires_before = expires_before;
+
+    // Generic filters
+    for f in filters {
+        filter = filter.with_filter(&f);
+    }
+
+    // Sort by field (supports -field for descending)
+    filter = filter.with_sort_field(sort);
     filter = filter.with_limit(limit);
 
     let results = engine.search(filter)?;

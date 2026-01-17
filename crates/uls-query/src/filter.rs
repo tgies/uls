@@ -68,6 +68,17 @@ fn multi_column_match_condition(columns: &[&str], value: &str) -> (String, Vec<S
 /// Filter criteria for license searches.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct SearchFilter {
+    // ===== Generic filter system =====
+    /// Generic filter expressions (e.g., "grant_date>2025-01-01", "state=TX").
+    #[serde(default)]
+    pub filters: Vec<crate::fields::FilterExpr>,
+    /// Sort by field name (prefix with - for descending).
+    pub sort_field: Option<String>,
+    /// Sort direction (true = descending).
+    #[serde(default)]
+    pub sort_desc: bool,
+
+    // ===== Legacy convenience fields (still supported) =====
     /// Filter by callsign pattern (supports wildcards).
     pub callsign: Option<String>,
     /// Filter by name (partial match).
@@ -92,8 +103,14 @@ pub struct SearchFilter {
     pub limit: Option<usize>,
     /// Number of results to skip (for pagination).
     pub offset: Option<usize>,
-    /// Sort order.
+    /// Sort order (legacy enum, use sort_field for generic).
     pub sort: SortOrder,
+    /// Filter by grant date (licenses granted on or after this date).
+    pub granted_after: Option<String>,
+    /// Filter by grant date (licenses granted on or before this date).
+    pub granted_before: Option<String>,
+    /// Filter by expiration date (licenses expiring on or before this date).
+    pub expires_before: Option<String>,
 }
 
 impl SearchFilter {
@@ -161,6 +178,27 @@ impl SearchFilter {
     /// Set sort order.
     pub fn with_sort(mut self, sort: SortOrder) -> Self {
         self.sort = sort;
+        self
+    }
+
+    /// Add a generic filter expression (e.g., "grant_date>2025-01-01").
+    pub fn with_filter(mut self, expr: impl AsRef<str>) -> Self {
+        if let Some(filter) = crate::fields::FilterExpr::parse(expr.as_ref()) {
+            self.filters.push(filter);
+        }
+        self
+    }
+
+    /// Set sort field by name (prefix with - for descending).
+    pub fn with_sort_field(mut self, field: impl Into<String>) -> Self {
+        let field_str = field.into();
+        if field_str.starts_with('-') {
+            self.sort_field = Some(field_str[1..].to_string());
+            self.sort_desc = true;
+        } else {
+            self.sort_field = Some(field_str);
+            self.sort_desc = false;
+        }
         self
     }
 
@@ -237,6 +275,47 @@ impl SearchFilter {
             }
         }
 
+        // Date range filters
+        if let Some(ref date) = self.granted_after {
+            conditions.push("l.grant_date >= ?".to_string());
+            params.push(date.clone());
+        }
+
+        if let Some(ref date) = self.granted_before {
+            conditions.push("l.grant_date <= ?".to_string());
+            params.push(date.clone());
+        }
+
+        if let Some(ref date) = self.expires_before {
+            conditions.push("l.expired_date <= ?".to_string());
+            params.push(date.clone());
+        }
+
+        // Process generic filter expressions
+        let registry = crate::fields::FieldRegistry::new();
+        for expr in &self.filters {
+            if let Some(field_def) = registry.get(&expr.field) {
+                // Check wildcards for LIKE
+                let op = if expr.value.contains('*') || expr.value.contains('?') {
+                    crate::fields::FilterOp::Like
+                } else {
+                    expr.op
+                };
+                
+                // Validate operator for field type
+                if op.valid_for(field_def.field_type) {
+                    if op == crate::fields::FilterOp::Like {
+                        let pattern = expr.value.replace('*', "%").replace('?', "_");
+                        conditions.push(format!("{} LIKE ?", field_def.column));
+                        params.push(pattern);
+                    } else {
+                        conditions.push(format!("{} {} ?", field_def.column, op.sql()));
+                        params.push(expr.value.clone());
+                    }
+                }
+            }
+        }
+
         let where_clause = if conditions.is_empty() {
             "1=1".to_string()
         } else {
@@ -247,14 +326,24 @@ impl SearchFilter {
     }
 
     /// Get the ORDER BY clause.
-    pub fn order_clause(&self) -> &str {
+    pub fn order_clause(&self) -> String {
+        // If sort_field is set, use generic field-based sorting
+        if let Some(ref field_name) = self.sort_field {
+            let registry = crate::fields::FieldRegistry::new();
+            if let Some(field_def) = registry.get(field_name) {
+                let dir = if self.sort_desc { "DESC" } else { "ASC" };
+                return format!("ORDER BY {} {}", field_def.column, dir);
+            }
+        }
+        
+        // Fall back to legacy SortOrder enum
         match self.sort {
-            SortOrder::CallSign => "ORDER BY l.call_sign ASC",
-            SortOrder::CallSignDesc => "ORDER BY l.call_sign DESC",
-            SortOrder::Name => "ORDER BY e.entity_name ASC, e.last_name ASC",
-            SortOrder::State => "ORDER BY e.state ASC, e.city ASC",
-            SortOrder::GrantDate => "ORDER BY l.grant_date DESC",
-            SortOrder::ExpirationDate => "ORDER BY l.expired_date ASC",
+            SortOrder::CallSign => "ORDER BY l.call_sign ASC".to_string(),
+            SortOrder::CallSignDesc => "ORDER BY l.call_sign DESC".to_string(),
+            SortOrder::Name => "ORDER BY e.entity_name ASC, e.last_name ASC".to_string(),
+            SortOrder::State => "ORDER BY e.state ASC, e.city ASC".to_string(),
+            SortOrder::GrantDate => "ORDER BY l.grant_date DESC".to_string(),
+            SortOrder::ExpirationDate => "ORDER BY l.expired_date ASC".to_string(),
         }
     }
 
