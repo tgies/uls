@@ -26,6 +26,19 @@ pub async fn execute(
     let engine = QueryEngine::with_database(db);
     let output_format = OutputFormat::from_str(format).unwrap_or_default();
 
+    // Require at least one search filter
+    if query.is_none() && state.is_none() && city.is_none() && class.is_none() && !active {
+        eprintln!("Error: At least one search filter is required.");
+        eprintln!();
+        eprintln!("Examples:");
+        eprintln!("  uls search W1*              # Callsign pattern");
+        eprintln!("  uls search \"John Smith\"     # Name search");
+        eprintln!("  uls search --state TX       # By state");
+        eprintln!("  uls search --class E        # By operator class");
+        eprintln!("  uls search --active         # Active licenses only");
+        std::process::exit(1);
+    }
+
     // Build filter
     let mut filter = if let Some(ref q) = query {
         if q.contains('*') || q.contains('?') {
