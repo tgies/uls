@@ -1,0 +1,619 @@
+//! Database repository for ULS data operations.
+//!
+//! Provides high-level methods for inserting, updating, and querying ULS data.
+
+use std::path::Path;
+
+use r2d2::{Pool, PooledConnection};
+use r2d2_sqlite::SqliteConnectionManager;
+use rusqlite::{params, Connection};
+use tracing::{debug, info};
+
+use uls_core::records::{
+    AmateurRecord, CommentRecord, EntityRecord, HeaderRecord, HistoryRecord,
+    SpecialConditionRecord, UlsRecord,
+};
+
+use crate::config::DatabaseConfig;
+use crate::error::Result;
+use crate::models::{License, LicenseStats};
+use crate::schema::Schema;
+
+/// Database connection pool and operations.
+pub struct Database {
+    pool: Pool<SqliteConnectionManager>,
+    config: DatabaseConfig,
+}
+
+impl Database {
+    /// Open a database at the given path.
+    pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
+        let config = DatabaseConfig::with_path(path.as_ref());
+        Self::with_config(config)
+    }
+
+    /// Open a database with the given configuration.
+    pub fn with_config(config: DatabaseConfig) -> Result<Self> {
+        // Create parent directory if needed
+        if let Some(parent) = config.path.parent() {
+            if !parent.exists() && config.path.to_str() != Some(":memory:") {
+                std::fs::create_dir_all(parent)?;
+            }
+        }
+
+        let manager = SqliteConnectionManager::file(&config.path);
+        let pool = Pool::builder()
+            .max_size(config.max_connections)
+            .connection_timeout(config.connection_timeout)
+            .build(manager)?;
+
+        let db = Self { pool, config };
+        db.configure_connection()?;
+
+        Ok(db)
+    }
+
+    /// Get a connection from the pool.
+    pub fn conn(&self) -> Result<PooledConnection<SqliteConnectionManager>> {
+        Ok(self.pool.get()?)
+    }
+
+    /// Configure SQLite connection settings.
+    fn configure_connection(&self) -> Result<()> {
+        let conn = self.conn()?;
+
+        // Enable WAL mode for better concurrency
+        if self.config.enable_wal {
+            conn.execute_batch("PRAGMA journal_mode = WAL;")?;
+        }
+
+        // Set cache size
+        conn.execute_batch(&format!(
+            "PRAGMA cache_size = {};",
+            self.config.cache_size
+        ))?;
+
+        // Enable foreign keys
+        if self.config.foreign_keys {
+            conn.execute_batch("PRAGMA foreign_keys = ON;")?;
+        }
+
+        // Other optimizations
+        conn.execute_batch(
+            r#"
+            PRAGMA synchronous = NORMAL;
+            PRAGMA temp_store = MEMORY;
+            PRAGMA mmap_size = 268435456;
+            "#,
+        )?;
+
+        Ok(())
+    }
+
+    /// Initialize the database schema.
+    pub fn initialize(&self) -> Result<()> {
+        let conn = self.conn()?;
+        Schema::initialize(&conn)?;
+        info!("Database initialized with schema version {}", crate::schema::SCHEMA_VERSION);
+        Ok(())
+    }
+
+    /// Check if the database is initialized.
+    pub fn is_initialized(&self) -> Result<bool> {
+        let conn = self.conn()?;
+        Ok(Schema::get_version(&conn)?.is_some())
+    }
+
+    /// Begin a transaction for bulk operations.
+    pub fn begin_transaction(&self) -> Result<Transaction> {
+        let conn = self.pool.get()?;
+        conn.execute("BEGIN TRANSACTION", [])?;
+        Ok(Transaction { conn })
+    }
+
+    /// Insert a ULS record into the database.
+    pub fn insert_record(&self, record: &UlsRecord) -> Result<()> {
+        let conn = self.conn()?;
+        Self::insert_record_conn(&conn, record)
+    }
+
+    /// Insert a record using an existing connection.
+    fn insert_record_conn(conn: &Connection, record: &UlsRecord) -> Result<()> {
+        match record {
+            UlsRecord::Header(hd) => Self::insert_header(conn, hd),
+            UlsRecord::Entity(en) => Self::insert_entity(conn, en),
+            UlsRecord::Amateur(am) => Self::insert_amateur(conn, am),
+            UlsRecord::History(hs) => Self::insert_history(conn, hs),
+            UlsRecord::Comment(co) => Self::insert_comment(conn, co),
+            UlsRecord::SpecialCondition(sc) => Self::insert_special_condition(conn, sc),
+            _ => {
+                debug!("Skipping unsupported record type: {:?}", record.record_type());
+                Ok(())
+            }
+        }
+    }
+
+    /// Insert a header record.
+    fn insert_header(conn: &Connection, hd: &HeaderRecord) -> Result<()> {
+        conn.execute(
+            r#"
+            INSERT OR REPLACE INTO licenses (
+                unique_system_identifier, uls_file_number, ebf_number, call_sign,
+                license_status, radio_service_code, grant_date, expired_date,
+                cancellation_date, effective_date, last_action_date
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)
+            "#,
+            params![
+                hd.unique_system_identifier,
+                hd.uls_file_number,
+                hd.ebf_number,
+                hd.call_sign,
+                hd.license_status.map(|c| c.to_string()),
+                hd.radio_service_code,
+                hd.grant_date.map(|d| d.to_string()),
+                hd.expired_date.map(|d| d.to_string()),
+                hd.cancellation_date.map(|d| d.to_string()),
+                hd.effective_date.map(|d| d.to_string()),
+                hd.last_action_date.map(|d| d.to_string()),
+            ],
+        )?;
+        Ok(())
+    }
+
+    /// Insert an entity record.
+    fn insert_entity(conn: &Connection, en: &EntityRecord) -> Result<()> {
+        conn.execute(
+            r#"
+            INSERT OR REPLACE INTO entities (
+                unique_system_identifier, uls_file_number, ebf_number, call_sign,
+                entity_type, licensee_id, entity_name, first_name, middle_initial,
+                last_name, suffix, phone, fax, email, street_address, city, state,
+                zip_code, po_box, attention_line, sgin, frn, applicant_type_code,
+                status_code, status_date
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25)
+            "#,
+            params![
+                en.unique_system_identifier,
+                en.uls_file_number,
+                en.ebf_number,
+                en.call_sign,
+                en.entity_type,
+                en.licensee_id,
+                en.entity_name,
+                en.first_name,
+                en.mi.map(|c| c.to_string()),
+                en.last_name,
+                en.suffix,
+                en.phone,
+                en.fax,
+                en.email,
+                en.street_address,
+                en.city,
+                en.state,
+                en.zip_code,
+                en.po_box,
+                en.attention_line,
+                en.sgin,
+                en.frn,
+                en.applicant_type_code.map(|c| c.to_string()),
+                en.status_code.map(|c| c.to_string()),
+                en.status_date,
+            ],
+        )?;
+        Ok(())
+    }
+
+    /// Insert an amateur record.
+    fn insert_amateur(conn: &Connection, am: &AmateurRecord) -> Result<()> {
+        conn.execute(
+            r#"
+            INSERT OR REPLACE INTO amateur_operators (
+                unique_system_identifier, uls_file_number, ebf_number, call_sign,
+                operator_class, group_code, region_code, trustee_call_sign,
+                trustee_indicator, physician_certification, ve_signature,
+                systematic_call_sign_change, vanity_call_sign_change,
+                vanity_relationship, previous_call_sign, previous_operator_class,
+                trustee_name
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17)
+            "#,
+            params![
+                am.unique_system_identifier,
+                am.uls_file_num,
+                am.ebf_number,
+                am.callsign,
+                am.operator_class.map(|c| c.to_string()),
+                am.group_code.map(|c| c.to_string()),
+                am.region_code,
+                am.trustee_callsign,
+                am.trustee_indicator.map(|c| c.to_string()),
+                am.physician_certification.map(|c| c.to_string()),
+                am.ve_signature.map(|c| c.to_string()),
+                am.systematic_callsign_change.map(|c| c.to_string()),
+                am.vanity_callsign_change.map(|c| c.to_string()),
+                am.vanity_relationship,
+                am.previous_callsign,
+                am.previous_operator_class.map(|c| c.to_string()),
+                am.trustee_name,
+            ],
+        )?;
+        Ok(())
+    }
+
+    /// Insert a history record.
+    fn insert_history(conn: &Connection, hs: &HistoryRecord) -> Result<()> {
+        conn.execute(
+            r#"
+            INSERT OR REPLACE INTO history (
+                unique_system_identifier, uls_file_number, callsign, log_date, code
+            ) VALUES (?1, ?2, ?3, ?4, ?5)
+            "#,
+            params![
+                hs.unique_system_identifier,
+                hs.uls_file_number,
+                hs.callsign,
+                hs.log_date,
+                hs.code,
+            ],
+        )?;
+        Ok(())
+    }
+
+    /// Insert a comment record.
+    fn insert_comment(conn: &Connection, co: &CommentRecord) -> Result<()> {
+        conn.execute(
+            r#"
+            INSERT OR REPLACE INTO comments (
+                unique_system_identifier, uls_file_number, callsign, comment_date,
+                description, status_code, status_date
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
+            "#,
+            params![
+                co.unique_system_identifier,
+                co.uls_file_num,
+                co.callsign,
+                co.comment_date,
+                co.description,
+                co.status_code.map(|c| c.to_string()),
+                co.status_date,
+            ],
+        )?;
+        Ok(())
+    }
+
+    /// Insert a special condition record.
+    fn insert_special_condition(conn: &Connection, sc: &SpecialConditionRecord) -> Result<()> {
+        conn.execute(
+            r#"
+            INSERT OR REPLACE INTO special_conditions (
+                unique_system_identifier, uls_file_number, ebf_number, callsign,
+                special_condition_type, special_condition_code, status_code, status_date
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
+            "#,
+            params![
+                sc.unique_system_identifier,
+                sc.uls_file_number,
+                sc.ebf_number,
+                sc.callsign,
+                sc.special_condition_type.map(|c| c.to_string()),
+                sc.special_condition_code,
+                sc.status_code.map(|c| c.to_string()),
+                sc.status_date,
+            ],
+        )?;
+        Ok(())
+    }
+
+    /// Look up a license by call sign.
+    pub fn get_license_by_callsign(&self, callsign: &str) -> Result<Option<License>> {
+        let conn = self.conn()?;
+        let callsign = callsign.to_uppercase();
+
+        let result = conn.query_row(
+            r#"
+            SELECT 
+                l.unique_system_identifier, l.call_sign,
+                e.entity_name, e.first_name, e.middle_initial, e.last_name,
+                l.license_status, l.radio_service_code,
+                l.grant_date, l.expired_date, l.cancellation_date,
+                e.frn, NULL as previous_call_sign,
+                e.street_address, e.city, e.state, e.zip_code,
+                a.operator_class
+            FROM licenses l
+            LEFT JOIN entities e ON l.unique_system_identifier = e.unique_system_identifier
+            LEFT JOIN amateur_operators a ON l.unique_system_identifier = a.unique_system_identifier
+            WHERE l.call_sign = ?1
+            LIMIT 1
+            "#,
+            [&callsign],
+            |row| {
+                Ok(License {
+                    unique_system_identifier: row.get(0)?,
+                    call_sign: row.get::<_, Option<String>>(1)?.unwrap_or_default(),
+                    licensee_name: row.get::<_, Option<String>>(2)?.unwrap_or_default(),
+                    first_name: row.get(3)?,
+                    middle_initial: row.get(4)?,
+                    last_name: row.get(5)?,
+                    status: row.get::<_, Option<String>>(6)?
+                        .and_then(|s| s.chars().next())
+                        .unwrap_or('?'),
+                    radio_service: row.get::<_, Option<String>>(7)?.unwrap_or_default(),
+                    grant_date: row.get::<_, Option<String>>(8)?
+                        .and_then(|s| chrono::NaiveDate::parse_from_str(&s, "%Y-%m-%d").ok()),
+                    expired_date: row.get::<_, Option<String>>(9)?
+                        .and_then(|s| chrono::NaiveDate::parse_from_str(&s, "%Y-%m-%d").ok()),
+                    cancellation_date: row.get::<_, Option<String>>(10)?
+                        .and_then(|s| chrono::NaiveDate::parse_from_str(&s, "%Y-%m-%d").ok()),
+                    frn: row.get(11)?,
+                    previous_call_sign: row.get(12)?,
+                    street_address: row.get(13)?,
+                    city: row.get(14)?,
+                    state: row.get(15)?,
+                    zip_code: row.get(16)?,
+                    operator_class: row.get::<_, Option<String>>(17)?
+                        .and_then(|s| s.chars().next()),
+                })
+            },
+        );
+
+        match result {
+            Ok(license) => Ok(Some(license)),
+            Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+            Err(e) => Err(e.into()),
+        }
+    }
+
+    /// Look up all licenses by FRN (FCC Registration Number).
+    pub fn get_licenses_by_frn(&self, frn: &str) -> Result<Vec<License>> {
+        let conn = self.conn()?;
+        // Normalize FRN - strip leading zeros for comparison or pad to 10 digits
+        let frn = frn.trim();
+
+        let mut stmt = conn.prepare(
+            r#"
+            SELECT 
+                l.unique_system_identifier, l.call_sign,
+                e.entity_name, e.first_name, e.middle_initial, e.last_name,
+                l.license_status, l.radio_service_code,
+                l.grant_date, l.expired_date, l.cancellation_date,
+                e.frn, NULL as previous_call_sign,
+                e.street_address, e.city, e.state, e.zip_code,
+                a.operator_class
+            FROM licenses l
+            INNER JOIN entities e ON l.unique_system_identifier = e.unique_system_identifier
+            LEFT JOIN amateur_operators a ON l.unique_system_identifier = a.unique_system_identifier
+            WHERE e.frn = ?1
+            GROUP BY l.unique_system_identifier
+            ORDER BY l.radio_service_code, l.call_sign
+            "#,
+        )?;
+
+        let licenses = stmt.query_map([frn], |row| {
+            Ok(License {
+                unique_system_identifier: row.get(0)?,
+                call_sign: row.get::<_, Option<String>>(1)?.unwrap_or_default(),
+                licensee_name: row.get::<_, Option<String>>(2)?.unwrap_or_default(),
+                first_name: row.get(3)?,
+                middle_initial: row.get(4)?,
+                last_name: row.get(5)?,
+                status: row.get::<_, Option<String>>(6)?
+                    .and_then(|s| s.chars().next())
+                    .unwrap_or('?'),
+                radio_service: row.get::<_, Option<String>>(7)?.unwrap_or_default(),
+                grant_date: row.get::<_, Option<String>>(8)?
+                    .and_then(|s| chrono::NaiveDate::parse_from_str(&s, "%Y-%m-%d").ok()),
+                expired_date: row.get::<_, Option<String>>(9)?
+                    .and_then(|s| chrono::NaiveDate::parse_from_str(&s, "%Y-%m-%d").ok()),
+                cancellation_date: row.get::<_, Option<String>>(10)?
+                    .and_then(|s| chrono::NaiveDate::parse_from_str(&s, "%Y-%m-%d").ok()),
+                frn: row.get(11)?,
+                previous_call_sign: row.get(12)?,
+                street_address: row.get(13)?,
+                city: row.get(14)?,
+                state: row.get(15)?,
+                zip_code: row.get(16)?,
+                operator_class: row.get::<_, Option<String>>(17)?
+                    .and_then(|s| s.chars().next()),
+            })
+        })?;
+
+        let mut result = Vec::new();
+        for license in licenses {
+            result.push(license?);
+        }
+        Ok(result)
+    }
+
+    /// Get database statistics.
+    pub fn get_stats(&self) -> Result<LicenseStats> {
+        let conn = self.conn()?;
+
+        let total_licenses: u64 = conn.query_row(
+            "SELECT COUNT(*) FROM licenses",
+            [],
+            |row| row.get(0),
+        )?;
+
+        let active_licenses: u64 = conn.query_row(
+            "SELECT COUNT(*) FROM licenses WHERE license_status = 'A'",
+            [],
+            |row| row.get(0),
+        )?;
+
+        let expired_licenses: u64 = conn.query_row(
+            "SELECT COUNT(*) FROM licenses WHERE license_status = 'E'",
+            [],
+            |row| row.get(0),
+        )?;
+
+        let cancelled_licenses: u64 = conn.query_row(
+            "SELECT COUNT(*) FROM licenses WHERE license_status = 'C'",
+            [],
+            |row| row.get(0),
+        )?;
+
+        let schema_version = Schema::get_version(&conn)?.unwrap_or(0);
+        let last_updated = Schema::get_metadata(&conn, "last_updated")?;
+
+        Ok(LicenseStats {
+            total_licenses,
+            active_licenses,
+            expired_licenses,
+            cancelled_licenses,
+            by_service: Vec::new(),
+            by_operator_class: Vec::new(),
+            last_updated,
+            schema_version,
+        })
+    }
+
+    /// Count licenses by radio service code(s).
+    /// Pass service codes like ["HA", "HV"] for amateur or ["ZA"] for GMRS.
+    pub fn count_by_service(&self, service_codes: &[&str]) -> Result<u64> {
+        if service_codes.is_empty() {
+            return Ok(0);
+        }
+        
+        let conn = self.conn()?;
+        let placeholders: String = service_codes.iter().map(|_| "?").collect::<Vec<_>>().join(",");
+        let sql = format!(
+            "SELECT COUNT(*) FROM licenses WHERE radio_service_code IN ({})",
+            placeholders
+        );
+        
+        let mut stmt = conn.prepare(&sql)?;
+        let count: u64 = stmt.query_row(
+            rusqlite::params_from_iter(service_codes.iter()),
+            |row| row.get(0),
+        )?;
+        
+        Ok(count)
+    }
+
+    /// Set the last updated timestamp.
+    pub fn set_last_updated(&self, timestamp: &str) -> Result<()> {
+        let conn = self.conn()?;
+        Schema::set_metadata(&conn, "last_updated", timestamp)?;
+        Ok(())
+    }
+
+    /// Get the ETag of the last imported file for a service.
+    pub fn get_imported_etag(&self, service: &str) -> Result<Option<String>> {
+        let conn = self.conn()?;
+        let key = format!("imported_etag_{}", service);
+        Schema::get_metadata(&conn, &key)
+    }
+
+    /// Set the ETag of the last imported file for a service.
+    pub fn set_imported_etag(&self, service: &str, etag: &str) -> Result<()> {
+        let conn = self.conn()?;
+        let key = format!("imported_etag_{}", service);
+        Schema::set_metadata(&conn, &key, etag)?;
+        Ok(())
+    }
+}
+
+/// A database transaction for bulk operations.
+pub struct Transaction {
+    conn: PooledConnection<SqliteConnectionManager>,
+}
+
+impl Transaction {
+    /// Insert a record within this transaction.
+    pub fn insert_record(&self, record: &UlsRecord) -> Result<()> {
+        Database::insert_record_conn(&self.conn, record)
+    }
+
+    /// Commit the transaction.
+    pub fn commit(self) -> Result<()> {
+        self.conn.execute("COMMIT", [])?;
+        Ok(())
+    }
+
+    /// Rollback the transaction.
+    pub fn rollback(self) -> Result<()> {
+        self.conn.execute("ROLLBACK", [])?;
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use uls_core::records::HeaderRecord;
+
+    fn create_test_db() -> Database {
+        let config = DatabaseConfig::in_memory();
+        let db = Database::with_config(config).unwrap();
+        db.initialize().unwrap();
+        db
+    }
+
+    fn create_test_header() -> HeaderRecord {
+        let mut hd = HeaderRecord::from_fields(&["HD", "12345"]);
+        hd.unique_system_identifier = 12345;
+        hd.call_sign = Some("W1TEST".to_string());
+        hd.license_status = Some('A');
+        hd.radio_service_code = Some("HA".to_string());
+        hd
+    }
+
+    #[test]
+    fn test_open_database() {
+        let db = create_test_db();
+        assert!(db.is_initialized().unwrap());
+    }
+
+    #[test]
+    fn test_insert_and_query() {
+        let db = create_test_db();
+        
+        let header = create_test_header();
+        db.insert_record(&UlsRecord::Header(header)).unwrap();
+
+        let license = db.get_license_by_callsign("W1TEST").unwrap();
+        assert!(license.is_some());
+
+        let license = license.unwrap();
+        assert_eq!(license.call_sign, "W1TEST");
+        assert_eq!(license.status, 'A');
+        assert!(license.is_active());
+    }
+
+    #[test]
+    fn test_case_insensitive_lookup() {
+        let db = create_test_db();
+        
+        let header = create_test_header();
+        db.insert_record(&UlsRecord::Header(header)).unwrap();
+
+        // Should find with different case
+        let license = db.get_license_by_callsign("w1test").unwrap();
+        assert!(license.is_some());
+    }
+
+    #[test]
+    fn test_stats() {
+        let db = create_test_db();
+        
+        let header = create_test_header();
+        db.insert_record(&UlsRecord::Header(header)).unwrap();
+
+        let stats = db.get_stats().unwrap();
+        assert_eq!(stats.total_licenses, 1);
+        assert_eq!(stats.active_licenses, 1);
+    }
+
+    #[test]
+    fn test_transaction() {
+        let db = create_test_db();
+        
+        let tx = db.begin_transaction().unwrap();
+        
+        let header = create_test_header();
+        tx.insert_record(&UlsRecord::Header(header)).unwrap();
+        tx.commit().unwrap();
+
+        let license = db.get_license_by_callsign("W1TEST").unwrap();
+        assert!(license.is_some());
+    }
+}

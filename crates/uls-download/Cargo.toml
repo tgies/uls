@@ -1,0 +1,28 @@
+[package]
+name = "uls-download"
+description = "FCC ULS file download and synchronization"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+uls-core.workspace = true
+thiserror.workspace = true
+reqwest.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+chrono.workspace = true
+zip.workspace = true
+indicatif.workspace = true
+serde.workspace = true
+dirs = "5.0"
+futures-util = "0.3"
+
+[dev-dependencies]
+tempfile.workspace = true
+wiremock.workspace = true
+rstest.workspace = true
+tokio = { workspace = true, features = ["test-util"] }

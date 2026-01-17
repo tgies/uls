@@ -1,0 +1,39 @@
+[package]
+name = "uls-cli"
+description = "CLI tool for FCC ULS data retrieval and management"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+
+[[bin]]
+name = "uls"
+path = "src/main.rs"
+
+[dependencies]
+uls-core.workspace = true
+uls-parser.workspace = true
+uls-db.workspace = true
+uls-download.workspace = true
+uls-query.workspace = true
+uls-api.workspace = true
+clap.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+anyhow.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+csv.workspace = true
+console.workspace = true
+indicatif.workspace = true
+chrono.workspace = true
+dirs = "5.0"
+
+[dev-dependencies]
+tempfile.workspace = true
+rstest.workspace = true
+assert_cmd = "2.0"
+predicates = "3.1"

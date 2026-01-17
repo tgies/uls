@@ -1,0 +1,8 @@
+create table auction_freq
+      (
+ auction_id smallint            Not null ,
+ freq_channel_block char(2)     Not null ,
+ freq_assigned numeric(16,8)    Null ,
+ freq_upper_band numeric(16,8)  Null ,
+ radio_service_code char(2)     Null 
+      )

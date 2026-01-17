@@ -1,0 +1,209 @@
+name: FCC Data Monitor
+
+on:
+  schedule:
+    # Run daily at 12:00 UTC (7:00 AM Eastern / 6:00 AM Central)
+    - cron: '0 12 * * *'
+  workflow_dispatch:
+    inputs:
+      force_check:
+        description: 'Force full check even if no changes detected'
+        type: boolean
+        default: false
+
+env:
+  FCC_PUBLIC_ACCESS_URL: "https://www.fcc.gov/wireless/data/public-access-updates"
+  FCC_DATA_BASE_URL: "https://data.fcc.gov/download/pub/uls"
+
+jobs:
+  check-fcc-updates:
+    name: Check FCC Public Access Updates
+    runs-on: ubuntu-latest
+    outputs:
+      has_updates: ${{ steps.check-page.outputs.has_updates }}
+      latest_update: ${{ steps.check-page.outputs.latest_update }}
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Check FCC Public Access Updates page
+        id: check-page
+        run: |
+          set -euo pipefail
+          
+          echo "Fetching FCC Public Access Updates page..."
+          RESPONSE=$(curl -sS --fail --retry 3 --retry-delay 5 \
+            -H "User-Agent: ULS-CLI-Monitor/1.0 (https://github.com/tgies/uls)" \
+            "$FCC_PUBLIC_ACCESS_URL" || echo "FETCH_FAILED")
+          
+          if [[ "$RESPONSE" == "FETCH_FAILED" ]]; then
+            echo "::error::Failed to fetch FCC Public Access Updates page"
+            echo "has_updates=unknown" >> "$GITHUB_OUTPUT"
+            exit 1
+          fi
+          
+          # Extract dates from the page - look for news items/announcements
+          # FCC typically uses date formats like "January 15, 2026" or "01/15/2026"
+          DATES=$(echo "$RESPONSE" | grep -oE '(January|February|March|April|May|June|July|August|September|October|November|December)\s+[0-9]{1,2},\s+[0-9]{4}' | head -5 || true)
+          
+          if [[ -z "$DATES" ]]; then
+            # Try alternate date format
+            DATES=$(echo "$RESPONSE" | grep -oE '[0-9]{1,2}/[0-9]{1,2}/[0-9]{4}' | head -5 || true)
+          fi
+          
+          echo "Recent dates found on page:"
+          echo "$DATES"
+          
+          LATEST=$(echo "$DATES" | head -1)
+          echo "latest_update=$LATEST" >> "$GITHUB_OUTPUT"
+          
+          # Check if there's a change indicator
+          # Save the hash of key content for comparison
+          CONTENT_HASH=$(echo "$RESPONSE" | grep -i -E '(update|change|notice|announcement)' | md5sum | cut -d' ' -f1)
+          echo "Content hash: $CONTENT_HASH"
+          
+          # Compare with cached hash if available
+          if [[ -f .fcc-monitor-cache/content-hash.txt ]]; then
+            CACHED_HASH=$(cat .fcc-monitor-cache/content-hash.txt)
+            if [[ "$CONTENT_HASH" != "$CACHED_HASH" ]]; then
+              echo "::warning::FCC Public Access page content has changed!"
+              echo "has_updates=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "No content changes detected"
+              echo "has_updates=false" >> "$GITHUB_OUTPUT"
+            fi
+          else
+            echo "No cached hash found (first run)"
+            echo "has_updates=unknown" >> "$GITHUB_OUTPUT"
+          fi
+      
+      - name: Cache content hash
+        run: |
+          mkdir -p .fcc-monitor-cache
+          curl -sS "$FCC_PUBLIC_ACCESS_URL" | \
+            grep -i -E '(update|change|notice|announcement)' | \
+            md5sum | cut -d' ' -f1 > .fcc-monitor-cache/content-hash.txt
+
+  verify-data-availability:
+    name: Verify FCC Data Files Availability
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        service:
+          - { name: "Amateur Licenses", file: "complete/l_amat.zip" }
+          - { name: "Amateur Applications", file: "complete/a_amat.zip" }
+          - { name: "GMRS Licenses", file: "complete/l_gmrs.zip" }
+    steps:
+      - name: Check ${{ matrix.service.name }}
+        run: |
+          set -euo pipefail
+          
+          URL="${FCC_DATA_BASE_URL}/${{ matrix.service.file }}"
+          echo "Checking: $URL"
+          
+          # Use HEAD request to check availability and get metadata
+          RESPONSE=$(curl -sS -I --fail --retry 3 --retry-delay 5 \
+            -H "User-Agent: ULS-CLI-Monitor/1.0" \
+            "$URL" 2>&1 || echo "FAILED")
+          
+          if [[ "$RESPONSE" == *"FAILED"* ]]; then
+            echo "::error::Failed to access ${{ matrix.service.name }} at $URL"
+            exit 1
+          fi
+          
+          # Extract useful headers
+          CONTENT_LENGTH=$(echo "$RESPONSE" | grep -i "content-length" | awk '{print $2}' | tr -d '\r')
+          LAST_MODIFIED=$(echo "$RESPONSE" | grep -i "last-modified" | cut -d: -f2- | tr -d '\r')
+          ETAG=$(echo "$RESPONSE" | grep -i "etag" | cut -d: -f2- | tr -d '\r')
+          
+          echo "✓ ${{ matrix.service.name }} is available"
+          echo "  Size: $CONTENT_LENGTH bytes"
+          echo "  Last-Modified: $LAST_MODIFIED"
+          echo "  ETag: $ETAG"
+
+  test-download-and-parse:
+    name: Test Download and Parse (Weekly)
+    runs-on: ubuntu-latest
+    # Only run on Sundays (when FCC updates weekly files) or manual trigger
+    if: github.event_name == 'workflow_dispatch' || github.event.schedule == '0 12 * * 0'
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+      
+      - name: Build uls-parser
+        run: cargo build --release -p uls-parser
+      
+      - name: Download sample data
+        run: |
+          mkdir -p test-data
+          curl -sS -o test-data/l_amat.zip \
+            -H "User-Agent: ULS-CLI-Monitor/1.0" \
+            "${FCC_DATA_BASE_URL}/complete/l_amat.zip"
+          
+          echo "Downloaded: $(ls -lh test-data/l_amat.zip)"
+      
+      - name: Extract and validate
+        run: |
+          cd test-data
+          unzip -q l_amat.zip -d l_amat
+          
+          echo "Extracted files:"
+          ls -la l_amat/
+          
+          echo ""
+          echo "File sizes:"
+          wc -l l_amat/*.dat | tail -1
+          
+          echo ""
+          echo "Sample records from HD.dat:"
+          head -3 l_amat/HD.dat
+      
+      # Future: Run actual parser tests against real data
+      # - name: Run parser validation
+      #   run: cargo run -p uls-parser --example validate -- test-data/l_amat/
+
+  notify-on-failure:
+    name: Notify on Failure
+    runs-on: ubuntu-latest
+    needs: [check-fcc-updates, verify-data-availability]
+    if: failure()
+    steps:
+      - name: Create failure issue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const title = `FCC Data Monitor: Issues Detected (${new Date().toISOString().split('T')[0]})`;
+            const body = `
+            ## FCC Data Monitor Alert
+            
+            The scheduled FCC data monitoring job detected issues.
+            
+            **Workflow Run:** ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}
+            
+            Please investigate:
+            - Check if FCC data files are accessible
+            - Review any changes to the FCC Public Access Updates page
+            - Verify network connectivity
+            
+            This issue was automatically created by the FCC Data Monitor workflow.
+            `;
+            
+            // Check for existing open issue
+            const issues = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'fcc-monitor'
+            });
+            
+            if (issues.data.length === 0) {
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: title,
+                body: body,
+                labels: ['fcc-monitor', 'automated']
+              });
+            }

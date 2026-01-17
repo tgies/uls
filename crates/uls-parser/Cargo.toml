@@ -1,0 +1,21 @@
+[package]
+name = "uls-parser"
+description = "Parser for FCC ULS pipe-delimited DAT files"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+uls-core.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+chrono.workspace = true
+zip.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+proptest.workspace = true
+rstest.workspace = true
