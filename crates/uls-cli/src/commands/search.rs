@@ -86,6 +86,7 @@ fn format_csv_with_fields(licenses: &[License], fields: &[&str]) -> String {
 #[allow(clippy::too_many_arguments)]
 pub async fn execute(
     query: Option<String>,
+    name: Option<String>,
     state: Option<String>,
     city: Option<String>,
     zip: Option<String>,
@@ -116,6 +117,7 @@ pub async fn execute(
 
     // Require at least one search filter
     let has_filter = query.is_some() 
+        || name.is_some()
         || state.is_some() 
         || city.is_some() 
         || zip.is_some()
@@ -131,24 +133,35 @@ pub async fn execute(
     if !has_filter {
         eprintln!("Error: At least one search filter is required.");
         eprintln!();
-        eprintln!("Examples:");
-        eprintln!("  uls search W1*                          # Callsign pattern");
-        eprintln!("  uls search \"John Smith\"                 # Name search");
-        eprintln!("  uls search --state TX                   # By state");
-        eprintln!("  uls search --filter \"grant_date>2025-01-01\"  # Generic filter");
-        eprintln!("  uls search --active --sort -grant_date  # Recent grants");
+        eprintln!("Quick examples:");
+        eprintln!("  uls search Brian -c Omaha -r gmrs  # Find Brian in Omaha (GMRS)");
+        eprintln!("  uls search -n Smith -s TX          # Name search in Texas");
+        eprintln!("  uls search W1* -a                  # Active callsigns starting with W1");
+        eprintln!("  uls search -s FL -S=-grant_date    # Recent grants in Florida");
+        eprintln!();
+        eprintln!("Run 'uls search --help' for all options.");
         std::process::exit(1);
     }
 
     // Build filter from convenience args
-    let mut filter = if let Some(ref q) = query {
+    // Priority: explicit -n/--name > positional query
+    // Auto-add wildcards to name for partial matching if not already present
+    let mut filter = if let Some(ref n) = name {
+        let name_pattern = if n.contains('*') || n.contains('?') {
+            n.clone()
+        } else {
+            format!("*{}*", n) // Partial match by default
+        };
+        SearchFilter::name(&name_pattern)
+    } else if let Some(ref q) = query {
         if q.contains('*') || q.contains('?') {
             SearchFilter::callsign(q)
         } else if q.chars().all(|c| c.is_alphanumeric()) && q.len() <= 10 {
             // Looks like a callsign
             SearchFilter::callsign(q)
         } else {
-            SearchFilter::name(q)
+            // For positional name search, also add wildcards
+            SearchFilter::name(&format!("*{}*", q))
         }
     } else {
         SearchFilter::new()
@@ -159,7 +172,8 @@ pub async fn execute(
     }
 
     if let Some(c) = city {
-        filter.city = Some(c.to_uppercase());
+        // Use generic filter for LIKE matching (handles partial/case matches)
+        filter = filter.with_filter(format!("city={}", c.to_uppercase()));
     }
 
     if let Some(z) = zip {
@@ -193,6 +207,14 @@ pub async fn execute(
     // Sort by field (supports -field for descending)
     filter = filter.with_sort_field(sort);
     filter = filter.with_limit(limit);
+
+    // Apply service filter - the unified DB contains all services
+    // Map the service code to the appropriate radio service codes
+    filter.radio_service = Some(match service_code {
+        "HA" => vec!["HA".to_string(), "HV".to_string()], // Amateur includes HV (vanity)
+        "ZA" => vec!["ZA".to_string()], // GMRS
+        _ => vec![service_code.to_string()],
+    });
 
     let results = engine.search(filter)?;
 

@@ -60,12 +60,16 @@ enum Commands {
         /// Search query (name, callsign pattern, etc.)
         query: Option<String>,
 
+        /// Name search (explicit, vs positional which auto-detects)
+        #[arg(short = 'n', long)]
+        name: Option<String>,
+
         /// Filter by state (2-letter code)
         #[arg(short, long)]
         state: Option<String>,
 
         /// Filter by city
-        #[arg(long)]
+        #[arg(short = 'c', long)]
         city: Option<String>,
 
         /// Filter by ZIP code
@@ -77,7 +81,7 @@ enum Commands {
         frn: Option<String>,
 
         /// Filter by operator class (T, G, A, E)
-        #[arg(short, long)]
+        #[arg(short = 'C', long)]
         class: Option<char>,
 
         /// Filter by license status (A=Active, E=Expired, C=Cancelled)
@@ -85,8 +89,9 @@ enum Commands {
         status: Option<char>,
 
         /// Only show active licenses (shortcut for --status A)
-        #[arg(long)]
+        #[arg(short = 'a', long)]
         active: bool,
+
 
         /// Licenses granted on or after this date (YYYY-MM-DD)
         #[arg(long)]
@@ -105,7 +110,7 @@ enum Commands {
         filters: Vec<String>,
 
         /// Sort order: callsign, -callsign, name, state, granted, expires
-        #[arg(long, default_value = "callsign")]
+        #[arg(short = 'S', long, default_value = "callsign")]
         sort: String,
 
         /// Maximum results to return
@@ -113,7 +118,7 @@ enum Commands {
         limit: usize,
 
         /// Radio service (amateur, gmrs)
-        #[arg(long, default_value = "amateur")]
+        #[arg(short = 'r', long, default_value = "amateur")]
         service: String,
 
         /// Output fields (comma-separated, e.g., call_sign,name,grant_date)
@@ -220,6 +225,7 @@ async fn main() -> Result<()> {
         }
         Some(Commands::Search {
             query,
+            name,
             state,
             city,
             zip,
@@ -237,7 +243,7 @@ async fn main() -> Result<()> {
             fields,
         }) => {
             commands::search::execute(
-                query, state, city, zip, frn, class, status, active,
+                query, name, state, city, zip, frn, class, status, active,
                 granted_after, granted_before, expires_before, filters,
                 &sort, limit, &service, &cli.format, fields
             ).await
