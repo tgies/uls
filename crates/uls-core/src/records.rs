@@ -154,3 +154,104 @@ impl UlsRecord {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // Helper to create minimal records for testing dispatch methods
+    fn header_record() -> UlsRecord {
+        UlsRecord::Header(HeaderRecord::from_fields(&[
+            "HD", "100001", "", "", "W1TEST", "A", "HA",
+        ]))
+    }
+
+    fn entity_record() -> UlsRecord {
+        UlsRecord::Entity(EntityRecord::from_fields(&[
+            "EN", "100002", "", "", "W2TEST", "L",
+        ]))
+    }
+
+    fn amateur_record() -> UlsRecord {
+        UlsRecord::Amateur(AmateurRecord::from_fields(&[
+            "AM", "100003", "", "", "W3TEST", "E", "D", "6",
+        ]))
+    }
+
+    fn history_record() -> UlsRecord {
+        UlsRecord::History(HistoryRecord::from_fields(&[
+            "HS", "100004", "", "W4TEST", "01/01/2020", "LIISS",
+        ]))
+    }
+
+    fn comment_record() -> UlsRecord {
+        UlsRecord::Comment(CommentRecord::from_fields(&[
+            "CO", "100005", "", "W5TEST", "01/01/2020", "Test comment",
+        ]))
+    }
+
+    fn location_record() -> UlsRecord {
+        UlsRecord::Location(LocationRecord::from_fields(&[
+            "LO", "100006", "", "", "W6TEST",
+        ]))
+    }
+
+    fn frequency_record() -> UlsRecord {
+        UlsRecord::Frequency(FrequencyRecord::from_fields(&[
+            "FR", "100007", "", "", "W7TEST",
+        ]))
+    }
+
+    fn special_condition_record() -> UlsRecord {
+        UlsRecord::SpecialCondition(SpecialConditionRecord::from_fields(&[
+            "SC", "100008", "", "", "W8TEST", "P", "999",
+        ]))
+    }
+
+    fn raw_record() -> UlsRecord {
+        UlsRecord::Raw {
+            record_type: RecordType::BC,
+            fields: vec!["BC".to_string(), "12345".to_string()],
+        }
+    }
+
+    #[test]
+    fn test_record_type_dispatch() {
+        assert_eq!(header_record().record_type(), RecordType::HD);
+        assert_eq!(entity_record().record_type(), RecordType::EN);
+        assert_eq!(amateur_record().record_type(), RecordType::AM);
+        assert_eq!(history_record().record_type(), RecordType::HS);
+        assert_eq!(comment_record().record_type(), RecordType::CO);
+        assert_eq!(location_record().record_type(), RecordType::LO);
+        assert_eq!(frequency_record().record_type(), RecordType::FR);
+        assert_eq!(special_condition_record().record_type(), RecordType::SC);
+        assert_eq!(raw_record().record_type(), RecordType::BC);
+    }
+
+    #[test]
+    fn test_unique_system_identifier_dispatch() {
+        assert_eq!(header_record().unique_system_identifier(), Some(100001));
+        assert_eq!(entity_record().unique_system_identifier(), Some(100002));
+        assert_eq!(amateur_record().unique_system_identifier(), Some(100003));
+        assert_eq!(history_record().unique_system_identifier(), Some(100004));
+        assert_eq!(comment_record().unique_system_identifier(), Some(100005));
+        assert_eq!(location_record().unique_system_identifier(), Some(100006));
+        assert_eq!(frequency_record().unique_system_identifier(), Some(100007));
+        assert_eq!(special_condition_record().unique_system_identifier(), Some(100008));
+        assert_eq!(raw_record().unique_system_identifier(), None);
+    }
+
+    #[test]
+    fn test_call_sign_dispatch() {
+        assert_eq!(header_record().call_sign(), Some("W1TEST"));
+        assert_eq!(entity_record().call_sign(), Some("W2TEST"));
+        assert_eq!(amateur_record().call_sign(), Some("W3TEST"));
+        assert_eq!(history_record().call_sign(), Some("W4TEST"));
+        assert_eq!(comment_record().call_sign(), Some("W5TEST"));
+        assert_eq!(location_record().call_sign(), Some("W6TEST"));
+        assert_eq!(frequency_record().call_sign(), Some("W7TEST"));
+        assert_eq!(special_condition_record().call_sign(), Some("W8TEST"));
+        assert_eq!(raw_record().call_sign(), None);
+    }
+}
+
