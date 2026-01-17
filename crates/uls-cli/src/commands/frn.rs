@@ -5,13 +5,13 @@ use uls_query::{FormatOutput, OutputFormat, QueryEngine};
 
 use super::auto_update;
 
-pub async fn execute(frn: &str, format: &str) -> Result<()> {
-    // Default to amateur service for FRN lookups
-    let service = auto_update::service_name_to_code("amateur")
-        .expect("amateur is a valid service");
+pub async fn execute(frn: &str, service_override: &str, format: &str) -> Result<()> {
+    // FRN lookups can't auto-detect, so use the service override (defaulting to amateur)
+    let service_code = auto_update::service_name_to_code(service_override)
+        .ok_or_else(|| anyhow::anyhow!("Unknown service: {}", service_override))?;
     
     // Ensure data is available, auto-download if needed
-    let db = auto_update::ensure_data_available(service).await
+    let db = auto_update::ensure_data_available(service_code).await
         .context("Failed to ensure data is available")?;
 
     let engine = QueryEngine::with_database(db);

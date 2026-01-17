@@ -41,6 +41,10 @@ enum Commands {
     Lookup {
         /// Callsign to look up
         callsign: String,
+
+        /// Radio service (amateur, gmrs)
+        #[arg(long, default_value = "amateur")]
+        service: String,
     },
 
     /// Search for licenses
@@ -67,6 +71,10 @@ enum Commands {
         /// Maximum results to return
         #[arg(short, long, default_value = "50")]
         limit: usize,
+
+        /// Radio service (amateur, gmrs)
+        #[arg(long, default_value = "amateur")]
+        service: String,
     },
 
     /// Update the local database
@@ -88,6 +96,10 @@ enum Commands {
     Frn {
         /// FRN to look up (10-digit FCC Registration Number)
         frn: String,
+
+        /// Radio service (amateur, gmrs)
+        #[arg(long, default_value = "amateur")]
+        service: String,
     },
 
     /// Show database statistics
@@ -159,8 +171,8 @@ async fn main() -> Result<()> {
 
     // Execute command
     match cli.command {
-        Some(Commands::Lookup { callsign }) => {
-            commands::lookup::execute(&callsign, &cli.format).await
+        Some(Commands::Lookup { callsign, service }) => {
+            commands::lookup::execute(&callsign, &service, &cli.format).await
         }
         Some(Commands::Search {
             query,
@@ -169,14 +181,15 @@ async fn main() -> Result<()> {
             class,
             active,
             limit,
+            service,
         }) => {
-            commands::search::execute(query, state, city, class, active, limit, &cli.format).await
+            commands::search::execute(query, state, city, class, active, limit, &service, &cli.format).await
         }
         Some(Commands::Update { service, force, minimal }) => {
             commands::update::execute(&service, force, minimal).await
         }
-        Some(Commands::Frn { frn }) => {
-            commands::frn::execute(&frn, &cli.format).await
+        Some(Commands::Frn { frn, service }) => {
+            commands::frn::execute(&frn, &service, &cli.format).await
         }
         Some(Commands::Stats) => {
             commands::stats::execute(&cli.format).await
@@ -190,7 +203,7 @@ async fn main() -> Result<()> {
             // No subcommand - check for quick callsign lookup
             if let Some(callsign) = cli.callsign {
                 if looks_like_callsign(&callsign) {
-                    commands::lookup::execute(&callsign, &cli.format).await
+                    commands::lookup::execute(&callsign, "amateur", &cli.format).await
                 } else {
                     eprintln!("Unknown command or invalid callsign: {}", callsign);
                     eprintln!("Run 'uls --help' for usage information.");

@@ -111,3 +111,62 @@ pub fn service_name_to_code(service: &str) -> Option<&'static str> {
     }
 }
 
+/// Detect service type from callsign format.
+/// 
+/// **Amateur callsign formats** (letter-number-letter pattern):
+/// - 1x2: K4AB (1 letter, 1 digit, 2 letters)
+/// - 1x3: K4ABC (1 letter, 1 digit, 3 letters)
+/// - 2x1: KB9A (2 letters, 1 digit, 1 letter)
+/// - 2x2: KB9AB (2 letters, 1 digit, 2 letters)
+/// - 2x3: KB9VBR (2 letters, 1 digit, 3 letters)
+/// 
+/// **GMRS callsign formats** (letters followed by digits, no embedded number):
+/// - WQFX467, WRXX201 (3-4 letters + 3-4 digits)
+/// - Legacy: KAE1234 format
+pub fn detect_service_from_callsign(callsign: &str) -> &'static str {
+    let upper = callsign.to_uppercase();
+    let chars: Vec<char> = upper.chars().collect();
+    
+    if chars.is_empty() {
+        return "HA"; // Default to amateur
+    }
+    
+    // Amateur callsigns have a digit embedded in the middle, followed by letters
+    // Pattern: [letters][digit][letters]
+    // Find first digit position
+    let first_digit_pos = chars.iter().position(|c| c.is_ascii_digit());
+    
+    if let Some(digit_pos) = first_digit_pos {
+        // Check if there are letters AFTER the digit (amateur pattern)
+        let after_digit: String = chars[digit_pos + 1..].iter().collect();
+        if !after_digit.is_empty() && after_digit.chars().all(|c| c.is_ascii_alphabetic()) {
+            // Has letters after digit = amateur callsign
+            // Validate: 1-2 prefix letters, 1 digit, 1-3 suffix letters
+            let prefix: String = chars[..digit_pos].iter().collect();
+            if prefix.len() >= 1 && prefix.len() <= 2 
+                && prefix.chars().all(|c| c.is_ascii_alphabetic())
+                && after_digit.len() >= 1 && after_digit.len() <= 3
+            {
+                return "HA"; // Amateur
+            }
+        }
+        
+        // Check GMRS pattern: all letters, then all digits (at the end)
+        let letters: String = chars.iter().take_while(|c| c.is_ascii_alphabetic()).collect();
+        let digits: String = chars.iter().skip(letters.len()).collect();
+        
+        if letters.len() >= 3 && letters.len() <= 4
+            && digits.len() >= 3 && digits.len() <= 4
+            && digits.chars().all(|c| c.is_ascii_digit())
+        {
+            return "ZA"; // GMRS
+        }
+    }
+    
+    "HA" // Default to amateur
+}
+
+
+
+
+
