@@ -604,4 +604,182 @@ mod tests {
         let license = db.get_license_by_callsign("W1TEST").unwrap();
         assert!(license.is_some());
     }
+
+    #[test]
+    fn test_insert_entity() {
+        use uls_core::records::EntityRecord;
+        
+        let db = create_test_db();
+        
+        // Insert header first for FK constraint
+        let header = create_test_header();
+        db.insert_record(&UlsRecord::Header(header)).unwrap();
+        
+        // Insert entity
+        let entity = EntityRecord::from_fields(&[
+            "EN", "12345", "", "", "W1TEST", "L", "L00100001",
+            "DOE, JOHN A", "JOHN", "A", "DOE", "",
+            "555-555-1234", "", "test@example.com", "123 Main St", "ANYTOWN", "CA", "90210",
+            "", "", "000", "0001234567", "I", "", "", "", "", "", "",
+        ]);
+        db.insert_record(&UlsRecord::Entity(entity)).unwrap();
+    }
+
+    #[test]
+    fn test_insert_amateur() {
+        use uls_core::records::AmateurRecord;
+        
+        let db = create_test_db();
+        
+        let header = create_test_header();
+        db.insert_record(&UlsRecord::Header(header)).unwrap();
+        
+        let amateur = AmateurRecord::from_fields(&[
+            "AM", "12345", "", "", "W1TEST", "E", "D", "6",
+            "", "", "", "", "", "", "", "", "", "",
+        ]);
+        db.insert_record(&UlsRecord::Amateur(amateur)).unwrap();
+    }
+
+    #[test]
+    fn test_insert_history() {
+        use uls_core::records::HistoryRecord;
+        
+        let db = create_test_db();
+        
+        let header = create_test_header();
+        db.insert_record(&UlsRecord::Header(header)).unwrap();
+        
+        let history = HistoryRecord::from_fields(&[
+            "HS", "12345", "", "W1TEST", "01/01/2020", "LIISS",
+        ]);
+        db.insert_record(&UlsRecord::History(history)).unwrap();
+    }
+
+    #[test]
+    fn test_insert_comment() {
+        use uls_core::records::CommentRecord;
+        
+        let db = create_test_db();
+        
+        let header = create_test_header();
+        db.insert_record(&UlsRecord::Header(header)).unwrap();
+        
+        let comment = CommentRecord::from_fields(&[
+            "CO", "12345", "", "W1TEST", "01/01/2020", "Test comment",
+        ]);
+        db.insert_record(&UlsRecord::Comment(comment)).unwrap();
+    }
+
+    #[test]
+    fn test_insert_special_condition() {
+        use uls_core::records::SpecialConditionRecord;
+        
+        let db = create_test_db();
+        
+        let header = create_test_header();
+        db.insert_record(&UlsRecord::Header(header)).unwrap();
+        
+        let sc = SpecialConditionRecord::from_fields(&[
+            "SC", "12345", "", "", "W1TEST", "P", "999", "", "",
+        ]);
+        db.insert_record(&UlsRecord::SpecialCondition(sc)).unwrap();
+    }
+
+    #[test]
+    fn test_get_licenses_by_frn() {
+        use uls_core::records::EntityRecord;
+        
+        let db = create_test_db();
+        
+        let header = create_test_header();
+        db.insert_record(&UlsRecord::Header(header)).unwrap();
+        
+        // Insert entity with FRN
+        let entity = EntityRecord::from_fields(&[
+            "EN", "12345", "", "", "W1TEST", "L", "L00100001",
+            "DOE, JOHN A", "JOHN", "A", "DOE", "",
+            "", "", "", "", "", "", "",
+            "", "", "000", "0001234567", "I", "", "", "", "", "", "",
+        ]);
+        db.insert_record(&UlsRecord::Entity(entity)).unwrap();
+        
+        let licenses = db.get_licenses_by_frn("0001234567").unwrap();
+        assert_eq!(licenses.len(), 1);
+        assert_eq!(licenses[0].call_sign, "W1TEST");
+    }
+
+    #[test]
+    fn test_get_licenses_by_frn_not_found() {
+        let db = create_test_db();
+        
+        let licenses = db.get_licenses_by_frn("9999999999").unwrap();
+        assert!(licenses.is_empty());
+    }
+
+    #[test]
+    fn test_count_by_service() {
+        let db = create_test_db();
+        
+        let header = create_test_header(); // Has radio_service_code = "HA"
+        db.insert_record(&UlsRecord::Header(header)).unwrap();
+        
+        let count = db.count_by_service(&["HA"]).unwrap();
+        assert_eq!(count, 1);
+        
+        let count = db.count_by_service(&["ZA"]).unwrap(); // GMRS, shouldn't match
+        assert_eq!(count, 0);
+    }
+
+    #[test]
+    fn test_etag_operations() {
+        let db = create_test_db();
+        
+        // Initially no etag
+        let etag = db.get_imported_etag("l_amat").unwrap();
+        assert!(etag.is_none());
+        
+        // Set etag
+        db.set_imported_etag("l_amat", "abc123").unwrap();
+        
+        // Should retrieve it
+        let etag = db.get_imported_etag("l_amat").unwrap();
+        assert_eq!(etag, Some("abc123".to_string()));
+        
+        // Update etag
+        db.set_imported_etag("l_amat", "xyz789").unwrap();
+        let etag = db.get_imported_etag("l_amat").unwrap();
+        assert_eq!(etag, Some("xyz789".to_string()));
+    }
+
+    #[test]
+    fn test_set_last_updated() {
+        let db = create_test_db();
+        
+        db.set_last_updated("2025-01-17T12:00:00Z").unwrap();
+        // Just verify it doesn't error - metadata retrieval would need Schema::get_metadata
+    }
+
+    #[test]
+    fn test_license_not_found() {
+        let db = create_test_db();
+        
+        let license = db.get_license_by_callsign("NOTEXIST").unwrap();
+        assert!(license.is_none());
+    }
+
+    #[test]
+    fn test_transaction_rollback() {
+        let db = create_test_db();
+        
+        let tx = db.begin_transaction().unwrap();
+        let header = create_test_header();
+        tx.insert_record(&UlsRecord::Header(header)).unwrap();
+        tx.rollback().unwrap();
+
+        // Should not be found after rollback
+        let license = db.get_license_by_callsign("W1TEST").unwrap();
+        assert!(license.is_none());
+    }
 }
+
