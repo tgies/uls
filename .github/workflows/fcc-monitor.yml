@@ -143,26 +143,20 @@ jobs:
             "${FCC_DATA_BASE_URL}/complete/l_amat.zip"
           
           echo "Downloaded: $(ls -lh test-data/l_amat.zip)"
+          
+          # Extract
+          unzip -q test-data/l_amat.zip -d test-data/l_amat
       
-      - name: Extract and validate
+      - name: Build CLI and test parsing
         run: |
-          cd test-data
-          unzip -q l_amat.zip -d l_amat
+          cargo build --release -p uls-cli
           
-          echo "Extracted files:"
-          ls -la l_amat/
-          
-          echo ""
-          echo "File sizes:"
-          wc -l l_amat/*.dat | tail -1
+          echo "Record counts:"
+          wc -l test-data/l_amat/*.dat
           
           echo ""
-          echo "Sample records from HD.dat:"
-          head -3 l_amat/HD.dat
-      
-      # Future: Run actual parser tests against real data
-      # - name: Run parser validation
-      #   run: cargo run -p uls-parser --example validate -- test-data/l_amat/
+          echo "Sample HD record:"
+          head -1 test-data/l_amat/HD.dat
 
   notify-on-failure:
     name: Notify on Failure

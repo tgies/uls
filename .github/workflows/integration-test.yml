@@ -12,18 +12,15 @@ on:
         options:
           - full
           - quick
-          - consistency
         default: quick
 
 env:
-  FCC_DATA_BASE_URL: "https://data.fcc.gov/download/pub/uls"
   CARGO_TERM_COLOR: always
 
 jobs:
   quick-integration:
     name: Quick Integration Test
     runs-on: ubuntu-latest
-    if: github.event.inputs.test_type != 'consistency'
     steps:
       - uses: actions/checkout@v4
       
@@ -41,29 +38,13 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-integration-
       
-      - name: Build all crates
-        run: cargo build --release --all
+      - name: Build CLI
+        run: cargo build --release -p uls-cli
       
-      - name: Download amateur license data
-        run: |
-          mkdir -p test-data
-          curl -sS -o test-data/l_amat.zip \
-            -H "User-Agent: ULS-CLI-Integration/1.0" \
-            "${FCC_DATA_BASE_URL}/complete/l_amat.zip"
-          
-          unzip -q test-data/l_amat.zip -d test-data/l_amat
-      
-      - name: Run parser on real data
-        run: |
-          # Count records per file type
-          for dat in test-data/l_amat/*.dat; do
-            echo "$(basename $dat): $(wc -l < "$dat") records"
-          done
-      
-      - name: Validate parsing
-        run: cargo test --release -p uls-parser -- --ignored 2>/dev/null || echo "No integration tests yet"
+      - name: Run unit tests
+        run: cargo test --all --verbose
 
-  database-build:
+  full-database-build:
     name: Full Database Build Test
     runs-on: ubuntu-latest
     if: github.event.inputs.test_type == 'full' || github.event_name == 'schedule'
@@ -85,68 +66,22 @@ jobs:
       - name: Build CLI
         run: cargo build --release -p uls-cli
       
-      - name: Download all amateur data
+      - name: Download and import amateur data
         run: |
-          mkdir -p test-data/{complete,daily}
-          
-          # Weekly database
-          curl -sS -o test-data/complete/l_amat.zip \
-            "${FCC_DATA_BASE_URL}/complete/l_amat.zip"
-          
-          # Daily updates (may not all exist)
-          for day in mon tue wed thu fri sat; do
-            curl -sS -o "test-data/daily/l_am_${day}.zip" \
-              "${FCC_DATA_BASE_URL}/daily/l_am_${day}.zip" 2>/dev/null || true
-          done
-          
-          ls -la test-data/complete/
-          ls -la test-data/daily/
+          ./target/release/uls update --service amateur
       
-      - name: Build database from weekly
+      - name: Verify database stats
         run: |
-          # Future: Run actual CLI command
-          # ./target/release/uls update --source test-data/complete/l_amat.zip --db test-data/uls.db
-          echo "Database build test placeholder"
+          ./target/release/uls stats
       
-      - name: Run lookup tests
+      - name: Test callsign lookup
         run: |
-          # Future: Test lookups
-          # ./target/release/uls lookup W1AW --db test-data/uls.db
-          echo "Lookup test placeholder"
-
-  consistency-check:
-    name: Database Consistency Test
-    runs-on: ubuntu-latest
-    if: github.event.inputs.test_type == 'consistency'
-    steps:
-      - uses: actions/checkout@v4
+          ./target/release/uls lookup W1AW --format json
       
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-      
-      - name: Build CLI
-        run: cargo build --release -p uls-cli
-      
-      - name: Download this week's and last week's data
+      - name: Test FRN lookup
         run: |
-          mkdir -p test-data/{current,previous}
-          
-          # Current weekly
-          curl -sS -o test-data/current/l_amat.zip \
-            "${FCC_DATA_BASE_URL}/complete/l_amat.zip"
-          
-          # Note: FCC doesn't keep historical weeklies, so this test
-          # would need to use cached data from a previous run
-          echo "Consistency check requires cached previous week data"
-      
-      - name: Compare databases
-        run: |
-          # Future: Build two databases and compare key metrics
-          # - Total license count
-          # - License status distribution
-          # - New licenses this week
-          # - Expired licenses
-          echo "Consistency check placeholder"
+          # Look up ARRL's FRN
+          ./target/release/uls frn 0001387578 --format json
 
   report:
     name: Generate Report
