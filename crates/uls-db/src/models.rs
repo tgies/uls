@@ -193,4 +193,122 @@ mod tests {
         assert_eq!(license.operator_class_description(), Some("Amateur Extra"));
         assert!(license.is_active());
     }
+
+    #[test]
+    fn test_status_description_all_variants() {
+        let mut license = License {
+            unique_system_identifier: 1,
+            call_sign: "W1AW".to_string(),
+            licensee_name: "Test".to_string(),
+            first_name: None,
+            middle_initial: None,
+            last_name: None,
+            status: 'A',
+            radio_service: "HA".to_string(),
+            grant_date: None,
+            expired_date: None,
+            cancellation_date: None,
+            frn: None,
+            street_address: None,
+            city: None,
+            state: None,
+            zip_code: None,
+            operator_class: None,
+            previous_call_sign: None,
+        };
+
+        assert_eq!(license.status_description(), "Active");
+        
+        license.status = 'C';
+        assert_eq!(license.status_description(), "Cancelled");
+        
+        license.status = 'E';
+        assert_eq!(license.status_description(), "Expired");
+        
+        license.status = 'L';
+        assert_eq!(license.status_description(), "Pending Legal Status");
+        
+        license.status = 'P';
+        assert_eq!(license.status_description(), "Parent Station Cancelled");
+        
+        license.status = 'T';
+        assert_eq!(license.status_description(), "Terminated");
+        
+        license.status = 'X';
+        assert_eq!(license.status_description(), "Term Pending");
+        
+        license.status = 'Z';
+        assert_eq!(license.status_description(), "Unknown");
+    }
+
+    #[test]
+    fn test_operator_class_all_variants() {
+        let mut license = License {
+            unique_system_identifier: 1,
+            call_sign: "W1AW".to_string(),
+            licensee_name: "Test".to_string(),
+            first_name: None,
+            middle_initial: None,
+            last_name: None,
+            status: 'A',
+            radio_service: "HA".to_string(),
+            grant_date: None,
+            expired_date: None,
+            cancellation_date: None,
+            frn: None,
+            street_address: None,
+            city: None,
+            state: None,
+            zip_code: None,
+            operator_class: Some('T'),
+            previous_call_sign: None,
+        };
+
+        assert_eq!(license.operator_class_description(), Some("Technician"));
+        
+        license.operator_class = Some('G');
+        assert_eq!(license.operator_class_description(), Some("General"));
+        
+        license.operator_class = Some('A');
+        assert_eq!(license.operator_class_description(), Some("Advanced"));
+        
+        license.operator_class = Some('N');
+        assert_eq!(license.operator_class_description(), Some("Novice"));
+        
+        license.operator_class = Some('P');
+        assert_eq!(license.operator_class_description(), Some("Technician Plus"));
+        
+        license.operator_class = Some('Z');
+        assert_eq!(license.operator_class_description(), Some("Unknown"));
+        
+        license.operator_class = None;
+        assert_eq!(license.operator_class_description(), None);
+    }
+
+    #[test]
+    fn test_display_name_without_middle_initial() {
+        let license = License {
+            unique_system_identifier: 1,
+            call_sign: "W1AW".to_string(),
+            licensee_name: "ARRL".to_string(),
+            first_name: Some("John".to_string()),
+            middle_initial: None,
+            last_name: Some("Doe".to_string()),
+            status: 'A',
+            radio_service: "HA".to_string(),
+            grant_date: None,
+            expired_date: None,
+            cancellation_date: None,
+            frn: None,
+            street_address: None,
+            city: None,
+            state: None,
+            zip_code: None,
+            operator_class: None,
+            previous_call_sign: None,
+        };
+
+        assert_eq!(license.display_name(), "John Doe");
+    }
 }
+
