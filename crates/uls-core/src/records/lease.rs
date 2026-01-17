@@ -22,3 +22,19 @@ impl LeaseRecord {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_lease_from_fields() {
+        let fields = vec!["LC", "12345", "ULS123", "EBF456", "W1TEST", "LEASE001"];
+        let lc = LeaseRecord::from_fields(&fields);
+        
+        assert_eq!(lc.unique_system_identifier, 12345);
+        assert_eq!(lc.call_sign, Some("W1TEST".to_string()));
+        assert_eq!(lc.lease_id, Some("LEASE001".to_string()));
+    }
+}
+

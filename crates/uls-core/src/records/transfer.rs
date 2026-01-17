@@ -30,3 +30,20 @@ impl TransferRecord {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_transfer_from_fields() {
+        let fields = vec!["TA", "12345", "ULS123", "EBF456", "Y", "Y", "", "", "V"];
+        let ta = TransferRecord::from_fields(&fields);
+        
+        assert_eq!(ta.unique_system_identifier, 12345);
+        assert_eq!(ta.pro_forma, Some('Y'));
+        assert_eq!(ta.full_assignment, Some('Y'));
+        assert_eq!(ta.voluntary_involuntary, Some('V'));
+    }
+}
+

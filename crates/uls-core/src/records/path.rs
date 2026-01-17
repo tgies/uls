@@ -40,3 +40,21 @@ impl PathRecord {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_path_from_fields() {
+        let fields = vec!["PA", "12345", "ULS123", "EBF456", "W1TEST", "A", "1", "1", "2", "2", "3", "MICROWAVE", "N", "US", "W2TEST"];
+        let pa = PathRecord::from_fields(&fields);
+        
+        assert_eq!(pa.unique_system_identifier, 12345);
+        assert_eq!(pa.callsign, Some("W1TEST".to_string()));
+        assert_eq!(pa.path_number, Some(1));
+        assert_eq!(pa.path_type_desc, Some("MICROWAVE".to_string()));
+        assert_eq!(pa.receiver_callsign, Some("W2TEST".to_string()));
+    }
+}
+
