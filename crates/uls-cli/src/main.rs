@@ -33,6 +33,10 @@ struct Cli {
     /// Callsign for quick lookup (shorthand for 'uls lookup <CALLSIGN>')
     #[arg(value_name = "CALLSIGN")]
     callsign: Option<String>,
+
+    /// Also show licenses from other services for the same FRN (with shorthand lookup)
+    #[arg(short, long)]
+    all: bool,
 }
 
 #[derive(Subcommand)]
@@ -207,7 +211,7 @@ async fn main() -> Result<()> {
             // No subcommand - check for quick callsign lookup
             if let Some(callsign) = cli.callsign {
                 if looks_like_callsign(&callsign) {
-                    commands::lookup::execute(&callsign, "amateur", false, &cli.format).await
+                    commands::lookup::execute(&callsign, "amateur", cli.all, &cli.format).await
                 } else {
                     eprintln!("Unknown command or invalid callsign: {}", callsign);
                     eprintln!("Run 'uls --help' for usage information.");

@@ -394,5 +394,51 @@ mod tests {
     fn test_csv_escape_newline() {
         assert_eq!(csv_escape("with\nnewline"), "\"with\nnewline\"");
     }
+
+    // ==========================================================================
+    // JSON output validation tests
+    // ==========================================================================
+
+    #[test]
+    fn test_json_format_is_valid_json() {
+        let license = test_license();
+        let output = license.format(OutputFormat::Json);
+        let parsed: serde_json::Result<serde_json::Value> = serde_json::from_str(&output);
+        assert!(parsed.is_ok(), "JSON output should be valid JSON: {}", output);
+    }
+
+    #[test]
+    fn test_json_pretty_format_is_valid_json() {
+        let license = test_license();
+        let output = license.format(OutputFormat::JsonPretty);
+        let parsed: serde_json::Result<serde_json::Value> = serde_json::from_str(&output);
+        assert!(parsed.is_ok(), "JSON-pretty output should be valid JSON: {}", output);
+    }
+
+    #[test]
+    fn test_vec_json_format_is_valid_json_array() {
+        let licenses = vec![test_license(), test_license()];
+        let output = licenses.format(OutputFormat::Json);
+        let parsed: serde_json::Result<Vec<serde_json::Value>> = serde_json::from_str(&output);
+        assert!(parsed.is_ok(), "Vec JSON output should be valid JSON array: {}", output);
+        assert_eq!(parsed.unwrap().len(), 2);
+    }
+
+    #[test]
+    fn test_vec_json_pretty_format_is_valid_json_array() {
+        let licenses = vec![test_license()];
+        let output = licenses.format(OutputFormat::JsonPretty);
+        let parsed: serde_json::Result<Vec<serde_json::Value>> = serde_json::from_str(&output);
+        assert!(parsed.is_ok(), "Vec JSON-pretty output should be valid JSON array: {}", output);
+    }
+
+    #[test]
+    fn test_empty_vec_json_format_is_valid_json() {
+        let licenses: Vec<License> = vec![];
+        let output = licenses.format(OutputFormat::Json);
+        let parsed: serde_json::Result<Vec<serde_json::Value>> = serde_json::from_str(&output);
+        assert!(parsed.is_ok(), "Empty vec JSON should be valid: {}", output);
+        assert_eq!(parsed.unwrap().len(), 0);
+    }
 }
 

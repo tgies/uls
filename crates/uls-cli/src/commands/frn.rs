@@ -24,16 +24,8 @@ pub async fn execute(frn: &str, service_override: &str, format: &str) -> Result<
         std::process::exit(1);
     }
     
-    // Print header with FRN info
-    println!("FRN {} - {} license(s):\n", frn, licenses.len());
-    
-    // Print each license
-    for (i, license) in licenses.iter().enumerate() {
-        if i > 0 {
-            println!("---");
-        }
-        println!("{}", license.format(output_format));
-    }
+    // Output all licenses using FormatOutput (handles JSON properly)
+    println!("{}", licenses.format(output_format));
     
     Ok(())
 }

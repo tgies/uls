@@ -62,17 +62,18 @@ pub async fn execute(callsign: &str, service_override: &str, all_services: bool,
     // Now query by FRN - this will find all licenses across all services in the single DB
     let db = auto_update::ensure_data_available(primary_service).await?;
     let engine = QueryEngine::with_database(db);
-    let all_licenses = engine.lookup_by_frn(&frn)?;
+    let mut all_licenses = engine.lookup_by_frn(&frn)?;
 
-    // Output all licenses (matching frn command format)
-    println!("FRN {} - {} license(s):\n", frn, all_licenses.len());
-    
-    for (i, license) in all_licenses.iter().enumerate() {
-        if i > 0 {
-            println!("---");
-        }
-        println!("{}", license.format(output_format));
-    }
+    // Ensure the originally looked-up callsign appears first
+    let callsign_upper = callsign.to_uppercase();
+    all_licenses.sort_by(|a, b| {
+        let a_is_primary = a.call_sign.to_uppercase() == callsign_upper;
+        let b_is_primary = b.call_sign.to_uppercase() == callsign_upper;
+        b_is_primary.cmp(&a_is_primary) // true sorts before false
+    });
+
+    // Output all licenses using FormatOutput (handles JSON properly)
+    println!("{}", all_licenses.format(output_format));
 
     Ok(())
 }
