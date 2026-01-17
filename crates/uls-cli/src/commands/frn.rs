@@ -3,20 +3,18 @@
 use anyhow::{Context, Result};
 use uls_query::{FormatOutput, OutputFormat, QueryEngine};
 
-/// Get the default database path.
-fn default_db_path() -> std::path::PathBuf {
-    dirs::data_local_dir()
-        .unwrap_or_else(|| std::path::PathBuf::from("."))
-        .join("uls")
-        .join("uls.db")
-}
+use super::auto_update;
 
 pub async fn execute(frn: &str, format: &str) -> Result<()> {
-    let db_path = default_db_path();
+    // Default to amateur service for FRN lookups
+    let service = auto_update::service_name_to_code("amateur")
+        .expect("amateur is a valid service");
     
-    let engine = QueryEngine::open(&db_path)
-        .context("Failed to open database. Run 'uls update' first to initialize.")?;
+    // Ensure data is available, auto-download if needed
+    let db = auto_update::ensure_data_available(service).await
+        .context("Failed to ensure data is available")?;
 
+    let engine = QueryEngine::with_database(db);
     let output_format = OutputFormat::from_str(format).unwrap_or_default();
     
     let licenses = engine.lookup_by_frn(frn)?;
