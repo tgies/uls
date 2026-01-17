@@ -9,6 +9,7 @@ use std::time::Instant;
 use tracing::{info, warn};
 use uls_parser::archive::ZipExtractor;
 
+use crate::bulk_inserter::BulkInserter;
 use crate::{Database, Result};
 
 /// Statistics from an import operation.
@@ -76,7 +77,7 @@ impl<'a> Importer<'a> {
     /// 1. Opens the ZIP file
     /// 2. Sorts DAT files by dependency order (HD first, then EN, AM, etc.)
     /// 3. Streams records through the parser
-    /// 4. Bulk inserts into the database
+    /// 4. Bulk inserts into the database using prepared statements
     ///
     /// # Arguments
     /// * `zip_path` - Path to the FCC ZIP file
@@ -109,17 +110,19 @@ impl<'a> Importer<'a> {
         info!("Processing {} DAT files: {:?}", dat_files.len(), dat_files);
         
         // Optimize SQLite for bulk import
-        {
-            let conn = self.db.conn()?;
-            conn.execute_batch(
-                "PRAGMA synchronous = OFF;
-                 PRAGMA journal_mode = MEMORY;
-                 PRAGMA temp_store = MEMORY;
-                 PRAGMA cache_size = -64000;"
-            )?;
-        }
+        let conn = self.db.conn()?;
+        conn.execute_batch(
+            "PRAGMA synchronous = OFF;
+             PRAGMA journal_mode = MEMORY;
+             PRAGMA temp_store = MEMORY;
+             PRAGMA cache_size = -64000;"
+        )?;
         
-        let tx = self.db.begin_transaction()?;
+        // Begin transaction
+        conn.execute("BEGIN TRANSACTION", [])?;
+        
+        // Create bulk inserter with prepared statements (statements compiled ONCE)
+        let mut inserter = BulkInserter::new(&conn)?;
         
         let mut stats = ImportStats {
             files: dat_files.len(),
@@ -134,7 +137,7 @@ impl<'a> Importer<'a> {
             extractor.process_dat_streaming(dat_file, |line| {
                 match line.to_record() {
                     Ok(record) => {
-                        if let Err(e) = tx.insert_record(&record) {
+                        if let Err(e) = inserter.insert(&record) {
                             file_insert_errors += 1;
                             if file_insert_errors <= 5 {
                                 warn!("Insert error in {}: {}", dat_file, e);
@@ -189,16 +192,17 @@ impl<'a> Importer<'a> {
             }
         }
         
-        tx.commit()?;
+        // Drop inserter to release statement borrows before commit
+        drop(inserter);
+        
+        // Commit transaction
+        conn.execute("COMMIT", [])?;
         
         // Reset SQLite settings
-        {
-            let conn = self.db.conn()?;
-            conn.execute_batch(
-                "PRAGMA synchronous = NORMAL;
-                 PRAGMA journal_mode = WAL;"
-            )?;
-        }
+        conn.execute_batch(
+            "PRAGMA synchronous = NORMAL;
+             PRAGMA journal_mode = WAL;"
+        )?;
         
         stats.duration_secs = start.elapsed().as_secs_f64();
         

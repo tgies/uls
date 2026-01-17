@@ -135,171 +135,159 @@ impl Database {
 
     /// Insert a header record.
     fn insert_header(conn: &Connection, hd: &HeaderRecord) -> Result<()> {
-        conn.execute(
-            r#"
-            INSERT OR REPLACE INTO licenses (
+        let mut stmt = conn.prepare_cached(
+            r#"INSERT OR REPLACE INTO licenses (
                 unique_system_identifier, uls_file_number, ebf_number, call_sign,
                 license_status, radio_service_code, grant_date, expired_date,
                 cancellation_date, effective_date, last_action_date
-            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)
-            "#,
-            params![
-                hd.unique_system_identifier,
-                hd.uls_file_number,
-                hd.ebf_number,
-                hd.call_sign,
-                hd.license_status.map(|c| c.to_string()),
-                hd.radio_service_code,
-                hd.grant_date.map(|d| d.to_string()),
-                hd.expired_date.map(|d| d.to_string()),
-                hd.cancellation_date.map(|d| d.to_string()),
-                hd.effective_date.map(|d| d.to_string()),
-                hd.last_action_date.map(|d| d.to_string()),
-            ],
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)"#,
         )?;
+        stmt.execute(params![
+            hd.unique_system_identifier,
+            hd.uls_file_number,
+            hd.ebf_number,
+            hd.call_sign,
+            hd.license_status.map(|c| c.to_string()),
+            hd.radio_service_code,
+            hd.grant_date.map(|d| d.to_string()),
+            hd.expired_date.map(|d| d.to_string()),
+            hd.cancellation_date.map(|d| d.to_string()),
+            hd.effective_date.map(|d| d.to_string()),
+            hd.last_action_date.map(|d| d.to_string()),
+        ])?;
         Ok(())
     }
 
     /// Insert an entity record.
     fn insert_entity(conn: &Connection, en: &EntityRecord) -> Result<()> {
-        conn.execute(
-            r#"
-            INSERT OR REPLACE INTO entities (
+        let mut stmt = conn.prepare_cached(
+            r#"INSERT OR REPLACE INTO entities (
                 unique_system_identifier, uls_file_number, ebf_number, call_sign,
                 entity_type, licensee_id, entity_name, first_name, middle_initial,
                 last_name, suffix, phone, fax, email, street_address, city, state,
                 zip_code, po_box, attention_line, sgin, frn, applicant_type_code,
                 status_code, status_date
-            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25)
-            "#,
-            params![
-                en.unique_system_identifier,
-                en.uls_file_number,
-                en.ebf_number,
-                en.call_sign,
-                en.entity_type,
-                en.licensee_id,
-                en.entity_name,
-                en.first_name,
-                en.mi.map(|c| c.to_string()),
-                en.last_name,
-                en.suffix,
-                en.phone,
-                en.fax,
-                en.email,
-                en.street_address,
-                en.city,
-                en.state,
-                en.zip_code,
-                en.po_box,
-                en.attention_line,
-                en.sgin,
-                en.frn,
-                en.applicant_type_code.map(|c| c.to_string()),
-                en.status_code.map(|c| c.to_string()),
-                en.status_date,
-            ],
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25)"#,
         )?;
+        stmt.execute(params![
+            en.unique_system_identifier,
+            en.uls_file_number,
+            en.ebf_number,
+            en.call_sign,
+            en.entity_type,
+            en.licensee_id,
+            en.entity_name,
+            en.first_name,
+            en.mi.map(|c| c.to_string()),
+            en.last_name,
+            en.suffix,
+            en.phone,
+            en.fax,
+            en.email,
+            en.street_address,
+            en.city,
+            en.state,
+            en.zip_code,
+            en.po_box,
+            en.attention_line,
+            en.sgin,
+            en.frn,
+            en.applicant_type_code.map(|c| c.to_string()),
+            en.status_code.map(|c| c.to_string()),
+            en.status_date,
+        ])?;
         Ok(())
     }
 
     /// Insert an amateur record.
     fn insert_amateur(conn: &Connection, am: &AmateurRecord) -> Result<()> {
-        conn.execute(
-            r#"
-            INSERT OR REPLACE INTO amateur_operators (
+        let mut stmt = conn.prepare_cached(
+            r#"INSERT OR REPLACE INTO amateur_operators (
                 unique_system_identifier, uls_file_number, ebf_number, call_sign,
                 operator_class, group_code, region_code, trustee_call_sign,
                 trustee_indicator, physician_certification, ve_signature,
                 systematic_call_sign_change, vanity_call_sign_change,
                 vanity_relationship, previous_call_sign, previous_operator_class,
                 trustee_name
-            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17)
-            "#,
-            params![
-                am.unique_system_identifier,
-                am.uls_file_num,
-                am.ebf_number,
-                am.callsign,
-                am.operator_class.map(|c| c.to_string()),
-                am.group_code.map(|c| c.to_string()),
-                am.region_code,
-                am.trustee_callsign,
-                am.trustee_indicator.map(|c| c.to_string()),
-                am.physician_certification.map(|c| c.to_string()),
-                am.ve_signature.map(|c| c.to_string()),
-                am.systematic_callsign_change.map(|c| c.to_string()),
-                am.vanity_callsign_change.map(|c| c.to_string()),
-                am.vanity_relationship,
-                am.previous_callsign,
-                am.previous_operator_class.map(|c| c.to_string()),
-                am.trustee_name,
-            ],
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17)"#,
         )?;
+        stmt.execute(params![
+            am.unique_system_identifier,
+            am.uls_file_num,
+            am.ebf_number,
+            am.callsign,
+            am.operator_class.map(|c| c.to_string()),
+            am.group_code.map(|c| c.to_string()),
+            am.region_code,
+            am.trustee_callsign,
+            am.trustee_indicator.map(|c| c.to_string()),
+            am.physician_certification.map(|c| c.to_string()),
+            am.ve_signature.map(|c| c.to_string()),
+            am.systematic_callsign_change.map(|c| c.to_string()),
+            am.vanity_callsign_change.map(|c| c.to_string()),
+            am.vanity_relationship,
+            am.previous_callsign,
+            am.previous_operator_class.map(|c| c.to_string()),
+            am.trustee_name,
+        ])?;
         Ok(())
     }
 
     /// Insert a history record.
     fn insert_history(conn: &Connection, hs: &HistoryRecord) -> Result<()> {
-        conn.execute(
-            r#"
-            INSERT OR REPLACE INTO history (
+        let mut stmt = conn.prepare_cached(
+            r#"INSERT OR REPLACE INTO history (
                 unique_system_identifier, uls_file_number, callsign, log_date, code
-            ) VALUES (?1, ?2, ?3, ?4, ?5)
-            "#,
-            params![
-                hs.unique_system_identifier,
-                hs.uls_file_number,
-                hs.callsign,
-                hs.log_date,
-                hs.code,
-            ],
+            ) VALUES (?1, ?2, ?3, ?4, ?5)"#,
         )?;
+        stmt.execute(params![
+            hs.unique_system_identifier,
+            hs.uls_file_number,
+            hs.callsign,
+            hs.log_date,
+            hs.code,
+        ])?;
         Ok(())
     }
 
     /// Insert a comment record.
     fn insert_comment(conn: &Connection, co: &CommentRecord) -> Result<()> {
-        conn.execute(
-            r#"
-            INSERT OR REPLACE INTO comments (
+        let mut stmt = conn.prepare_cached(
+            r#"INSERT OR REPLACE INTO comments (
                 unique_system_identifier, uls_file_number, callsign, comment_date,
                 description, status_code, status_date
-            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
-            "#,
-            params![
-                co.unique_system_identifier,
-                co.uls_file_num,
-                co.callsign,
-                co.comment_date,
-                co.description,
-                co.status_code.map(|c| c.to_string()),
-                co.status_date,
-            ],
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)"#,
         )?;
+        stmt.execute(params![
+            co.unique_system_identifier,
+            co.uls_file_num,
+            co.callsign,
+            co.comment_date,
+            co.description,
+            co.status_code.map(|c| c.to_string()),
+            co.status_date,
+        ])?;
         Ok(())
     }
 
     /// Insert a special condition record.
     fn insert_special_condition(conn: &Connection, sc: &SpecialConditionRecord) -> Result<()> {
-        conn.execute(
-            r#"
-            INSERT OR REPLACE INTO special_conditions (
+        let mut stmt = conn.prepare_cached(
+            r#"INSERT OR REPLACE INTO special_conditions (
                 unique_system_identifier, uls_file_number, ebf_number, callsign,
                 special_condition_type, special_condition_code, status_code, status_date
-            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
-            "#,
-            params![
-                sc.unique_system_identifier,
-                sc.uls_file_number,
-                sc.ebf_number,
-                sc.callsign,
-                sc.special_condition_type.map(|c| c.to_string()),
-                sc.special_condition_code,
-                sc.status_code.map(|c| c.to_string()),
-                sc.status_date,
-            ],
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)"#,
         )?;
+        stmt.execute(params![
+            sc.unique_system_identifier,
+            sc.uls_file_number,
+            sc.ebf_number,
+            sc.callsign,
+            sc.special_condition_type.map(|c| c.to_string()),
+            sc.special_condition_code,
+            sc.status_code.map(|c| c.to_string()),
+            sc.status_date,
+        ])?;
         Ok(())
     }
 
