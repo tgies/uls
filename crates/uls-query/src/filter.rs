@@ -2,6 +2,69 @@
 
 use serde::{Deserialize, Serialize};
 
+/// Result of analyzing a search pattern for wildcards.
+#[derive(Debug, Clone, PartialEq)]
+enum MatchPattern {
+    /// Exact match (no wildcards)
+    Exact(String),
+    /// Pattern match using SQL LIKE
+    Like(String),
+}
+
+impl MatchPattern {
+    /// Analyze a search term and determine the matching strategy.
+    /// 
+    /// Wildcards:
+    /// - `*` matches any sequence of characters
+    /// - `?` matches exactly one character
+    /// 
+    /// Examples:
+    /// - `SMITH` → Exact match
+    /// - `SMITH*` → Prefix match (`SMITH%`)
+    /// - `*SMITH` → Suffix match (`%SMITH`)
+    /// - `*SMITH*` → Contains match (`%SMITH%`)
+    /// - `SM?TH` → Single-char wildcard (`SM_TH`)
+    fn from_search_term(term: &str) -> Self {
+        if term.contains('*') || term.contains('?') {
+            let pattern = term.replace('*', "%").replace('?', "_");
+            MatchPattern::Like(pattern)
+        } else {
+            MatchPattern::Exact(term.to_string())
+        }
+    }
+}
+
+/// Generate a SQL condition and parameter for a text field match.
+/// 
+/// Returns (condition_string, parameters).
+fn text_match_condition(column: &str, value: &str) -> (String, Vec<String>) {
+    match MatchPattern::from_search_term(value) {
+        MatchPattern::Exact(v) => {
+            (format!("{} = ?", column), vec![v])
+        }
+        MatchPattern::Like(pattern) => {
+            (format!("{} LIKE ?", column), vec![pattern])
+        }
+    }
+}
+
+/// Generate SQL condition for matching across multiple columns (OR).
+/// 
+/// Useful for name searches that span entity_name, first_name, last_name.
+fn multi_column_match_condition(columns: &[&str], value: &str) -> (String, Vec<String>) {
+    let pattern = MatchPattern::from_search_term(value);
+    
+    let (conditions, params): (Vec<_>, Vec<_>) = columns
+        .iter()
+        .map(|col| match &pattern {
+            MatchPattern::Exact(v) => (format!("{} = ?", col), v.clone()),
+            MatchPattern::Like(p) => (format!("{} LIKE ?", col), p.clone()),
+        })
+        .unzip();
+    
+    (format!("({})", conditions.join(" OR ")), params)
+}
+
 /// Filter criteria for license searches.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct SearchFilter {
@@ -106,39 +169,47 @@ impl SearchFilter {
         let mut conditions = Vec::new();
         let mut params = Vec::new();
 
+        // Callsign - exact or wildcard match
         if let Some(ref callsign) = self.callsign {
-            if callsign.contains('*') || callsign.contains('?') {
-                // Wildcard search
-                let pattern = callsign.replace('*', "%").replace('?', "_");
-                conditions.push("l.call_sign LIKE ?".to_string());
-                params.push(pattern);
-            } else {
-                conditions.push("l.call_sign = ?".to_string());
-                params.push(callsign.clone());
-            }
+            let (cond, p) = text_match_condition("l.call_sign", callsign);
+            conditions.push(cond);
+            params.extend(p);
         }
 
+        // Name - search across entity_name, first_name, last_name
         if let Some(ref name) = self.name {
-            conditions.push("(e.entity_name LIKE ? OR e.first_name LIKE ? OR e.last_name LIKE ?)".to_string());
-            let pattern = format!("%{}%", name);
-            params.push(pattern.clone());
-            params.push(pattern.clone());
-            params.push(pattern);
+            let (cond, p) = multi_column_match_condition(
+                &["e.entity_name", "e.first_name", "e.last_name"],
+                name,
+            );
+            conditions.push(cond);
+            params.extend(p);
         }
 
+        // City - exact or wildcard match
         if let Some(ref city) = self.city {
-            conditions.push("e.city LIKE ?".to_string());
-            params.push(format!("%{}%", city));
+            let (cond, p) = text_match_condition("e.city", city);
+            conditions.push(cond);
+            params.extend(p);
         }
 
+        // State - always exact match (2-letter code)
         if let Some(ref state) = self.state {
             conditions.push("e.state = ?".to_string());
             params.push(state.clone());
         }
 
+        // ZIP - prefix match by default (allows 5-digit or 9-digit)
         if let Some(ref zip) = self.zip_code {
-            conditions.push("e.zip_code LIKE ?".to_string());
-            params.push(format!("{}%", zip));
+            // If no wildcards, treat as prefix search
+            let value = if zip.contains('*') || zip.contains('?') {
+                zip.clone()
+            } else {
+                format!("{}*", zip)
+            };
+            let (cond, p) = text_match_condition("e.zip_code", &value);
+            conditions.push(cond);
+            params.extend(p);
         }
 
         if let Some(status) = self.status {
@@ -279,7 +350,8 @@ mod tests {
 
     #[test]
     fn test_location_filter() {
-        let filter = SearchFilter::location(Some("NEWINGTON".to_string()), Some("CT".to_string()));
+        // Use wildcards for contains match
+        let filter = SearchFilter::location(Some("*NEWINGTON*".to_string()), Some("CT".to_string()));
         let (clause, params) = filter.to_where_clause();
         assert!(clause.contains("city"));
         assert!(clause.contains("state"));
@@ -351,5 +423,68 @@ mod tests {
         assert!(clause.contains("LIKE"));
         assert_eq!(params, vec!["W1A_"]);
     }
+
+    #[test]
+    fn test_match_pattern_exact() {
+        let pattern = MatchPattern::from_search_term("SMITH");
+        assert_eq!(pattern, MatchPattern::Exact("SMITH".to_string()));
+    }
+
+    #[test]
+    fn test_match_pattern_prefix() {
+        let pattern = MatchPattern::from_search_term("SMITH*");
+        assert_eq!(pattern, MatchPattern::Like("SMITH%".to_string()));
+    }
+
+    #[test]
+    fn test_match_pattern_suffix() {
+        let pattern = MatchPattern::from_search_term("*SMITH");
+        assert_eq!(pattern, MatchPattern::Like("%SMITH".to_string()));
+    }
+
+    #[test]
+    fn test_match_pattern_contains() {
+        let pattern = MatchPattern::from_search_term("*SMITH*");
+        assert_eq!(pattern, MatchPattern::Like("%SMITH%".to_string()));
+    }
+
+    #[test]
+    fn test_text_match_condition_exact() {
+        let (cond, params) = text_match_condition("name", "SMITH");
+        assert_eq!(cond, "name = ?");
+        assert_eq!(params, vec!["SMITH"]);
+    }
+
+    #[test]
+    fn test_text_match_condition_like() {
+        let (cond, params) = text_match_condition("name", "SMITH*");
+        assert_eq!(cond, "name LIKE ?");
+        assert_eq!(params, vec!["SMITH%"]);
+    }
+
+    #[test]
+    fn test_multi_column_match_exact() {
+        let (cond, params) = multi_column_match_condition(&["a", "b", "c"], "VALUE");
+        assert_eq!(cond, "(a = ? OR b = ? OR c = ?)");
+        assert_eq!(params, vec!["VALUE", "VALUE", "VALUE"]);
+    }
+
+    #[test]
+    fn test_multi_column_match_like() {
+        let (cond, params) = multi_column_match_condition(&["a", "b"], "*VALUE*");
+        assert_eq!(cond, "(a LIKE ? OR b LIKE ?)");
+        assert_eq!(params, vec!["%VALUE%", "%VALUE%"]);
+    }
+
+    #[test]
+    fn test_exact_city_match() {
+        // No wildcards = exact match
+        let mut filter = SearchFilter::new();
+        filter.city = Some("NEWINGTON".to_string());
+        let (clause, params) = filter.to_where_clause();
+        assert!(clause.contains("city = ?"));
+        assert_eq!(params, vec!["NEWINGTON"]);
+    }
 }
+
 
