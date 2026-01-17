@@ -1,0 +1,8 @@
+[profile.default]
+# Retry failed tests once to handle flaky tests
+retries = 1
+
+[profile.ci]
+# CI profile with JUnit output
+retries = 2
+fail-fast = false

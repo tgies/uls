@@ -54,8 +54,14 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-
       
-      - name: Run tests
-        run: cargo test --all --verbose
+      - name: Install cargo-nextest
+        uses: taiki-e/install-action@nextest
+      
+      - name: Run tests with nextest
+        run: cargo nextest run --all
+      
+      - name: Run doctests
+        run: cargo test --doc
 
   clippy:
     name: Clippy
@@ -104,6 +110,8 @@ jobs:
       
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
+        with:
+          components: llvm-tools-preview
       
       - name: Cache cargo registry
         uses: actions/cache@v4
@@ -116,16 +124,18 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-coverage-
       
-      - name: Install cargo-tarpaulin
-        run: cargo install cargo-tarpaulin
+      - name: Install cargo-llvm-cov and cargo-nextest
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-llvm-cov,cargo-nextest
       
       - name: Generate coverage report
-        run: cargo tarpaulin --all --out Xml --output-dir coverage
+        run: cargo llvm-cov nextest --all-features --workspace --lcov --output-path lcov.info
       
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
         with:
-          files: coverage/cobertura.xml
+          files: lcov.info
           fail_ci_if_error: false
           verbose: true
 
