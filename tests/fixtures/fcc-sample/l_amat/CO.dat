@@ -1,0 +1,8 @@
+CO|331233||W0GG|02/10/2006|Test comment for fixture data.||
+CO|833165||WK9FDB|07/17/2001|Test comment for fixture data.||
+CO|3101744||N5RF|07/31/2009|Test comment for fixture data.||
+CO|3415234||AE4SXQ|08/16/2014|Test comment for fixture data.||
+CO|3692264||N5HF|12/04/2015|Test comment for fixture data.||
+CO|3871351||KD3AQ|02/17/2017|This is a multi-line test comment that spans multiple lines.
+CONTINUATION: This line tests the continuation handling in the parser.||
+CO|4484493||AD3CI|12/02/2023|Test comment for fixture data.||
