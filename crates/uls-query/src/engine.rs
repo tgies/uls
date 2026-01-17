@@ -198,5 +198,92 @@ mod tests {
         let result = engine.lookup("NONEXISTENT").unwrap();
         assert!(result.is_none());
     }
+
+    #[test]
+    fn test_search_empty_db() {
+        let config = DatabaseConfig::in_memory();
+        let db = Database::with_config(config).unwrap();
+        db.initialize().unwrap();
+        
+        let engine = QueryEngine::with_database(db);
+        let filter = SearchFilter::default();
+        let results = engine.search(filter).unwrap();
+        assert!(results.is_empty());
+    }
+
+    #[test]
+    fn test_count_empty_db() {
+        let config = DatabaseConfig::in_memory();
+        let db = Database::with_config(config).unwrap();
+        db.initialize().unwrap();
+        
+        let engine = QueryEngine::with_database(db);
+        let filter = SearchFilter::default();
+        let count = engine.count(filter).unwrap();
+        assert_eq!(count, 0);
+    }
+
+    #[test]
+    fn test_stats() {
+        let config = DatabaseConfig::in_memory();
+        let db = Database::with_config(config).unwrap();
+        db.initialize().unwrap();
+        
+        let engine = QueryEngine::with_database(db);
+        let stats = engine.stats().unwrap();
+        assert_eq!(stats.total_licenses, 0);
+    }
+
+    #[test]
+    fn test_lookup_by_frn_empty() {
+        let config = DatabaseConfig::in_memory();
+        let db = Database::with_config(config).unwrap();
+        db.initialize().unwrap();
+        
+        let engine = QueryEngine::with_database(db);
+        let results = engine.lookup_by_frn("0001234567").unwrap();
+        assert!(results.is_empty());
+    }
+
+    #[test]
+    fn test_database_accessor() {
+        let config = DatabaseConfig::in_memory();
+        let db = Database::with_config(config).unwrap();
+        db.initialize().unwrap();
+        
+        let engine = QueryEngine::with_database(db);
+        assert!(engine.database().is_initialized().unwrap());
+    }
+
+    #[test]
+    fn test_search_with_data() {
+        use uls_core::records::{HeaderRecord, UlsRecord};
+        
+        let config = DatabaseConfig::in_memory();
+        let db = Database::with_config(config).unwrap();
+        db.initialize().unwrap();
+        
+        // Insert a test license
+        let mut header = HeaderRecord::from_fields(&["HD", "12345"]);
+        header.unique_system_identifier = 12345;
+        header.call_sign = Some("W1TEST".to_string());
+        header.license_status = Some('A');
+        header.radio_service_code = Some("HA".to_string());
+        db.insert_record(&UlsRecord::Header(header)).unwrap();
+        
+        let engine = QueryEngine::with_database(db);
+        
+        // Search with callsign filter
+        let filter = SearchFilter::callsign("W1TEST");
+        let results = engine.search(filter).unwrap();
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].call_sign, "W1TEST");
+        
+        // Count should match
+        let filter = SearchFilter::callsign("W1TEST");
+        let count = engine.count(filter).unwrap();
+        assert_eq!(count, 1);
+    }
 }
+
 
