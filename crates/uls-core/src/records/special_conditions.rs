@@ -80,3 +80,58 @@ impl VanityCallSignRecord {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_special_condition_from_fields() {
+        let fields = vec!["SC", "12345", "ULS123", "EBF456", "W1TEST", "P", "999", "A", "01/01/2020"];
+        let sc = SpecialConditionRecord::from_fields(&fields);
+        
+        assert_eq!(sc.unique_system_identifier, 12345);
+        assert_eq!(sc.uls_file_number, Some("ULS123".to_string()));
+        assert_eq!(sc.callsign, Some("W1TEST".to_string()));
+        assert_eq!(sc.special_condition_type, Some('P'));
+        assert_eq!(sc.special_condition_code, Some(999));
+        assert_eq!(sc.status_code, Some('A'));
+    }
+
+    #[test]
+    fn test_special_condition_from_minimal_fields() {
+        let fields = vec!["SC", "12345"];
+        let sc = SpecialConditionRecord::from_fields(&fields);
+        
+        assert_eq!(sc.unique_system_identifier, 12345);
+        assert!(sc.callsign.is_none());
+        assert!(sc.special_condition_code.is_none());
+    }
+
+    #[test]
+    fn test_freeform_condition_from_fields() {
+        let fields = vec![
+            "SF", "12345", "ULS123", "EBF456", "W1TEST", "P",
+            "999", "1", "This is a test condition", "A", "01/01/2020"
+        ];
+        let sf = FreeformConditionRecord::from_fields(&fields);
+        
+        assert_eq!(sf.unique_system_identifier, Some(12345));
+        assert_eq!(sf.callsign, Some("W1TEST".to_string()));
+        assert_eq!(sf.lic_freeform_cond_type, Some('P'));
+        assert_eq!(sf.unique_lic_freeform_id, Some(999));
+        assert_eq!(sf.sequence_number, Some(1));
+        assert_eq!(sf.lic_freeform_condition, Some("This is a test condition".to_string()));
+    }
+
+    #[test]
+    fn test_vanity_callsign_from_fields() {
+        let fields = vec!["VC", "12345", "ULS123", "EBF456", "1", "W1AW"];
+        let vc = VanityCallSignRecord::from_fields(&fields);
+        
+        assert_eq!(vc.unique_system_identifier, 12345);
+        assert_eq!(vc.request_sequence, Some(1));
+        assert_eq!(vc.callsign_requested, Some("W1AW".to_string()));
+    }
+}
+
