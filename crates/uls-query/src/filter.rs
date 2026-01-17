@@ -574,6 +574,43 @@ mod tests {
         assert!(clause.contains("city = ?"));
         assert_eq!(params, vec!["NEWINGTON"]);
     }
+
+    // Case-insensitive tests - inputs are passed through unchanged,
+    // relying on COLLATE NOCASE in the database schema
+    #[test]
+    fn test_lowercase_name_filter() {
+        let filter = SearchFilter::name("smith");
+        let (clause, params) = filter.to_where_clause();
+        assert!(clause.contains("entity_name"));
+        // Should contain lowercase - DB handles case-insensitivity
+        assert!(params.iter().any(|p| p == "smith"));
+    }
+
+    #[test]
+    fn test_lowercase_city_filter() {
+        let mut filter = SearchFilter::new();
+        filter.city = Some("newington".to_string());
+        let (clause, params) = filter.to_where_clause();
+        assert!(clause.contains("city = ?"));
+        assert_eq!(params, vec!["newington"]);
+    }
+
+    #[test]
+    fn test_lowercase_callsign_filter() {
+        let filter = SearchFilter::callsign("w1aw");
+        let (clause, params) = filter.to_where_clause();
+        assert!(clause.contains("call_sign"));
+        assert_eq!(params, vec!["w1aw"]);
+    }
+
+    #[test]
+    fn test_mixed_case_wildcard_name() {
+        let filter = SearchFilter::name("*Smith*");
+        let (clause, params) = filter.to_where_clause();
+        assert!(clause.contains("LIKE"));
+        // Wildcards converted to SQL LIKE pattern
+        assert!(params.iter().any(|p| p == "%Smith%"));
+    }
 }
 
 
