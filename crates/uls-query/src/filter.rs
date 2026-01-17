@@ -264,4 +264,92 @@ mod tests {
         let filter = SearchFilter::new().with_limit(50).with_offset(100);
         assert_eq!(filter.limit_clause(), "LIMIT 50 OFFSET 100");
     }
+
+    #[test]
+    fn test_limit_only() {
+        let filter = SearchFilter::new().with_limit(25);
+        assert_eq!(filter.limit_clause(), "LIMIT 25");
+    }
+
+    #[test]
+    fn test_offset_only() {
+        let filter = SearchFilter::new().with_offset(50);
+        assert_eq!(filter.limit_clause(), "LIMIT -1 OFFSET 50");
+    }
+
+    #[test]
+    fn test_location_filter() {
+        let filter = SearchFilter::location(Some("NEWINGTON".to_string()), Some("CT".to_string()));
+        let (clause, params) = filter.to_where_clause();
+        assert!(clause.contains("city"));
+        assert!(clause.contains("state"));
+        assert!(params.contains(&"%NEWINGTON%".to_string()));
+        assert!(params.contains(&"CT".to_string()));
+    }
+
+    #[test]
+    fn test_frn_filter() {
+        let mut filter = SearchFilter::new();
+        filter.frn = Some("0001234567".to_string());
+        let (clause, params) = filter.to_where_clause();
+        assert!(clause.contains("frn"));
+        assert!(params.contains(&"0001234567".to_string()));
+    }
+
+    #[test]
+    fn test_zip_filter() {
+        let mut filter = SearchFilter::new();
+        filter.zip_code = Some("06111".to_string());
+        let (clause, params) = filter.to_where_clause();
+        assert!(clause.contains("zip_code"));
+        assert!(params.contains(&"06111%".to_string()));
+    }
+
+    #[test]
+    fn test_radio_service_filter() {
+        let mut filter = SearchFilter::new();
+        filter.radio_service = Some(vec!["HA".to_string(), "HV".to_string()]);
+        let (clause, params) = filter.to_where_clause();
+        assert!(clause.contains("radio_service_code IN"));
+        assert!(params.contains(&"HA".to_string()));
+        assert!(params.contains(&"HV".to_string()));
+    }
+
+    #[test]
+    fn test_sort_orders() {
+        let filter = SearchFilter::new().with_sort(SortOrder::CallSign);
+        assert!(filter.order_clause().contains("call_sign ASC"));
+        
+        let filter = SearchFilter::new().with_sort(SortOrder::CallSignDesc);
+        assert!(filter.order_clause().contains("call_sign DESC"));
+        
+        let filter = SearchFilter::new().with_sort(SortOrder::Name);
+        assert!(filter.order_clause().contains("entity_name"));
+        
+        let filter = SearchFilter::new().with_sort(SortOrder::State);
+        assert!(filter.order_clause().contains("state"));
+        
+        let filter = SearchFilter::new().with_sort(SortOrder::GrantDate);
+        assert!(filter.order_clause().contains("grant_date"));
+        
+        let filter = SearchFilter::new().with_sort(SortOrder::ExpirationDate);
+        assert!(filter.order_clause().contains("expired_date"));
+    }
+
+    #[test]
+    fn test_empty_filter() {
+        let filter = SearchFilter::new();
+        let (clause, params) = filter.to_where_clause();
+        assert_eq!(clause, "1=1");
+        assert!(params.is_empty());
+    }
+
+    #[test]
+    fn test_single_char_wildcard() {
+        let filter = SearchFilter::callsign("W1A?");
+        let (clause, params) = filter.to_where_clause();
+        assert!(clause.contains("LIKE"));
+        assert_eq!(params, vec!["W1A_"]);
+    }
 }
+
