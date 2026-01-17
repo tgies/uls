@@ -1,16 +1,12 @@
 //! Update command - download and update the database.
 
-use anyhow::{Context, Result};
+use anyhow::Result;
 use indicatif::{ProgressBar, ProgressStyle};
 use std::path::PathBuf;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicUsize, Ordering};
-use std::time::Instant;
-use tracing::{info, warn, error};
 
-use uls_db::{Database, DatabaseConfig};
+use uls_db::{Database, DatabaseConfig, Importer};
 use uls_download::{DownloadConfig, DownloadProgress, DownloadResult, FccClient, ProgressCallback, ServiceCatalog};
-use uls_parser::archive::ZipExtractor;
 
 /// Get the default database path.
 fn default_db_path() -> PathBuf {
@@ -85,8 +81,7 @@ pub async fn execute(service: &str, force: bool, _full_only: bool) -> Result<()>
     let (zip_path, download_result) = client.download_file(&data_file, progress_callback).await?;
     
     // Read the cached ETag for this file
-    let cache_etag_path = zip_path.with_extension("zip.etag");
-    let cache_etag = std::fs::read_to_string(&cache_etag_path).ok();
+    let cache_etag = client.get_cached_etag(&data_file);
     
     // Get the ETag of what's currently imported in the DB for this service
     let db_imported_etag = db.get_imported_etag(service)?;
@@ -137,31 +132,6 @@ pub async fn execute(service: &str, force: bool, _full_only: bool) -> Result<()>
 
     println!();
 
-    // Import into database
-    println!("Importing records...");
-    let import_start = Instant::now();
-    
-    let mut extractor = ZipExtractor::open(&zip_path)
-        .context("Failed to open ZIP file")?;
-
-    let mut dat_files = extractor.list_dat_files();
-    info!("Found {} DAT files in archive", dat_files.len());
-
-    // Sort files to ensure HD.dat (licenses) is processed first
-    // Other records have foreign key references to licenses
-    dat_files.sort_by(|a, b| {
-        let priority = |s: &str| -> u8 {
-            let upper = s.to_uppercase();
-            if upper.contains("HD") { 0 }      // Header/licenses first
-            else if upper.contains("EN") { 1 } // Entities second
-            else if upper.contains("AM") { 2 } // Amateur third
-            else { 3 }                         // Everything else
-        };
-        priority(a).cmp(&priority(b))
-    });
-    
-    info!("Processing order: {:?}", dat_files);
-
     // Create progress bar for import
     let import_pb = ProgressBar::new_spinner();
     import_pb.set_style(ProgressStyle::default_spinner()
@@ -169,127 +139,45 @@ pub async fn execute(service: &str, force: bool, _full_only: bool) -> Result<()>
         .unwrap());
     import_pb.enable_steady_tick(std::time::Duration::from_millis(100));
 
-    let mut total_records = 0usize;
-    let mut files_done = 0usize;
-    let mut parse_errors = 0usize;
-    let mut insert_errors = 0usize;
-
-    // Optimize SQLite for bulk import
-    {
-        let conn = db.conn()?;
-        conn.execute_batch(
-            "PRAGMA synchronous = OFF;
-             PRAGMA journal_mode = MEMORY;
-             PRAGMA temp_store = MEMORY;
-             PRAGMA cache_size = -64000;"  // 64MB cache
-        )?;
-    }
-
-    // Begin transaction for bulk import
-    let tx = db.begin_transaction()?;
-
-    for dat_file in &dat_files {
+    // Use the library Importer
+    println!("Importing records...");
+    let importer = Importer::new(&db);
+    
+    let progress_cb = Box::new(move |p: &uls_db::ImportProgress| {
         import_pb.set_message(format!(
-            "File {}/{}: {} ({} records, {} errors)",
-            files_done + 1,
-            dat_files.len(),
-            dat_file,
-            total_records,
-            parse_errors + insert_errors
+            "File {}/{}: {} ({} records)",
+            p.current_file, p.total_files, p.file_name, p.records
         ));
-
-        let mut file_records = 0usize;
-        let mut file_parse_errors = 0usize;
-        let mut file_insert_errors = 0usize;
-        
-        extractor.process_dat_streaming(dat_file, |line| {
-            match line.to_record() {
-                Ok(record) => {
-                    if let Err(e) = tx.insert_record(&record) {
-                        file_insert_errors += 1;
-                        if file_insert_errors <= 5 {
-                            warn!("Insert error in {}: {}", dat_file, e);
-                        }
-                    } else {
-                        file_records += 1;
-                    }
-                }
-                Err(e) => {
-                    file_parse_errors += 1;
-                    if file_parse_errors <= 5 {
-                        warn!("Parse error in {}: {}", dat_file, e);
-                    }
-                }
-            }
-            
-            // Update progress every 10k records
-            if (file_records + file_parse_errors) % 10_000 == 0 {
-                import_pb.set_message(format!(
-                    "File {}/{}: {} ({} records)",
-                    files_done + 1,
-                    dat_files.len(),
-                    dat_file,
-                    total_records + file_records
-                ));
-            }
-            true
-        })?;
-        
-        total_records += file_records;
-        parse_errors += file_parse_errors;
-        insert_errors += file_insert_errors;
-        files_done += 1;
-
-        // Log file summary if there were errors
-        if file_parse_errors > 0 || file_insert_errors > 0 {
-            warn!(
-                "{}: {} records, {} parse errors, {} insert errors",
-                dat_file, file_records, file_parse_errors, file_insert_errors
-            );
-        }
-    }
-
-    import_pb.set_message("Committing transaction...");
-    tx.commit()?;
-
-    // Reset SQLite settings
-    {
-        let conn = db.conn()?;
-        conn.execute_batch(
-            "PRAGMA synchronous = NORMAL;
-             PRAGMA journal_mode = WAL;"
-        )?;
-    }
-
-    import_pb.finish_with_message(format!("Imported {} records", total_records));
+    });
+    
+    let stats = importer.import_zip(&zip_path, Some(progress_cb))?;
+    
+    println!("  [{}] Imported {} records", 
+        chrono::Utc::now().format("%H:%M:%S"),
+        stats.records);
 
     // Set last updated
     let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S UTC").to_string();
     db.set_last_updated(&now)?;
     
     // Only save the imported ETag if there were no insert errors
-    // This ensures we'll re-import on next run if something went wrong
-    if insert_errors == 0 {
+    if stats.is_successful() {
         if let Some(etag) = import_etag {
             db.set_imported_etag(service, &etag)?;
         }
     }
 
-    let elapsed = import_start.elapsed();
-    let rate = total_records as f64 / elapsed.as_secs_f64();
-
-    println!();
     println!("✓ Imported {} records from {} files in {:.1}s ({:.0} records/sec)", 
-        total_records, dat_files.len(), elapsed.as_secs_f64(), rate);
+        stats.records, stats.files, stats.duration_secs, stats.rate());
     
     // Report errors
-    if parse_errors > 0 || insert_errors > 0 {
+    if stats.parse_errors > 0 || stats.insert_errors > 0 {
         println!();
-        if parse_errors > 0 {
-            println!("⚠ {} parse errors (use -v to see details)", parse_errors);
+        if stats.parse_errors > 0 {
+            println!("⚠ {} parse errors (use -v to see details)", stats.parse_errors);
         }
-        if insert_errors > 0 {
-            println!("⚠ {} insert errors (use -v to see details)", insert_errors);
+        if stats.insert_errors > 0 {
+            println!("⚠ {} insert errors (use -v to see details)", stats.insert_errors);
         }
     }
     

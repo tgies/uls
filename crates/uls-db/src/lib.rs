@@ -23,12 +23,15 @@
 
 pub mod config;
 pub mod error;
+pub mod importer;
 pub mod models;
 pub mod repository;
 pub mod schema;
 
 pub use config::DatabaseConfig;
 pub use error::{DbError, Result};
+pub use importer::{ImportProgress, ImportStats, Importer};
 pub use models::{License, LicenseStats, Operator};
 pub use repository::{Database, Transaction};
 pub use schema::Schema;
+

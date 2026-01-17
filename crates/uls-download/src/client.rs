@@ -348,7 +348,7 @@ impl FccClient {
     }
 
     /// Get the cached ETag for a file.
-    fn get_cached_etag(&self, file: &DataFile) -> Option<String> {
+    pub fn get_cached_etag(&self, file: &DataFile) -> Option<String> {
         let etag_path = self.config.cache_dir.join(format!("{}.etag", file.filename()));
         fs::read_to_string(etag_path).ok()
     }

@@ -45,6 +45,10 @@ pub enum DbError {
     /// Parser error.
     #[error("parser error: {0}")]
     Parser(#[from] uls_parser::ParseError),
+
+    /// ZIP archive error.
+    #[error("zip error: {0}")]
+    Zip(#[from] uls_parser::archive::ZipError),
 }
 
 /// Result type for database operations.
