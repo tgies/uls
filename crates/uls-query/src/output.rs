@@ -309,4 +309,90 @@ mod tests {
         assert_eq!(csv_escape("with,comma"), "\"with,comma\"");
         assert_eq!(csv_escape("with\"quote"), "\"with\"\"quote\"");
     }
+
+    #[test]
+    fn test_json_format() {
+        let license = test_license();
+        let output = license.format(OutputFormat::Json);
+        assert!(output.contains("W1TEST"));
+        assert!(output.contains("unique_system_identifier"));
+    }
+
+    #[test]
+    fn test_json_pretty_format() {
+        let license = test_license();
+        let output = license.format(OutputFormat::JsonPretty);
+        assert!(output.contains("W1TEST"));
+        assert!(output.contains("\n")); // Pretty format has newlines
+    }
+
+    #[test]
+    fn test_yaml_format() {
+        let license = test_license();
+        let output = license.format(OutputFormat::Yaml);
+        assert!(output.contains("call_sign: W1TEST"));
+        assert!(output.contains("status: A"));
+    }
+
+    #[test]
+    fn test_vec_table_format() {
+        let licenses = vec![test_license()];
+        let output = licenses.format(OutputFormat::Table);
+        assert!(output.contains("W1TEST"));
+        assert!(output.contains("CALL")); // Header
+        assert!(output.contains("1 result"));
+    }
+
+    #[test]
+    fn test_vec_empty_table() {
+        let licenses: Vec<License> = vec![];
+        let output = licenses.format(OutputFormat::Table);
+        assert!(output.contains("No results found"));
+    }
+
+    #[test]
+    fn test_vec_csv_format() {
+        let licenses = vec![test_license()];
+        let output = licenses.format(OutputFormat::Csv);
+        assert!(output.contains("call_sign,name")); // Header
+        assert!(output.contains("W1TEST"));
+    }
+
+    #[test]
+    fn test_vec_yaml_format() {
+        let licenses = vec![test_license()];
+        let output = licenses.format(OutputFormat::Yaml);
+        assert!(output.contains("licenses:"));
+        assert!(output.contains("call_sign: W1TEST"));
+    }
+
+    #[test]
+    fn test_vec_compact_format() {
+        let licenses = vec![test_license()];
+        let output = licenses.format(OutputFormat::Compact);
+        assert!(output.contains("W1TEST"));
+    }
+
+    #[test]
+    fn test_output_format_from_str() {
+        assert_eq!(OutputFormat::from_str("table"), Some(OutputFormat::Table));
+        assert_eq!(OutputFormat::from_str("json"), Some(OutputFormat::Json));
+        assert_eq!(OutputFormat::from_str("json-pretty"), Some(OutputFormat::JsonPretty));
+        assert_eq!(OutputFormat::from_str("csv"), Some(OutputFormat::Csv));
+        assert_eq!(OutputFormat::from_str("yaml"), Some(OutputFormat::Yaml));
+        assert_eq!(OutputFormat::from_str("compact"), Some(OutputFormat::Compact));
+        assert_eq!(OutputFormat::from_str("unknown"), None);
+    }
+
+    #[test]
+    fn test_truncate() {
+        assert_eq!(truncate("short", 10), "short");
+        assert_eq!(truncate("this is a very long string", 10), "this is...");
+    }
+
+    #[test]
+    fn test_csv_escape_newline() {
+        assert_eq!(csv_escape("with\nnewline"), "\"with\nnewline\"");
+    }
 }
+
