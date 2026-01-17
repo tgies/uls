@@ -167,6 +167,127 @@ pub fn detect_service_from_callsign(callsign: &str) -> &'static str {
 }
 
 
+#[cfg(test)]
+mod tests {
+    use super::*;
 
+    // ==========================================================================
+    // service_name_to_code tests
+    // ==========================================================================
 
+    #[test]
+    fn test_service_name_to_code_amateur() {
+        assert_eq!(service_name_to_code("amateur"), Some("HA"));
+        assert_eq!(service_name_to_code("Amateur"), Some("HA"));
+        assert_eq!(service_name_to_code("AMATEUR"), Some("HA"));
+        assert_eq!(service_name_to_code("ham"), Some("HA"));
+        assert_eq!(service_name_to_code("ha"), Some("HA"));
+    }
+
+    #[test]
+    fn test_service_name_to_code_gmrs() {
+        assert_eq!(service_name_to_code("gmrs"), Some("ZA"));
+        assert_eq!(service_name_to_code("GMRS"), Some("ZA"));
+        assert_eq!(service_name_to_code("za"), Some("ZA"));
+    }
+
+    #[test]
+    fn test_service_name_to_code_unknown() {
+        assert_eq!(service_name_to_code("invalid"), None);
+        assert_eq!(service_name_to_code("cb"), None);
+        assert_eq!(service_name_to_code(""), None);
+    }
+
+    // ==========================================================================
+    // detect_service_from_callsign tests - Amateur formats
+    // ==========================================================================
+
+    #[test]
+    fn test_detect_amateur_1x2() {
+        // 1x2: K0AA (1 letter, 1 digit, 2 letters)
+        assert_eq!(detect_service_from_callsign("K0AA"), "HA");
+        assert_eq!(detect_service_from_callsign("W1AW"), "HA");
+        assert_eq!(detect_service_from_callsign("N5ZV"), "HA");
+    }
+
+    #[test]
+    fn test_detect_amateur_1x3() {
+        // 1x3: K0AAA (1 letter, 1 digit, 3 letters)
+        assert_eq!(detect_service_from_callsign("K0AAA"), "HA");
+        assert_eq!(detect_service_from_callsign("W1ABC"), "HA");
+        assert_eq!(detect_service_from_callsign("N5WXY"), "HA");
+    }
+
+    #[test]
+    fn test_detect_amateur_2x1() {
+        // 2x1: AA0A (2 letters, 1 digit, 1 letter)
+        assert_eq!(detect_service_from_callsign("AA0A"), "HA");
+        assert_eq!(detect_service_from_callsign("KB9V"), "HA");
+        assert_eq!(detect_service_from_callsign("WA5X"), "HA");
+    }
+
+    #[test]
+    fn test_detect_amateur_2x2() {
+        // 2x2: AA0AA (2 letters, 1 digit, 2 letters)
+        assert_eq!(detect_service_from_callsign("AA0AA"), "HA");
+        assert_eq!(detect_service_from_callsign("KB9AB"), "HA");
+        assert_eq!(detect_service_from_callsign("WA5XY"), "HA");
+    }
+
+    #[test]
+    fn test_detect_amateur_2x3() {
+        // 2x3: AA0AAA (2 letters, 1 digit, 3 letters)
+        assert_eq!(detect_service_from_callsign("KA0AAA"), "HA");
+        assert_eq!(detect_service_from_callsign("KC5MQP"), "HA");
+        assert_eq!(detect_service_from_callsign("WB9VBR"), "HA");
+    }
+
+    // ==========================================================================
+    // detect_service_from_callsign tests - GMRS formats
+    // ==========================================================================
+
+    #[test]
+    fn test_detect_gmrs_3x4() {
+        // 3x4: KAA1234 (3 letters, 4 digits)
+        assert_eq!(detect_service_from_callsign("KAA0219"), "ZA");
+        assert_eq!(detect_service_from_callsign("KAB5678"), "ZA");
+        assert_eq!(detect_service_from_callsign("KUE6893"), "ZA");
+    }
+
+    #[test]
+    fn test_detect_gmrs_4x3() {
+        // 4x3: WQFX467 (4 letters, 3 digits)
+        assert_eq!(detect_service_from_callsign("WQFX467"), "ZA");
+        assert_eq!(detect_service_from_callsign("WPTW543"), "ZA");
+        assert_eq!(detect_service_from_callsign("WRAU623"), "ZA");
+        assert_eq!(detect_service_from_callsign("WSAC374"), "ZA");
+    }
+
+    #[test]
+    fn test_detect_callsign_case_insensitive() {
+        assert_eq!(detect_service_from_callsign("w1aw"), "HA");
+        assert_eq!(detect_service_from_callsign("wqfx467"), "ZA");
+    }
+
+    #[test]
+    fn test_detect_callsign_empty() {
+        assert_eq!(detect_service_from_callsign(""), "HA");
+    }
+
+    #[test]
+    fn test_detect_callsign_real_data_amateur() {
+        // Real callsigns from FCC database
+        assert_eq!(detect_service_from_callsign("AJ8EO"), "HA");
+        assert_eq!(detect_service_from_callsign("WK9CLS"), "HA");
+        assert_eq!(detect_service_from_callsign("NI7D"), "HA");
+    }
+
+    #[test]
+    fn test_detect_callsign_real_data_gmrs() {
+        // Real GMRS callsigns from FCC database
+        assert_eq!(detect_service_from_callsign("WQIY060"), "ZA");
+        assert_eq!(detect_service_from_callsign("WSTZ988"), "ZA");
+        assert_eq!(detect_service_from_callsign("KJL4040"), "ZA");
+    }
+}
 

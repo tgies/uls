@@ -468,5 +468,150 @@ mod tests {
             panic!("License W1TEST should have been imported");
         }
     }
+
+    // ==========================================================================
+    // ImportMode tests
+    // ==========================================================================
+
+    #[test]
+    fn test_import_mode_should_import_minimal() {
+        let mode = ImportMode::Minimal;
+        
+        // Minimal should only allow HD, EN, AM
+        assert!(mode.should_import("HD"));
+        assert!(mode.should_import("EN"));
+        assert!(mode.should_import("AM"));
+        assert!(mode.should_import("hd")); // Case insensitive
+        
+        // Minimal should NOT import other record types
+        assert!(!mode.should_import("HS"));
+        assert!(!mode.should_import("CO"));
+        assert!(!mode.should_import("SC"));
+        assert!(!mode.should_import("LA"));
+        assert!(!mode.should_import("SF"));
+    }
+
+    #[test]
+    fn test_import_mode_should_import_full() {
+        let mode = ImportMode::Full;
+        
+        // Full should allow all record types
+        assert!(mode.should_import("HD"));
+        assert!(mode.should_import("EN"));
+        assert!(mode.should_import("AM"));
+        assert!(mode.should_import("HS"));
+        assert!(mode.should_import("CO"));
+        assert!(mode.should_import("SC"));
+        assert!(mode.should_import("LA"));
+        assert!(mode.should_import("SF"));
+        assert!(mode.should_import("ANYTYPE")); // Full allows anything
+    }
+
+    #[test]
+    fn test_import_mode_should_import_selective() {
+        let mode = ImportMode::Selective(vec!["HD".to_string(), "CO".to_string()]);
+        
+        assert!(mode.should_import("HD"));
+        assert!(mode.should_import("CO"));
+        assert!(mode.should_import("hd")); // Case insensitive
+        
+        assert!(!mode.should_import("EN"));
+        assert!(!mode.should_import("AM"));
+        assert!(!mode.should_import("HS"));
+    }
+
+    #[test]
+    fn test_import_mode_should_import_file() {
+        let mode = ImportMode::Minimal;
+        
+        assert!(mode.should_import_file("HD.dat"));
+        assert!(mode.should_import_file("EN.dat"));
+        assert!(mode.should_import_file("AM.dat"));
+        
+        assert!(!mode.should_import_file("HS.dat"));
+        assert!(!mode.should_import_file("CO.dat"));
+    }
+
+    #[test]
+    fn test_import_mode_default_is_full() {
+        let mode = ImportMode::default();
+        assert!(matches!(mode, ImportMode::Full));
+    }
+
+    fn create_multi_type_test_zip(temp_dir: &TempDir) -> std::path::PathBuf {
+        let zip_path = temp_dir.path().join("multi.zip");
+        let file = std::fs::File::create(&zip_path).unwrap();
+        let mut zip = ZipWriter::new(file);
+        let options: FileOptions<()> = FileOptions::default();
+
+        // HD record
+        zip.start_file("HD.dat", options.clone()).unwrap();
+        zip.write_all(b"HD|100001|0000000001||W1TEST|A|HA|01/15/2020|01/15/2030|||||||||||||||||||||||||||||||||||N|||||||||||01/15/2020|01/15/2020|||||||||||||||\n").unwrap();
+
+        // EN record
+        zip.start_file("EN.dat", options.clone()).unwrap();
+        zip.write_all(b"EN|100001|||W1TEST|L|L00100001|DOE, JOHN|JOHN||DOE||||||||||||000|0001234567|I||||||\n").unwrap();
+
+        // AM record
+        zip.start_file("AM.dat", options.clone()).unwrap();
+        zip.write_all(b"AM|100001|||W1TEST|E|D|6||||||||||\n").unwrap();
+
+        // HS record (history)
+        zip.start_file("HS.dat", options.clone()).unwrap();
+        zip.write_all(b"HS|100001||W1TEST|01/15/2020|LIISS\n").unwrap();
+
+        // CO record (comment)
+        zip.start_file("CO.dat", options.clone()).unwrap();
+        zip.write_all(b"CO|100001||W1TEST|01/15/2020|Test comment||\n").unwrap();
+
+        zip.finish().unwrap();
+        zip_path
+    }
+
+    #[test]
+    fn test_import_zip_with_mode_minimal() {
+        let (temp_dir, db) = create_test_db();
+        let zip_path = create_multi_type_test_zip(&temp_dir);
+        
+        let importer = Importer::new(&db);
+        let stats = importer.import_zip_with_mode(&zip_path, ImportMode::Minimal, None).unwrap();
+        
+        // Minimal should only import HD, EN, AM (3 files, 3 records)
+        assert_eq!(stats.files, 3);
+        assert_eq!(stats.records, 3);
+        assert!(stats.is_successful());
+        
+        // Verify license was imported
+        assert!(db.get_license_by_callsign("W1TEST").unwrap().is_some());
+    }
+
+    #[test]
+    fn test_import_zip_with_mode_full() {
+        let (temp_dir, db) = create_test_db();
+        let zip_path = create_multi_type_test_zip(&temp_dir);
+        
+        let importer = Importer::new(&db);
+        let stats = importer.import_zip_with_mode(&zip_path, ImportMode::Full, None).unwrap();
+        
+        // Full should import all 5 files
+        assert_eq!(stats.files, 5);
+        assert_eq!(stats.records, 5);
+        assert!(stats.is_successful());
+    }
+
+    #[test]
+    fn test_import_zip_with_mode_selective() {
+        let (temp_dir, db) = create_test_db();
+        let zip_path = create_multi_type_test_zip(&temp_dir);
+        
+        let importer = Importer::new(&db);
+        let mode = ImportMode::Selective(vec!["HD".to_string(), "EN".to_string()]);
+        let stats = importer.import_zip_with_mode(&zip_path, mode, None).unwrap();
+        
+        // Selective should only import HD and EN (2 files, 2 records)
+        assert_eq!(stats.files, 2);
+        assert_eq!(stats.records, 2);
+        assert!(stats.is_successful());
+    }
 }
 
