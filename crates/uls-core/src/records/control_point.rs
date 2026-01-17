@@ -34,3 +34,20 @@ impl ControlPointRecord {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_control_point_from_fields() {
+        let fields = vec!["CP", "12345", "ULS123", "EBF456", "W1TEST", "A", "1", "123 Main St", "Springfield", "IL", "555-555-1234", "Sangamon"];
+        let cp = ControlPointRecord::from_fields(&fields);
+        
+        assert_eq!(cp.unique_system_identifier, 12345);
+        assert_eq!(cp.call_sign, Some("W1TEST".to_string()));
+        assert_eq!(cp.control_city, Some("Springfield".to_string()));
+        assert_eq!(cp.state_code, Some("IL".to_string()));
+    }
+}
+
