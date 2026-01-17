@@ -92,6 +92,52 @@ impl License {
             _ => "Unknown",
         })
     }
+
+    /// Get a field value by name for dynamic output.
+    pub fn get_field(&self, name: &str) -> Option<String> {
+        match name.to_lowercase().as_str() {
+            "call_sign" | "callsign" | "call" => Some(self.call_sign.clone()),
+            "name" | "licensee" | "entity_name" => Some(self.display_name()),
+            "first_name" | "first" => self.first_name.clone(),
+            "last_name" | "last" => self.last_name.clone(),
+            "middle_initial" | "mi" => self.middle_initial.clone(),
+            "status" | "license_status" => Some(self.status.to_string()),
+            "status_desc" | "status_description" => Some(self.status_description().to_string()),
+            "service" | "radio_service" => Some(self.radio_service.clone()),
+            "class" | "operator_class" => self.operator_class.map(|c| c.to_string()),
+            "class_desc" | "class_description" => self.operator_class_description().map(|s| s.to_string()),
+            "city" => self.city.clone(),
+            "state" => self.state.clone(),
+            "zip" | "zip_code" => self.zip_code.clone(),
+            "location" => {
+                let city = self.city.as_deref().unwrap_or("");
+                let state = self.state.as_deref().unwrap_or("");
+                if city.is_empty() && state.is_empty() {
+                    None
+                } else {
+                    Some(format!("{}, {}", city, state))
+                }
+            }
+            "address" | "street_address" => self.street_address.clone(),
+            "frn" => self.frn.clone(),
+            "grant_date" | "granted" => self.grant_date.map(|d| d.to_string()),
+            "expired_date" | "expires" | "expiration" => self.expired_date.map(|d| d.to_string()),
+            "cancellation_date" | "cancelled" => self.cancellation_date.map(|d| d.to_string()),
+            "previous_call_sign" | "previous_call" => self.previous_call_sign.clone(),
+            "usi" | "unique_system_identifier" => Some(self.unique_system_identifier.to_string()),
+            _ => None,
+        }
+    }
+
+    /// Get list of available field names.
+    pub fn field_names() -> &'static [&'static str] {
+        &[
+            "call_sign", "name", "first_name", "last_name", "status", "status_desc",
+            "service", "class", "class_desc", "city", "state", "zip", "location",
+            "address", "frn", "grant_date", "expired_date", "cancellation_date",
+            "previous_call_sign", "usi"
+        ]
+    }
 }
 
 /// Amateur operator information.

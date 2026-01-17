@@ -1,9 +1,87 @@
 //! Search command - search for licenses.
 
 use anyhow::{Context, Result};
-use uls_query::{FormatOutput, OutputFormat, QueryEngine, SearchFilter};
+use uls_query::{FormatOutput, OutputFormat, QueryEngine, SearchFilter, License};
 
 use super::auto_update;
+
+/// Format results with custom field selection.
+fn format_with_fields(licenses: &[License], fields: &[&str], format: OutputFormat) -> String {
+    match format {
+        OutputFormat::Table => format_table_with_fields(licenses, fields),
+        OutputFormat::Csv => format_csv_with_fields(licenses, fields),
+        // For structured formats, just output all data
+        _ => licenses.to_vec().format(format),
+    }
+}
+
+fn format_table_with_fields(licenses: &[License], fields: &[&str]) -> String {
+    if licenses.is_empty() {
+        return "No results found.\n".to_string();
+    }
+    
+    // Calculate column widths (min 6, max 30)
+    let widths: Vec<usize> = fields.iter()
+        .map(|f| f.len().max(6).min(30))
+        .collect();
+    
+    let mut output = String::new();
+    
+    // Header
+    for (i, field) in fields.iter().enumerate() {
+        output.push_str(&format!("{:width$} ", field.to_uppercase(), width = widths[i]));
+    }
+    output.push('\n');
+    
+    // Separator
+    for width in &widths {
+        output.push_str(&format!("{:-<width$} ", "", width = *width));
+    }
+    output.push('\n');
+    
+    // Rows
+    for license in licenses {
+        for (i, field) in fields.iter().enumerate() {
+            let value = license.get_field(field).unwrap_or_else(|| "-".to_string());
+            let truncated = if value.len() > widths[i] {
+                format!("{}...", &value[..widths[i].saturating_sub(3)])
+            } else {
+                value
+            };
+            output.push_str(&format!("{:width$} ", truncated, width = widths[i]));
+        }
+        output.push('\n');
+    }
+    
+    output.push_str(&format!("\n{} result(s)\n", licenses.len()));
+    output
+}
+
+fn format_csv_with_fields(licenses: &[License], fields: &[&str]) -> String {
+    let mut output = String::new();
+    
+    // Header
+    output.push_str(&fields.join(","));
+    output.push('\n');
+    
+    // Rows
+    for license in licenses {
+        let values: Vec<String> = fields.iter()
+            .map(|f| {
+                let v = license.get_field(f).unwrap_or_default();
+                if v.contains(',') || v.contains('"') || v.contains('\n') {
+                    format!("\"{}\"", v.replace('"', "\"\""))
+                } else {
+                    v
+                }
+            })
+            .collect();
+        output.push_str(&values.join(","));
+        output.push('\n');
+    }
+    
+    output
+}
 
 #[allow(clippy::too_many_arguments)]
 pub async fn execute(
@@ -23,6 +101,7 @@ pub async fn execute(
     limit: usize,
     service_override: &str,
     format: &str,
+    fields: Option<String>,
 ) -> Result<()> {
     // Use service override (defaulting to amateur for searches)
     let service_code = auto_update::service_name_to_code(service_override)
@@ -122,6 +201,13 @@ pub async fn execute(
         std::process::exit(1);
     }
 
-    println!("{}", results.format(output_format));
+    // Output with custom fields if specified
+    if let Some(ref field_list) = fields {
+        let field_vec: Vec<&str> = field_list.split(',').map(|s| s.trim()).collect();
+        println!("{}", format_with_fields(&results, &field_vec, output_format));
+    } else {
+        println!("{}", results.format(output_format));
+    }
+    
     Ok(())
 }

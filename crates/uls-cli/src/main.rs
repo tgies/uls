@@ -115,6 +115,10 @@ enum Commands {
         /// Radio service (amateur, gmrs)
         #[arg(long, default_value = "amateur")]
         service: String,
+
+        /// Output fields (comma-separated, e.g., call_sign,name,grant_date)
+        #[arg(long)]
+        fields: Option<String>,
     },
 
     /// Update the local database
@@ -230,11 +234,12 @@ async fn main() -> Result<()> {
             sort,
             limit,
             service,
+            fields,
         }) => {
             commands::search::execute(
                 query, state, city, zip, frn, class, status, active,
                 granted_after, granted_before, expires_before, filters,
-                &sort, limit, &service, &cli.format
+                &sort, limit, &service, &cli.format, fields
             ).await
         }
         Some(Commands::Update { service, force, minimal }) => {
