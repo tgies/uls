@@ -45,6 +45,10 @@ enum Commands {
         /// Radio service (amateur, gmrs)
         #[arg(long, default_value = "amateur")]
         service: String,
+
+        /// Also show licenses from other services for the same FRN
+        #[arg(short, long)]
+        all: bool,
     },
 
     /// Search for licenses
@@ -171,8 +175,8 @@ async fn main() -> Result<()> {
 
     // Execute command
     match cli.command {
-        Some(Commands::Lookup { callsign, service }) => {
-            commands::lookup::execute(&callsign, &service, &cli.format).await
+        Some(Commands::Lookup { callsign, service, all }) => {
+            commands::lookup::execute(&callsign, &service, all, &cli.format).await
         }
         Some(Commands::Search {
             query,
@@ -203,7 +207,7 @@ async fn main() -> Result<()> {
             // No subcommand - check for quick callsign lookup
             if let Some(callsign) = cli.callsign {
                 if looks_like_callsign(&callsign) {
-                    commands::lookup::execute(&callsign, "amateur", &cli.format).await
+                    commands::lookup::execute(&callsign, "amateur", false, &cli.format).await
                 } else {
                     eprintln!("Unknown command or invalid callsign: {}", callsign);
                     eprintln!("Run 'uls --help' for usage information.");
