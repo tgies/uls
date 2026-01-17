@@ -7,7 +7,7 @@ use rusqlite::Connection;
 use crate::error::Result;
 
 /// Current schema version.
-pub const SCHEMA_VERSION: i32 = 2;
+pub const SCHEMA_VERSION: i32 = 3;
 
 /// Database schema management.
 pub struct Schema;
@@ -180,6 +180,19 @@ impl Schema {
                 status_date TEXT,
                 UNIQUE(unique_system_identifier, special_condition_code),
                 FOREIGN KEY (unique_system_identifier) REFERENCES licenses(unique_system_identifier)
+            );
+            "#,
+        )?;
+
+        // Import status tracking - which record types have been imported per service
+        conn.execute_batch(
+            r#"
+            CREATE TABLE IF NOT EXISTS import_status (
+                radio_service_code TEXT NOT NULL,
+                record_type TEXT NOT NULL,
+                imported_at TEXT,
+                record_count INTEGER,
+                PRIMARY KEY (radio_service_code, record_type)
             );
             "#,
         )?;

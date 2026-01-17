@@ -32,7 +32,7 @@ pub mod schema;
 pub use bulk_inserter::BulkInserter;
 pub use config::DatabaseConfig;
 pub use error::{DbError, Result};
-pub use importer::{ImportProgress, ImportStats, Importer};
+pub use importer::{ImportMode, ImportProgress, ImportStats, Importer};
 pub use models::{License, LicenseStats, Operator};
 pub use repository::{Database, Transaction};
 pub use schema::Schema;

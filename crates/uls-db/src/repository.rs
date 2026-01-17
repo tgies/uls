@@ -498,6 +498,72 @@ impl Database {
         Schema::set_metadata(&conn, &key, etag)?;
         Ok(())
     }
+
+    // ========================================================================
+    // Import Status Tracking
+    // ========================================================================
+
+    /// Check if a record type has been imported for a service.
+    pub fn has_record_type(&self, service: &str, record_type: &str) -> Result<bool> {
+        let conn = self.conn()?;
+        let count: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM import_status WHERE radio_service_code = ?1 AND record_type = ?2",
+            params![service, record_type],
+            |row| row.get(0),
+        )?;
+        Ok(count > 0)
+    }
+
+    /// Get list of imported record types for a service.
+    pub fn get_imported_types(&self, service: &str) -> Result<Vec<String>> {
+        let conn = self.conn()?;
+        let mut stmt = conn.prepare(
+            "SELECT record_type FROM import_status WHERE radio_service_code = ?1 ORDER BY record_type"
+        )?;
+        let iter = stmt.query_map(params![service], |row| row.get(0))?;
+        let mut types = Vec::new();
+        for record_type in iter {
+            types.push(record_type?);
+        }
+        Ok(types)
+    }
+
+    /// Mark record type as imported for a service.
+    pub fn mark_imported(&self, service: &str, record_type: &str, count: usize) -> Result<()> {
+        let conn = self.conn()?;
+        let now = chrono::Utc::now().to_rfc3339();
+        conn.execute(
+            "INSERT OR REPLACE INTO import_status (radio_service_code, record_type, imported_at, record_count) 
+             VALUES (?1, ?2, ?3, ?4)",
+            params![service, record_type, now, count as i64],
+        )?;
+        Ok(())
+    }
+
+    /// Clear import status for a service (used when doing full re-import).
+    pub fn clear_import_status(&self, service: &str) -> Result<()> {
+        let conn = self.conn()?;
+        conn.execute(
+            "DELETE FROM import_status WHERE radio_service_code = ?1",
+            params![service],
+        )?;
+        Ok(())
+    }
+
+    /// Get record count for an imported record type.
+    pub fn get_imported_count(&self, service: &str, record_type: &str) -> Result<Option<usize>> {
+        let conn = self.conn()?;
+        let result: rusqlite::Result<i64> = conn.query_row(
+            "SELECT record_count FROM import_status WHERE radio_service_code = ?1 AND record_type = ?2",
+            params![service, record_type],
+            |row| row.get(0),
+        );
+        match result {
+            Ok(count) => Ok(Some(count as usize)),
+            Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+            Err(e) => Err(e.into()),
+        }
+    }
 }
 
 /// A database transaction for bulk operations.

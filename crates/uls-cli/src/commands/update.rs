@@ -5,7 +5,7 @@ use indicatif::{ProgressBar, ProgressStyle};
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use uls_db::{Database, DatabaseConfig, Importer};
+use uls_db::{Database, DatabaseConfig, ImportMode, Importer};
 use uls_download::{DownloadConfig, DownloadProgress, DownloadResult, FccClient, ProgressCallback, ServiceCatalog};
 
 /// Get the default database path.
@@ -23,7 +23,7 @@ fn default_cache_path() -> PathBuf {
         .join("uls")
 }
 
-pub async fn execute(service: &str, force: bool, _full_only: bool) -> Result<()> {
+pub async fn execute(service: &str, force: bool, minimal: bool) -> Result<()> {
     let db_path = default_db_path();
     let cache_path = default_cache_path();
 
@@ -41,7 +41,9 @@ pub async fn execute(service: &str, force: bool, _full_only: bool) -> Result<()>
         }
     };
 
-    println!("Updating {} database...", service);
+    let import_mode = if minimal { ImportMode::Minimal } else { ImportMode::Full };
+    
+    println!("Updating {} database (mode={:?})...", service, import_mode);
     println!("Database: {}", db_path.display());
     println!("Cache:    {}", cache_path.display());
     println!();
@@ -150,7 +152,7 @@ pub async fn execute(service: &str, force: bool, _full_only: bool) -> Result<()>
         ));
     });
     
-    let stats = importer.import_zip(&zip_path, Some(progress_cb))?;
+    let stats = importer.import_zip_with_mode(&zip_path, import_mode, Some(progress_cb))?;
     
     println!("  [{}] Imported {} records", 
         chrono::Utc::now().format("%H:%M:%S"),

@@ -79,9 +79,9 @@ enum Commands {
         #[arg(long)]
         force: bool,
 
-        /// Skip daily incremental updates
+        /// Import only HD+EN+AM records (sufficient for callsign/FRN lookups)
         #[arg(long)]
-        full_only: bool,
+        minimal: bool,
     },
 
     /// Look up all licenses by FRN (FCC Registration Number)
@@ -172,8 +172,8 @@ async fn main() -> Result<()> {
         }) => {
             commands::search::execute(query, state, city, class, active, limit, &cli.format).await
         }
-        Some(Commands::Update { service, force, full_only }) => {
-            commands::update::execute(&service, force, full_only).await
+        Some(Commands::Update { service, force, minimal }) => {
+            commands::update::execute(&service, force, minimal).await
         }
         Some(Commands::Frn { frn }) => {
             commands::frn::execute(&frn, &cli.format).await

@@ -60,6 +60,43 @@ pub struct ImportProgress {
 /// Callback type for import progress updates.
 pub type ProgressCallback = Box<dyn Fn(&ImportProgress) + Send + Sync>;
 
+/// Import mode controls which record types are imported.
+#[derive(Debug, Clone, Default)]
+pub enum ImportMode {
+    /// Import only HD + EN + AM (sufficient for callsign/FRN/name lookups)
+    Minimal,
+    /// Import all record types
+    #[default]
+    Full,
+    /// Import specific record types
+    Selective(Vec<String>),
+}
+
+impl ImportMode {
+    /// Record types to import for minimal mode (for amateur service).
+    pub const MINIMAL_TYPES: &'static [&'static str] = &["HD", "EN", "AM"];
+    
+    /// Check if a record type should be imported.
+    pub fn should_import(&self, record_type: &str) -> bool {
+        match self {
+            ImportMode::Minimal => Self::MINIMAL_TYPES.contains(&record_type.to_uppercase().as_str()),
+            ImportMode::Full => true,
+            ImportMode::Selective(types) => types.iter().any(|t| t.eq_ignore_ascii_case(record_type)),
+        }
+    }
+    
+    /// Check if a file should be imported based on its name.
+    pub fn should_import_file(&self, filename: &str) -> bool {
+        // Extract record type from filename like "HD.dat" or "EN.dat"
+        let record_type = filename
+            .split('.')
+            .next()
+            .unwrap_or("")
+            .to_uppercase();
+        self.should_import(&record_type)
+    }
+}
+
 /// Importer handles bulk import of FCC data into the database.
 pub struct Importer<'a> {
     db: &'a Database,
@@ -71,29 +108,49 @@ impl<'a> Importer<'a> {
         Self { db }
     }
 
-    /// Import records from a ZIP file.
+    /// Import records from a ZIP file (full import of all record types).
     ///
-    /// This method:
-    /// 1. Opens the ZIP file
-    /// 2. Sorts DAT files by dependency order (HD first, then EN, AM, etc.)
-    /// 3. Streams records through the parser
-    /// 4. Bulk inserts into the database using prepared statements
-    ///
-    /// # Arguments
-    /// * `zip_path` - Path to the FCC ZIP file
-    /// * `progress` - Optional callback for progress updates
-    ///
-    /// # Returns
-    /// Import statistics including record counts and error counts.
+    /// This is a convenience method that calls `import_zip_with_mode` with `ImportMode::Full`.
     pub fn import_zip(
         &self,
         zip_path: &Path,
         progress: Option<ProgressCallback>,
     ) -> Result<ImportStats> {
+        self.import_zip_with_mode(zip_path, ImportMode::Full, progress)
+    }
+
+    /// Import records from a ZIP file with specified import mode.
+    ///
+    /// This method:
+    /// 1. Opens the ZIP file
+    /// 2. Filters DAT files by import mode (minimal imports only HD+EN+AM)
+    /// 3. Sorts DAT files by dependency order (HD first, then EN, AM, etc.)
+    /// 4. Streams records through the parser
+    /// 5. Bulk inserts into the database using prepared statements
+    ///
+    /// # Arguments
+    /// * `zip_path` - Path to the FCC ZIP file
+    /// * `mode` - Import mode (Minimal, Full, or Selective)
+    /// * `progress` - Optional callback for progress updates
+    ///
+    /// # Returns
+    /// Import statistics including record counts and error counts.
+    pub fn import_zip_with_mode(
+        &self,
+        zip_path: &Path,
+        mode: ImportMode,
+        progress: Option<ProgressCallback>,
+    ) -> Result<ImportStats> {
         let start = Instant::now();
         
         let mut extractor = ZipExtractor::open(zip_path)?;
-        let mut dat_files = extractor.list_dat_files();
+        let all_dat_files = extractor.list_dat_files();
+        
+        // Filter files based on import mode
+        let mut dat_files: Vec<String> = all_dat_files
+            .into_iter()
+            .filter(|f| mode.should_import_file(f))
+            .collect();
         
         // Sort by processing order: HD (licenses) first, then EN (entities), then others
         dat_files.sort_by(|a, b| {
@@ -107,7 +164,7 @@ impl<'a> Importer<'a> {
             priority(a).cmp(&priority(b))
         });
         
-        info!("Processing {} DAT files: {:?}", dat_files.len(), dat_files);
+        info!("Processing {} DAT files (mode={:?}): {:?}", dat_files.len(), mode, dat_files);
         
         // Optimize SQLite for bulk import
         let conn = self.db.conn()?;
@@ -128,6 +185,9 @@ impl<'a> Importer<'a> {
             files: dat_files.len(),
             ..Default::default()
         };
+        
+        // Track records per file type for import_status updates
+        let mut records_per_type: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
         
         for (idx, dat_file) in dat_files.iter().enumerate() {
             let mut file_records = 0usize;
@@ -172,6 +232,10 @@ impl<'a> Importer<'a> {
             stats.records += file_records;
             stats.parse_errors += file_parse_errors;
             stats.insert_errors += file_insert_errors;
+            
+            // Track per-file-type records
+            let record_type = dat_file.split('.').next().unwrap_or("").to_uppercase();
+            *records_per_type.entry(record_type).or_insert(0) += file_records;
             
             if file_parse_errors > 0 || file_insert_errors > 0 {
                 warn!(
