@@ -29,7 +29,7 @@ fn format_table_with_fields(licenses: &[License], fields: &[&str]) -> String {
     
     // Header
     for (i, field) in fields.iter().enumerate() {
-        output.push_str(&format!("{:width$} ", field.to_uppercase(), width = widths[i]));
+        output.push_str(&format!("{:width$} ", field, width = widths[i]));
     }
     output.push('\n');
     
@@ -134,7 +134,7 @@ pub async fn execute(
         eprintln!("Error: At least one search filter is required.");
         eprintln!();
         eprintln!("Quick examples:");
-        eprintln!("  uls search Brian -c Omaha -r gmrs  # Find Brian in Omaha (GMRS)");
+        eprintln!("  uls search Smith -c Denver -r gmrs   # Find Smith in Denver (GMRS)");
         eprintln!("  uls search -n Smith -s TX          # Name search in Texas");
         eprintln!("  uls search W1* -a                  # Active callsigns starting with W1");
         eprintln!("  uls search -s FL -S=-grant_date    # Recent grants in Florida");
@@ -154,15 +154,13 @@ pub async fn execute(
         };
         SearchFilter::name(&name_pattern)
     } else if let Some(ref q) = query {
-        if q.contains('*') || q.contains('?') {
-            SearchFilter::callsign(q)
-        } else if q.chars().all(|c| c.is_alphanumeric()) && q.len() <= 10 {
-            // Looks like a callsign
-            SearchFilter::callsign(q)
+        // Positional query is always a name search (use `lookup` for callsigns)
+        let name_pattern = if q.contains('*') || q.contains('?') {
+            q.clone()
         } else {
-            // For positional name search, also add wildcards
-            SearchFilter::name(&format!("*{}*", q))
-        }
+            format!("*{}*", q) // Partial match by default
+        };
+        SearchFilter::name(&name_pattern)
     } else {
         SearchFilter::new()
     };
@@ -173,7 +171,7 @@ pub async fn execute(
 
     if let Some(c) = city {
         // Use generic filter for LIKE matching (handles partial/case matches)
-        filter = filter.with_filter(format!("city={}", c.to_uppercase()));
+        filter = filter.with_filter(format!("city={}", c));
     }
 
     if let Some(z) = zip {

@@ -122,7 +122,7 @@ impl SearchFilter {
     /// Create a filter for callsign lookup.
     pub fn callsign(callsign: impl Into<String>) -> Self {
         Self {
-            callsign: Some(callsign.into().to_uppercase()),
+            callsign: Some(callsign.into()),
             ..Default::default()
         }
     }
@@ -130,7 +130,7 @@ impl SearchFilter {
     /// Create a filter for name search.
     pub fn name(name: impl Into<String>) -> Self {
         Self {
-            name: Some(name.into().to_uppercase()),
+            name: Some(name.into()),
             ..Default::default()
         }
     }
@@ -138,8 +138,8 @@ impl SearchFilter {
     /// Create a filter for location search.
     pub fn location(city: Option<String>, state: Option<String>) -> Self {
         Self {
-            city: city.map(|s| s.to_uppercase()),
-            state: state.map(|s| s.to_uppercase()),
+            city: city,
+            state: state,
             ..Default::default()
         }
     }
@@ -165,7 +165,7 @@ impl SearchFilter {
 
     /// Filter by state.
     pub fn with_state(mut self, state: impl Into<String>) -> Self {
-        self.state = Some(state.into().to_uppercase());
+        self.state = Some(state.into());
         self
     }
 

@@ -29,7 +29,7 @@ pub async fn execute(callsign: &str, service_override: &str, all_services: bool,
     let primary_license = match engine.lookup(callsign)? {
         Some(license) => license,
         None => {
-            eprintln!("No license found for callsign: {}", callsign.to_uppercase());
+            eprintln!("No license found for callsign: {}", callsign);
             std::process::exit(1);
         }
     };
@@ -65,10 +65,9 @@ pub async fn execute(callsign: &str, service_override: &str, all_services: bool,
     let mut all_licenses = engine.lookup_by_frn(&frn)?;
 
     // Ensure the originally looked-up callsign appears first
-    let callsign_upper = callsign.to_uppercase();
     all_licenses.sort_by(|a, b| {
-        let a_is_primary = a.call_sign.to_uppercase() == callsign_upper;
-        let b_is_primary = b.call_sign.to_uppercase() == callsign_upper;
+        let a_is_primary = a.call_sign == callsign;
+        let b_is_primary = b.call_sign == callsign;
         b_is_primary.cmp(&a_is_primary) // true sorts before false
     });
 
