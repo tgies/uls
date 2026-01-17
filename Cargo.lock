@@ -2525,6 +2525,7 @@ dependencies = [
  "tracing",
  "uls-core",
  "uls-parser",
+ "zip",
 ]
 
 [[package]]

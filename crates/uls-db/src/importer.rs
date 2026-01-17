@@ -214,3 +214,158 @@ impl<'a> Importer<'a> {
         Ok(stats)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::DatabaseConfig;
+    use std::io::Write;
+    use tempfile::TempDir;
+    use zip::write::FileOptions;
+    use zip::ZipWriter;
+
+    fn create_test_db() -> (TempDir, Database) {
+        let temp_dir = TempDir::new().unwrap();
+        let db_path = temp_dir.path().join("test.db");
+        let config = DatabaseConfig::with_path(db_path);
+        let db = Database::with_config(config).unwrap();
+        db.initialize().unwrap();
+        (temp_dir, db)
+    }
+
+    fn create_test_zip(temp_dir: &TempDir) -> std::path::PathBuf {
+        let zip_path = temp_dir.path().join("test.zip");
+        let file = std::fs::File::create(&zip_path).unwrap();
+        let mut zip = ZipWriter::new(file);
+        let options: FileOptions<()> = FileOptions::default();
+
+        // HD record - license header
+        zip.start_file("HD.dat", options.clone()).unwrap();
+        zip.write_all(b"HD|100001|0000000001||W1TEST|A|HA|01/15/2020|01/15/2030|||||||||||||||||||||||||||||||||||N|||||||||||01/15/2020|01/15/2020|||||||||||||||\n").unwrap();
+
+        // EN record - entity
+        zip.start_file("EN.dat", options.clone()).unwrap();
+        zip.write_all(b"EN|100001|||W1TEST|L|L00100001|DOE, JOHN A|JOHN|A|DOE||555-555-1234||test@example.com|123 Main St|ANYTOWN|CA|90210||||000|0001234567|I||||||\n").unwrap();
+
+        // AM record - amateur
+        zip.start_file("AM.dat", options.clone()).unwrap();
+        zip.write_all(b"AM|100001|||W1TEST|E|D|6||||||||||\n").unwrap();
+
+        zip.finish().unwrap();
+        zip_path
+    }
+
+    #[test]
+    fn test_import_stats_default() {
+        let stats = ImportStats::default();
+        assert_eq!(stats.records, 0);
+        assert_eq!(stats.files, 0);
+        assert_eq!(stats.parse_errors, 0);
+        assert_eq!(stats.insert_errors, 0);
+        assert_eq!(stats.duration_secs, 0.0);
+    }
+
+    #[test]
+    fn test_import_stats_rate() {
+        let stats = ImportStats {
+            records: 1000,
+            duration_secs: 2.0,
+            ..Default::default()
+        };
+        assert_eq!(stats.rate(), 500.0);
+    }
+
+    #[test]
+    fn test_import_stats_rate_zero_duration() {
+        let stats = ImportStats {
+            records: 1000,
+            duration_secs: 0.0,
+            ..Default::default()
+        };
+        assert_eq!(stats.rate(), 0.0);
+    }
+
+    #[test]
+    fn test_import_stats_is_successful() {
+        let stats = ImportStats {
+            insert_errors: 0,
+            ..Default::default()
+        };
+        assert!(stats.is_successful());
+
+        let stats_with_errors = ImportStats {
+            insert_errors: 1,
+            ..Default::default()
+        };
+        assert!(!stats_with_errors.is_successful());
+    }
+
+    #[test]
+    fn test_importer_new() {
+        let (_temp_dir, db) = create_test_db();
+        let importer = Importer::new(&db);
+        // Just verify it can be created
+        assert!(std::ptr::eq(importer.db, &db));
+    }
+
+    #[test]
+    fn test_import_zip_basic() {
+        let (temp_dir, db) = create_test_db();
+        let zip_path = create_test_zip(&temp_dir);
+        
+        let importer = Importer::new(&db);
+        let stats = importer.import_zip(&zip_path, None).unwrap();
+        
+        assert_eq!(stats.files, 3); // HD, EN, AM
+        assert_eq!(stats.records, 3);
+        assert_eq!(stats.parse_errors, 0);
+        assert_eq!(stats.insert_errors, 0);
+        assert!(stats.is_successful());
+    }
+
+    #[test]
+    fn test_import_zip_with_progress_callback() {
+        let (temp_dir, db) = create_test_db();
+        let zip_path = create_test_zip(&temp_dir);
+        
+        let progress_called = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let progress_called_clone = progress_called.clone();
+        
+        let callback: ProgressCallback = Box::new(move |_progress| {
+            progress_called_clone.store(true, std::sync::atomic::Ordering::SeqCst);
+        });
+        
+        let importer = Importer::new(&db);
+        let stats = importer.import_zip(&zip_path, Some(callback)).unwrap();
+        
+        assert!(stats.is_successful());
+        // Progress callback may or may not be called depending on record count
+    }
+
+    #[test]
+    fn test_import_zip_nonexistent_file() {
+        let (_temp_dir, db) = create_test_db();
+        let importer = Importer::new(&db);
+        
+        let result = importer.import_zip(Path::new("/nonexistent/file.zip"), None);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_import_zip_verifies_data() {
+        let (temp_dir, db) = create_test_db();
+        let zip_path = create_test_zip(&temp_dir);
+        
+        let importer = Importer::new(&db);
+        importer.import_zip(&zip_path, None).unwrap();
+        
+        // Verify data was actually imported
+        if let Some(license) = db.get_license_by_callsign("W1TEST").unwrap() {
+            assert_eq!(license.call_sign, "W1TEST");
+            assert_eq!(license.radio_service.as_str(), "HA");
+        } else {
+            panic!("License W1TEST should have been imported");
+        }
+    }
+}
+
