@@ -781,5 +781,43 @@ mod tests {
         let license = db.get_license_by_callsign("W1TEST").unwrap();
         assert!(license.is_none());
     }
+
+    #[test]
+    fn test_open_database_with_path() {
+        use tempfile::TempDir;
+        
+        let temp_dir = TempDir::new().unwrap();
+        let db_path = temp_dir.path().join("subdir").join("test.db");
+        
+        // Database::open should work and create parent directory
+        let db = Database::open(&db_path).unwrap();
+        db.initialize().unwrap();
+        assert!(db.is_initialized().unwrap());
+        assert!(db_path.parent().unwrap().exists());
+    }
+
+    #[test]
+    fn test_insert_unsupported_record_type() {
+        use uls_core::records::LocationRecord;
+        
+        let db = create_test_db();
+        
+        // Location is not supported in repository insert_record
+        let location = LocationRecord::from_fields(&[
+            "LO", "12345", "", "", "W1TEST",
+        ]);
+        // Should not error, just skip
+        db.insert_record(&UlsRecord::Location(location)).unwrap();
+    }
+
+    #[test]
+    fn test_count_by_service_empty() {
+        let db = create_test_db();
+        
+        // Empty service codes should return 0
+        let count = db.count_by_service(&[]).unwrap();
+        assert_eq!(count, 0);
+    }
 }
+
 
