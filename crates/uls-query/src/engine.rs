@@ -162,6 +162,52 @@ impl QueryEngine {
     pub fn database(&self) -> &Database {
         &self.db
     }
+
+    // ========================================================================
+    // Lazy Loading Support
+    // ========================================================================
+
+    /// Determine which record types are required for basic queries.
+    /// 
+    /// Returns the minimal set of record types needed:
+    /// - HD (licenses) - always needed
+    /// - EN (entities) - needed for name/address/FRN
+    /// - AM (amateur) - needed if operator_class filter is used
+    pub fn required_record_types(filter: &SearchFilter) -> Vec<&'static str> {
+        let mut types = vec!["HD", "EN"];
+        if filter.operator_class.is_some() {
+            types.push("AM");
+        }
+        types
+    }
+
+    /// Check if any required record types are missing for a given service.
+    /// 
+    /// Returns a list of missing record types that need to be imported.
+    pub fn missing_data_for_query(&self, service: &str, filter: &SearchFilter) -> Result<Vec<String>> {
+        let required = Self::required_record_types(filter);
+        let mut missing = Vec::new();
+        
+        for record_type in required {
+            if !self.db.has_record_type(service, record_type)? {
+                missing.push(record_type.to_string());
+            }
+        }
+        
+        Ok(missing)
+    }
+
+    /// Check if data is available for basic queries (HD + EN at minimum).
+    pub fn has_basic_data(&self, service: &str) -> Result<bool> {
+        let has_hd = self.db.has_record_type(service, "HD")?;
+        let has_en = self.db.has_record_type(service, "EN")?;
+        Ok(has_hd && has_en)
+    }
+
+    /// Get the list of imported record types for a service.
+    pub fn imported_types(&self, service: &str) -> Result<Vec<String>> {
+        Ok(self.db.get_imported_types(service)?)
+    }
 }
 
 #[cfg(test)]

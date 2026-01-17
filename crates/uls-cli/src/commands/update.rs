@@ -152,7 +152,7 @@ pub async fn execute(service: &str, force: bool, minimal: bool) -> Result<()> {
         ));
     });
     
-    let stats = importer.import_zip_with_mode(&zip_path, import_mode, Some(progress_cb))?;
+    let stats = importer.import_for_service(&zip_path, service_code, import_mode, Some(progress_cb))?;
     
     println!("  [{}] Imported {} records", 
         chrono::Utc::now().format("%H:%M:%S"),

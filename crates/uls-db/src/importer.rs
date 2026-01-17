@@ -277,6 +277,43 @@ impl<'a> Importer<'a> {
         
         Ok(stats)
     }
+
+    /// Import records from a ZIP file for a specific service and track import status.
+    /// 
+    /// This wraps `import_zip_with_mode` and records which record types were imported
+    /// to enable lazy loading detection.
+    pub fn import_for_service(
+        &self,
+        zip_path: &Path,
+        service: &str,
+        mode: ImportMode,
+        progress: Option<ProgressCallback>,
+    ) -> Result<ImportStats> {
+        // Clear previous import status for this service
+        self.db.clear_import_status(service)?;
+        
+        let mut extractor = uls_parser::archive::ZipExtractor::open(zip_path)?;
+        let all_dat_files = extractor.list_dat_files();
+        
+        // Determine which record types will be imported
+        let imported_types: Vec<String> = all_dat_files
+            .iter()
+            .filter(|f| mode.should_import_file(f))
+            .map(|f| f.split('.').next().unwrap_or("").to_uppercase())
+            .collect();
+        
+        // Perform the import
+        let stats = self.import_zip_with_mode(zip_path, mode, progress)?;
+        
+        // Record import status for each record type
+        // Note: We estimate record counts per type based on file structure
+        // For now, we just mark them as imported with 0 as placeholder count
+        for record_type in imported_types {
+            self.db.mark_imported(service, &record_type, 0)?;
+        }
+        
+        Ok(stats)
+    }
 }
 
 #[cfg(test)]
