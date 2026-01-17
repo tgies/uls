@@ -1,6 +1,5 @@
 //! Output formatting for license data.
 
-use serde::Serialize;
 use uls_db::models::License;
 
 /// Supported output formats.
