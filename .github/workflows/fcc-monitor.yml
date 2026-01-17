@@ -132,20 +132,29 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
       
-      - name: Build uls-parser
-        run: cargo build --release -p uls-parser
+      - name: Cache FCC data
+        uses: actions/cache@v4
+        with:
+          path: test-data
+          key: fcc-monitor-data-${{ github.run_id }}
+          restore-keys: |
+            fcc-monitor-data-
       
-      - name: Download sample data
+      - name: Download sample data (if not cached)
         run: |
-          mkdir -p test-data
-          curl -sS -o test-data/l_amat.zip \
-            -H "User-Agent: ULS-CLI-Monitor/1.0" \
-            "${FCC_DATA_BASE_URL}/complete/l_amat.zip"
+          if [[ ! -f test-data/l_amat.zip ]]; then
+            mkdir -p test-data
+            curl -sS -o test-data/l_amat.zip \
+              -H "User-Agent: ULS-CLI-Monitor/1.0" \
+              "${FCC_DATA_BASE_URL}/complete/l_amat.zip"
+          fi
           
-          echo "Downloaded: $(ls -lh test-data/l_amat.zip)"
+          echo "Data file: $(ls -lh test-data/l_amat.zip)"
           
-          # Extract
-          unzip -q test-data/l_amat.zip -d test-data/l_amat
+          # Extract if not already extracted
+          if [[ ! -d test-data/l_amat ]]; then
+            unzip -q test-data/l_amat.zip -d test-data/l_amat
+          fi
       
       - name: Build CLI and test parsing
         run: |

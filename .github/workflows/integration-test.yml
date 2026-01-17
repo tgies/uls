@@ -13,13 +13,18 @@ on:
           - full
           - quick
         default: quick
+      force_download:
+        description: 'Force fresh download (ignore cache)'
+        type: boolean
+        default: false
 
 env:
   CARGO_TERM_COLOR: always
+  FCC_DATA_BASE_URL: "https://data.fcc.gov/download/pub/uls"
 
 jobs:
-  quick-integration:
-    name: Quick Integration Test
+  integration-test:
+    name: Integration Test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -63,11 +68,26 @@ jobs:
             target
           key: ${{ runner.os }}-cargo-integration-${{ hashFiles('**/Cargo.lock') }}
       
+      - name: Cache FCC amateur data
+        id: cache-fcc-data
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/uls
+          key: fcc-amateur-data-${{ github.run_id }}
+          restore-keys: |
+            fcc-amateur-data-
+      
       - name: Build CLI
         run: cargo build --release -p uls-cli
       
       - name: Download and import amateur data
         run: |
+          if [[ "${{ github.event.inputs.force_download }}" == "true" ]]; then
+            echo "Force download requested, clearing cache..."
+            rm -rf ~/.cache/uls
+          fi
+          
           ./target/release/uls update --service amateur
       
       - name: Verify database stats
@@ -86,7 +106,7 @@ jobs:
   report:
     name: Generate Report
     runs-on: ubuntu-latest
-    needs: [quick-integration]
+    needs: [integration-test]
     if: always()
     steps:
       - name: Generate summary
@@ -95,4 +115,4 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "- **Date**: $(date -u +%Y-%m-%d)" >> $GITHUB_STEP_SUMMARY
           echo "- **Trigger**: ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Status**: ${{ needs.quick-integration.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Status**: ${{ needs.integration-test.result }}" >> $GITHUB_STEP_SUMMARY
