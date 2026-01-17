@@ -227,7 +227,7 @@ def extract_fixture(cache_dir: Path, output_dir: Path, count: int = 50, seed: in
         f.write("All records are real FCC data with referential integrity preserved.\n\n")
         f.write("## Generation\n\n")
         f.write("```bash\n")
-        f.write(f"python scripts/extract_test_fixture.py {cache_dir} {output_dir} --count {count}\n")
+        f.write(f"python scripts/extract_test_fixture.py <cache_dir> <output_dir> --count {count}\n")
         f.write("```\n\n")
         f.write("## Contents\n\n")
         
