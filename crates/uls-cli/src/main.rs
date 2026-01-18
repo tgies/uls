@@ -14,6 +14,7 @@ use clap::{Parser, Subcommand};
 use tracing_subscriber::EnvFilter;
 
 mod commands;
+mod config;
 
 #[derive(Parser)]
 #[command(name = "uls")]
@@ -91,7 +92,6 @@ enum Commands {
         /// Only show active licenses (shortcut for --status A)
         #[arg(short = 'a', long)]
         active: bool,
-
 
         /// Licenses granted on or after this date (YYYY-MM-DD)
         #[arg(long)]
@@ -185,19 +185,19 @@ fn looks_like_callsign(s: &str) -> bool {
     if s.len() < 3 || s.len() > 7 {
         return false;
     }
-    
+
     let chars: Vec<char> = s.chars().collect();
-    
+
     // Must start with letter
     if !chars[0].is_ascii_alphabetic() {
         return false;
     }
-    
+
     // Must contain at least one digit
     if !chars.iter().any(|c| c.is_ascii_digit()) {
         return false;
     }
-    
+
     // All chars must be alphanumeric
     chars.iter().all(|c| c.is_ascii_alphanumeric())
 }
@@ -215,14 +215,18 @@ async fn main() -> Result<()> {
     };
 
     tracing_subscriber::fmt()
-        .with_env_filter(EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new(filter)))
+        .with_env_filter(
+            EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new(filter)),
+        )
         .init();
 
     // Execute command
     match cli.command {
-        Some(Commands::Lookup { callsign, service, all }) => {
-            commands::lookup::execute(&callsign, &service, all, &cli.format).await
-        }
+        Some(Commands::Lookup {
+            callsign,
+            service,
+            all,
+        }) => commands::lookup::execute(&callsign, &service, all, &cli.format).await,
         Some(Commands::Search {
             query,
             name,
@@ -243,20 +247,36 @@ async fn main() -> Result<()> {
             fields,
         }) => {
             commands::search::execute(
-                query, name, state, city, zip, frn, class, status, active,
-                granted_after, granted_before, expires_before, filters,
-                &sort, limit, &service, &cli.format, fields
-            ).await
+                query,
+                name,
+                state,
+                city,
+                zip,
+                frn,
+                class,
+                status,
+                active,
+                granted_after,
+                granted_before,
+                expires_before,
+                filters,
+                &sort,
+                limit,
+                &service,
+                &cli.format,
+                fields,
+            )
+            .await
         }
-        Some(Commands::Update { service, force, minimal }) => {
-            commands::update::execute(&service, force, minimal).await
-        }
+        Some(Commands::Update {
+            service,
+            force,
+            minimal,
+        }) => commands::update::execute(&service, force, minimal).await,
         Some(Commands::Frn { frn, service }) => {
             commands::frn::execute(&frn, &service, &cli.format).await
         }
-        Some(Commands::Stats) => {
-            commands::stats::execute(&cli.format).await
-        }
+        Some(Commands::Stats) => commands::stats::execute(&cli.format).await,
         Some(Commands::Db { command }) => match command {
             DbCommands::Init { path } => commands::db::init(path).await,
             DbCommands::Info => commands::db::info(&cli.format).await,
@@ -294,11 +314,11 @@ mod tests {
         assert!(looks_like_callsign("AA1A"));
         assert!(looks_like_callsign("w1aw")); // case insensitive
         assert!(looks_like_callsign("KA1AAA"));
-        
+
         assert!(!looks_like_callsign("lookup")); // no digits
         assert!(!looks_like_callsign("search")); // no digits
-        assert!(!looks_like_callsign("AB"));     // too short
-        assert!(!looks_like_callsign("")); 
-        assert!(!looks_like_callsign("12345"));  // no letters at start
+        assert!(!looks_like_callsign("AB")); // too short
+        assert!(!looks_like_callsign(""));
+        assert!(!looks_like_callsign("12345")); // no letters at start
     }
 }

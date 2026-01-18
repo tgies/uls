@@ -37,3 +37,4 @@ tempfile.workspace = true
 rstest.workspace = true
 assert_cmd = "2.0"
 predicates = "3.1"
+zip.workspace = true

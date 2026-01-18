@@ -3,17 +3,11 @@
 use anyhow::{Context, Result};
 use uls_query::{OutputFormat, QueryEngine};
 
-/// Get the default database path.
-fn default_db_path() -> std::path::PathBuf {
-    dirs::data_local_dir()
-        .unwrap_or_else(|| std::path::PathBuf::from("."))
-        .join("uls")
-        .join("uls.db")
-}
+use crate::config::default_db_path;
 
 pub async fn execute(format: &str) -> Result<()> {
     let db_path = default_db_path();
-    
+
     let engine = QueryEngine::open(&db_path)
         .context("Failed to open database. Run 'uls update' first to initialize.")?;
 

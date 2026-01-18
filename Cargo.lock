@@ -2494,6 +2494,7 @@ dependencies = [
  "uls-download",
  "uls-parser",
  "uls-query",
+ "zip",
 ]
 
 [[package]]

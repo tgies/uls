@@ -4,20 +4,16 @@ use anyhow::{Context, Result};
 use uls_db::{Database, DatabaseConfig};
 use uls_query::{OutputFormat, QueryEngine};
 
-/// Get the default database path.
-fn default_db_path() -> std::path::PathBuf {
-    dirs::data_local_dir()
-        .unwrap_or_else(|| std::path::PathBuf::from("."))
-        .join("uls")
-        .join("uls.db")
-}
+use crate::config::default_db_path;
 
 /// Initialize a new database.
 pub async fn init(path: Option<String>) -> Result<()> {
-    let db_path = path.map(std::path::PathBuf::from).unwrap_or_else(default_db_path);
-    
+    let db_path = path
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(default_db_path);
+
     println!("Initializing database at: {}", db_path.display());
-    
+
     // Create parent directory if needed
     if let Some(parent) = db_path.parent() {
         std::fs::create_dir_all(parent)?;
@@ -34,15 +30,14 @@ pub async fn init(path: Option<String>) -> Result<()> {
 /// Show database info.
 pub async fn info(format: &str) -> Result<()> {
     let db_path = default_db_path();
-    
+
     if !db_path.exists() {
         eprintln!("Database not found at: {}", db_path.display());
         eprintln!("Run 'uls db init' to create a new database.");
         std::process::exit(1);
     }
 
-    let engine = QueryEngine::open(&db_path)
-        .context("Failed to open database")?;
+    let engine = QueryEngine::open(&db_path).context("Failed to open database")?;
 
     let stats = engine.stats()?;
     let output_format = OutputFormat::from_str(format).unwrap_or_default();
@@ -80,20 +75,20 @@ pub async fn info(format: &str) -> Result<()> {
 /// Vacuum/optimize the database.
 pub async fn vacuum() -> Result<()> {
     let db_path = default_db_path();
-    
+
     if !db_path.exists() {
         eprintln!("Database not found at: {}", db_path.display());
         std::process::exit(1);
     }
 
     println!("Optimizing database...");
-    
+
     let config = DatabaseConfig::with_path(&db_path);
     let db = Database::with_config(config)?;
     let conn = db.conn()?;
-    
+
     conn.execute_batch("VACUUM; ANALYZE;")?;
-    
+
     println!("✓ Database optimized.");
     Ok(())
 }
