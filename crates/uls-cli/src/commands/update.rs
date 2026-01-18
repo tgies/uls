@@ -78,7 +78,7 @@ pub async fn execute(service: &str, force: bool, minimal: bool) -> Result<()> {
     let cache_etag = client.get_cached_etag(&data_file);
 
     // Get the ETag of what's currently imported in the DB for this service
-    let db_imported_etag = db.get_imported_etag(service)?;
+    let db_imported_etag = db.get_imported_etag(service_code)?;
 
     // Service codes for this import
     let service_codes: Vec<&str> = match service_code {
@@ -167,7 +167,7 @@ pub async fn execute(service: &str, force: bool, minimal: bool) -> Result<()> {
     // Only save the imported ETag if there were no insert errors
     if stats.is_successful() {
         if let Some(etag) = import_etag {
-            db.set_imported_etag(service, &etag)?;
+            db.set_imported_etag(service_code, &etag)?;
         }
     }
 
