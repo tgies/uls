@@ -31,9 +31,9 @@ struct Cli {
     #[command(subcommand)]
     command: Option<Commands>,
 
-    /// Callsign for quick lookup (shorthand for `uls lookup <CALLSIGN>`)
+    /// Callsigns for quick lookup (shorthand for `uls lookup <CALLSIGN>...`)
     #[arg(value_name = "CALLSIGN")]
-    callsign: Option<String>,
+    callsigns: Vec<String>,
 
     /// Also show licenses from other services for the same FRN (with shorthand lookup)
     #[arg(short, long)]
@@ -42,13 +42,14 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-    /// Look up a license by callsign
+    /// Look up licenses by callsign (one or more)
     Lookup {
-        /// Callsign to look up
-        callsign: String,
+        /// Callsigns to look up
+        #[arg(required = true)]
+        callsigns: Vec<String>,
 
-        /// Radio service (amateur, gmrs)
-        #[arg(long, default_value = "amateur")]
+        /// Radio service (amateur, gmrs, auto)
+        #[arg(long, default_value = "auto")]
         service: String,
 
         /// Also show licenses from other services for the same FRN
@@ -227,10 +228,10 @@ async fn main() -> Result<()> {
     // Execute command
     match cli.command {
         Some(Commands::Lookup {
-            callsign,
+            callsigns,
             service,
             all,
-        }) => commands::lookup::execute(&callsign, &service, all, &cli.format).await,
+        }) => commands::lookup::execute(&callsigns, &service, all, &cli.format).await,
         Some(Commands::Search(args)) => {
             commands::search::execute(
                 args.query,
@@ -270,16 +271,23 @@ async fn main() -> Result<()> {
         },
         None => {
             // No subcommand - check for quick callsign lookup
-            if let Some(callsign) = cli.callsign {
-                if looks_like_callsign(&callsign) {
-                    commands::lookup::execute(&callsign, "amateur", cli.all, &cli.format).await
+            if !cli.callsigns.is_empty() {
+                // Validate all args look like callsigns
+                if cli.callsigns.iter().all(|c| looks_like_callsign(c)) {
+                    commands::lookup::execute(&cli.callsigns, "auto", cli.all, &cli.format).await
                 } else {
-                    eprintln!("Unknown command or invalid callsign: {}", callsign);
+                    // Find first non-callsign to report
+                    let bad = cli
+                        .callsigns
+                        .iter()
+                        .find(|c| !looks_like_callsign(c))
+                        .unwrap();
+                    eprintln!("Unknown command or invalid callsign: {}", bad);
                     eprintln!("Run 'uls --help' for usage information.");
                     std::process::exit(1);
                 }
             } else {
-                // No command and no callsign - show help
+                // No command and no callsigns - show help
                 use clap::CommandFactory;
                 Cli::command().print_help()?;
                 Ok(())

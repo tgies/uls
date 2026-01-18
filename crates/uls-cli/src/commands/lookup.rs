@@ -1,4 +1,6 @@
-//! Lookup command - look up a license by callsign.
+//! Lookup command - look up licenses by callsign.
+
+use std::collections::HashSet;
 
 use anyhow::{Context, Result};
 use uls_query::{FormatOutput, OutputFormat, QueryEngine};
@@ -9,75 +11,111 @@ use super::auto_update;
 const ALL_SERVICES: &[&str] = &["HA", "ZA"];
 
 pub async fn execute(
-    callsign: &str,
+    callsigns: &[String],
     service_override: &str,
     all_services: bool,
     format: &str,
 ) -> Result<()> {
-    // Use service override if provided, otherwise auto-detect from callsign
-    let primary_service = if service_override == "auto" || service_override == "amateur" {
-        // For "amateur" default, still auto-detect to catch GMRS
-        auto_update::detect_service_from_callsign(callsign)
-    } else {
-        auto_update::service_name_to_code(service_override)
-            .ok_or_else(|| anyhow::anyhow!("Unknown service: {}", service_override))?
-    };
+    if callsigns.is_empty() {
+        anyhow::bail!("At least one callsign is required");
+    }
 
-    // Ensure primary service data is available
-    let db = auto_update::ensure_data_available(primary_service)
-        .await
-        .context("Failed to ensure data is available")?;
+    // Batch service detection: collect unique services needed
+    let services_needed: HashSet<&str> = callsigns
+        .iter()
+        .map(|cs| {
+            if service_override == "auto" || service_override == "amateur" {
+                auto_update::detect_service_from_callsign(cs)
+            } else {
+                auto_update::service_name_to_code(service_override).unwrap_or("HA")
+            }
+        })
+        .collect();
 
+    // Batch downloads: ensure each unique service is available
+    for service in &services_needed {
+        auto_update::ensure_data_available(service)
+            .await
+            .context(format!(
+                "Failed to ensure data is available for {}",
+                service
+            ))?;
+    }
+
+    // Get database handle (any service will do, they share the same DB)
+    let primary_service = services_needed.iter().next().unwrap_or(&"HA");
+    let db = auto_update::ensure_data_available(primary_service).await?;
     let engine = QueryEngine::with_database(db);
     let output_format = format.parse::<OutputFormat>().unwrap_or_default();
 
-    // Look up the primary license
-    let primary_license = match engine.lookup(callsign)? {
-        Some(license) => license,
-        None => {
-            eprintln!("No license found for callsign: {}", callsign);
-            std::process::exit(1);
-        }
-    };
+    // Query each callsign, track results and failures
+    let mut results = Vec::new();
+    let mut not_found = Vec::new();
 
-    // If not requesting all services, just print the primary and exit
+    for callsign in callsigns {
+        match engine.lookup(callsign)? {
+            Some(license) => results.push(license),
+            None => not_found.push(callsign.as_str()),
+        }
+    }
+
+    // Report not-found callsigns to stderr (non-blocking)
+    for cs in &not_found {
+        eprintln!("No license found for: {}", cs);
+    }
+
+    // If nothing found at all, exit with error
+    if results.is_empty() {
+        std::process::exit(1);
+    }
+
+    // If not requesting cross-service lookup, output what we have
     if !all_services {
-        println!("{}", primary_license.format(output_format));
+        println!("{}", results.format(output_format));
         return Ok(());
     }
 
-    // Cross-service lookup: need FRN
-    let frn = match &primary_license.frn {
-        Some(f) if !f.is_empty() => f.clone(),
-        _ => {
-            // No FRN, can't do cross-service lookup
-            println!("{}", primary_license.format(output_format));
-            eprintln!("\nNo FRN available for cross-service lookup");
-            return Ok(());
-        }
-    };
+    // Cross-service lookup: collect unique FRNs from found licenses
+    let frns: HashSet<String> = results
+        .iter()
+        .filter_map(|l| l.frn.clone())
+        .filter(|f| !f.is_empty())
+        .collect();
 
-    // Ensure ALL services are loaded into the single database
+    if frns.is_empty() {
+        // No FRNs available, can't do cross-service lookup
+        eprintln!("\nNo FRNs available for cross-service lookup");
+        println!("{}", results.format(output_format));
+        return Ok(());
+    }
+
+    // Ensure ALL services are loaded for cross-service queries
     for &service in ALL_SERVICES {
-        if service == primary_service {
-            continue; // Already loaded
-        }
         auto_update::ensure_data_available(service).await?;
     }
 
-    // Now query by FRN - this will find all licenses across all services in the single DB
+    // Re-get engine with all data loaded
     let db = auto_update::ensure_data_available(primary_service).await?;
     let engine = QueryEngine::with_database(db);
-    let mut all_licenses = engine.lookup_by_frn(&frn)?;
 
-    // Ensure the originally looked-up callsign appears first
+    // Query all FRNs and collect licenses
+    let mut all_licenses = Vec::new();
+    for frn in &frns {
+        all_licenses.extend(engine.lookup_by_frn(frn)?);
+    }
+
+    // Deduplicate by unique_system_identifier
+    all_licenses.sort_by(|a, b| a.unique_system_identifier.cmp(&b.unique_system_identifier));
+    all_licenses.dedup_by(|a, b| a.unique_system_identifier == b.unique_system_identifier);
+
+    // Sort so originally-requested callsigns appear first
+    let requested: HashSet<&str> = callsigns.iter().map(|s| s.as_str()).collect();
     all_licenses.sort_by(|a, b| {
-        let a_is_primary = a.call_sign == callsign;
-        let b_is_primary = b.call_sign == callsign;
-        b_is_primary.cmp(&a_is_primary) // true sorts before false
+        let a_requested = requested.contains(a.call_sign.as_str());
+        let b_requested = requested.contains(b.call_sign.as_str());
+        b_requested.cmp(&a_requested) // requested ones sort first
     });
 
-    // Output all licenses using FormatOutput (handles JSON properly)
     println!("{}", all_licenses.format(output_format));
 
     Ok(())

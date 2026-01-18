@@ -203,13 +203,14 @@ fn test_lookup_json_output() {
     let (_temp_dir, db_path) = setup_test_db(&["l_amat"]);
     let callsign = get_first_callsign("l_amat");
 
+    // Lookup now returns array for consistency with multi-callsign support
     Command::cargo_bin("uls")
         .unwrap()
         .env("ULS_DB_PATH", &db_path)
         .args(["lookup", &callsign, "--format", "json"])
         .assert()
         .success()
-        .stdout(predicate::str::starts_with("{"))
+        .stdout(predicate::str::starts_with("["))
         .stdout(predicate::str::contains("call_sign"));
 }
 
@@ -304,6 +305,37 @@ fn test_shorthand_callsign_lookup() {
         .assert()
         .success()
         .stdout(predicate::str::contains(&callsign));
+}
+
+#[test]
+fn test_multi_callsign_lookup() {
+    let (_temp_dir, db_path) = setup_test_db(&["l_amat"]);
+    let callsign = get_first_callsign("l_amat");
+
+    // Multiple callsigns should all be looked up
+    Command::cargo_bin("uls")
+        .unwrap()
+        .env("ULS_DB_PATH", &db_path)
+        .args(["lookup", &callsign, &callsign, "--format", "json"])
+        .assert()
+        .success()
+        .stdout(predicate::str::starts_with("["));
+}
+
+#[test]
+fn test_multi_callsign_partial_failure() {
+    let (_temp_dir, db_path) = setup_test_db(&["l_amat"]);
+    let callsign = get_first_callsign("l_amat");
+
+    // One valid, one invalid - should still succeed with warning
+    Command::cargo_bin("uls")
+        .unwrap()
+        .env("ULS_DB_PATH", &db_path)
+        .args(["lookup", &callsign, "ZZZZZZ"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(&callsign))
+        .stderr(predicate::str::contains("No license found"));
 }
 
 // =============================================================================
