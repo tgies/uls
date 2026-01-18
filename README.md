@@ -4,11 +4,11 @@ A fast, robust command-line tool for querying FCC ULS public data.
 
 ## Features
 
-- 🔍 **Quick callsign lookups** - `uls W1AW`
-- 📥 **Automatic data updates** - Downloads and applies FCC weekly/daily updates
-- 🗄️ **Local database** - SQLite for fast offline queries
-- 🌐 **REST API mode** - Serve ULS data over HTTP
-- 📊 **Multiple output formats** - JSON, CSV, YAML, table
+- **Quick callsign lookups** - `uls W1AW`
+- **Automatic data updates** - Downloads and applies FCC weekly/daily updates
+- **Local database** - SQLite for fast offline queries
+- **REST API mode** - Serve ULS data over HTTP (planned)
+- **Multiple output formats** - JSON, CSV, YAML, table
 
 ## Quick Start
 
@@ -35,7 +35,7 @@ Currently prioritized:
 - **Amateur Radio (HA/HV)** - Full support
 - **GMRS (ZA)** - Full support
 
-All 142+ FCC radio services will be supported in future releases.
+Additional FCC radio services are planned for future releases.
 
 ## Commands
 
@@ -66,7 +66,6 @@ cargo build --release
 ### Requirements
 
 - Rust 1.75+
-- SQLite 3.x (bundled)
 
 ## Data Sources
 
