@@ -365,6 +365,20 @@ fn test_frn_help() {
         .stdout(predicate::str::contains("FRN").or(predicate::str::contains("frn")));
 }
 
+#[test]
+fn test_multi_frn_partial_failure() {
+    let (_temp_dir, db_path) = setup_test_db(&["l_amat"]);
+
+    // One invalid FRN - should fail with warning
+    Command::cargo_bin("uls")
+        .unwrap()
+        .env("ULS_DB_PATH", &db_path)
+        .args(["frn", "0000000000", "9999999999"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("No licenses found"));
+}
+
 // =============================================================================
 // Database management tests
 // =============================================================================

@@ -77,8 +77,9 @@ enum Commands {
 
     /// Look up all licenses by FRN (FCC Registration Number)
     Frn {
-        /// FRN to look up (10-digit FCC Registration Number)
-        frn: String,
+        /// FRNs to look up (10-digit FCC Registration Numbers)
+        #[arg(required = true)]
+        frns: Vec<String>,
 
         /// Radio service (amateur, gmrs)
         #[arg(long, default_value = "amateur")]
@@ -260,8 +261,8 @@ async fn main() -> Result<()> {
             force,
             minimal,
         }) => commands::update::execute(&service, force, minimal).await,
-        Some(Commands::Frn { frn, service }) => {
-            commands::frn::execute(&frn, &service, &cli.format).await
+        Some(Commands::Frn { frns, service }) => {
+            commands::frn::execute(&frns, &service, &cli.format).await
         }
         Some(Commands::Stats) => commands::stats::execute(&cli.format).await,
         Some(Commands::Db { command }) => match command {
