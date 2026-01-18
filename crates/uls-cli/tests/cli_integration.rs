@@ -305,3 +305,101 @@ fn test_shorthand_callsign_lookup() {
         .success()
         .stdout(predicate::str::contains(&callsign));
 }
+
+// =============================================================================
+// FRN lookup tests
+// =============================================================================
+
+#[test]
+fn test_frn_lookup_not_found() {
+    let (_temp_dir, db_path) = setup_test_db(&["l_amat"]);
+
+    Command::cargo_bin("uls")
+        .unwrap()
+        .env("ULS_DB_PATH", &db_path)
+        .args(["frn", "0000000000"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("No licenses found"));
+}
+
+#[test]
+fn test_frn_help() {
+    Command::cargo_bin("uls")
+        .unwrap()
+        .args(["frn", "--help"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("FRN").or(predicate::str::contains("frn")));
+}
+
+// =============================================================================
+// Database management tests
+// =============================================================================
+
+#[test]
+fn test_db_init() {
+    let temp_dir = TempDir::new().unwrap();
+    let db_path = temp_dir.path().join("new.db");
+
+    Command::cargo_bin("uls")
+        .unwrap()
+        .args(["db", "init", "--path", db_path.to_str().unwrap()])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("initialized"));
+
+    assert!(db_path.exists());
+}
+
+#[test]
+fn test_db_info() {
+    let (_temp_dir, db_path) = setup_test_db(&["l_amat"]);
+
+    Command::cargo_bin("uls")
+        .unwrap()
+        .env("ULS_DB_PATH", &db_path)
+        .args(["db", "info"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Database Info").or(predicate::str::contains("path")));
+}
+
+#[test]
+fn test_db_info_json_format() {
+    let (_temp_dir, db_path) = setup_test_db(&["l_amat"]);
+
+    Command::cargo_bin("uls")
+        .unwrap()
+        .env("ULS_DB_PATH", &db_path)
+        .args(["db", "info", "--format", "json"])
+        .assert()
+        .success()
+        .stdout(predicate::str::starts_with("{"))
+        .stdout(predicate::str::contains("\"path\""));
+}
+
+#[test]
+fn test_db_vacuum() {
+    let (_temp_dir, db_path) = setup_test_db(&["l_amat"]);
+
+    Command::cargo_bin("uls")
+        .unwrap()
+        .env("ULS_DB_PATH", &db_path)
+        .args(["db", "vacuum"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("optimized"));
+}
+
+#[test]
+fn test_db_help() {
+    Command::cargo_bin("uls")
+        .unwrap()
+        .args(["db", "--help"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("init"))
+        .stdout(predicate::str::contains("info"))
+        .stdout(predicate::str::contains("vacuum"));
+}
