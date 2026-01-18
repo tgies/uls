@@ -21,7 +21,7 @@ fn format_table_with_fields(licenses: &[License], fields: &[&str]) -> String {
     }
 
     // Calculate column widths (min 6, max 30)
-    let widths: Vec<usize> = fields.iter().map(|f| f.len().max(6).min(30)).collect();
+    let widths: Vec<usize> = fields.iter().map(|f| f.len().clamp(6, 30)).collect();
 
     let mut output = String::new();
 
@@ -113,7 +113,7 @@ pub async fn execute(
         .context("Failed to ensure data is available")?;
 
     let engine = QueryEngine::with_database(db);
-    let output_format = OutputFormat::from_str(format).unwrap_or_default();
+    let output_format = format.parse::<OutputFormat>().unwrap_or_default();
 
     // Require at least one search filter
     let has_filter = query.is_some()

@@ -38,18 +38,18 @@ pub enum FilterOp {
 impl FilterOp {
     /// Parse operator from string prefix.
     pub fn parse(s: &str) -> (Self, &str) {
-        if s.starts_with(">=") {
-            (FilterOp::Ge, &s[2..])
-        } else if s.starts_with("<=") {
-            (FilterOp::Le, &s[2..])
-        } else if s.starts_with("!=") {
-            (FilterOp::Ne, &s[2..])
-        } else if s.starts_with('>') {
-            (FilterOp::Gt, &s[1..])
-        } else if s.starts_with('<') {
-            (FilterOp::Lt, &s[1..])
-        } else if s.starts_with('=') {
-            (FilterOp::Eq, &s[1..])
+        if let Some(rest) = s.strip_prefix(">=") {
+            (FilterOp::Ge, rest)
+        } else if let Some(rest) = s.strip_prefix("<=") {
+            (FilterOp::Le, rest)
+        } else if let Some(rest) = s.strip_prefix("!=") {
+            (FilterOp::Ne, rest)
+        } else if let Some(rest) = s.strip_prefix('>') {
+            (FilterOp::Gt, rest)
+        } else if let Some(rest) = s.strip_prefix('<') {
+            (FilterOp::Lt, rest)
+        } else if let Some(rest) = s.strip_prefix('=') {
+            (FilterOp::Eq, rest)
         } else {
             // No operator prefix = Eq
             (FilterOp::Eq, s)

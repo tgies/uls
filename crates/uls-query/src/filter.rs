@@ -134,8 +134,8 @@ impl SearchFilter {
     /// Create a filter for location search.
     pub fn location(city: Option<String>, state: Option<String>) -> Self {
         Self {
-            city: city,
-            state: state,
+            city,
+            state,
             ..Default::default()
         }
     }
@@ -188,8 +188,8 @@ impl SearchFilter {
     /// Set sort field by name (prefix with - for descending).
     pub fn with_sort_field(mut self, field: impl Into<String>) -> Self {
         let field_str = field.into();
-        if field_str.starts_with('-') {
-            self.sort_field = Some(field_str[1..].to_string());
+        if let Some(rest) = field_str.strip_prefix('-') {
+            self.sort_field = Some(rest.to_string());
             self.sort_desc = true;
         } else {
             self.sort_field = Some(field_str);

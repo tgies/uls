@@ -357,15 +357,15 @@ mod tests {
         let options: FileOptions<()> = FileOptions::default();
 
         // HD record - license header
-        zip.start_file("HD.dat", options.clone()).unwrap();
+        zip.start_file("HD.dat", options).unwrap();
         zip.write_all(b"HD|100001|0000000001||W1TEST|A|HA|01/15/2020|01/15/2030|||||||||||||||||||||||||||||||||||N|||||||||||01/15/2020|01/15/2020|||||||||||||||\n").unwrap();
 
         // EN record - entity
-        zip.start_file("EN.dat", options.clone()).unwrap();
+        zip.start_file("EN.dat", options).unwrap();
         zip.write_all(b"EN|100001|||W1TEST|L|L00100001|DOE, JOHN A|JOHN|A|DOE||555-555-1234||test@example.com|123 Main St|ANYTOWN|CA|90210||||000|0001234567|I||||||\n").unwrap();
 
         // AM record - amateur
-        zip.start_file("AM.dat", options.clone()).unwrap();
+        zip.start_file("AM.dat", options).unwrap();
         zip.write_all(b"AM|100001|||W1TEST|E|D|6||||||||||\n")
             .unwrap();
 
@@ -562,25 +562,25 @@ mod tests {
         let options: FileOptions<()> = FileOptions::default();
 
         // HD record
-        zip.start_file("HD.dat", options.clone()).unwrap();
+        zip.start_file("HD.dat", options).unwrap();
         zip.write_all(b"HD|100001|0000000001||W1TEST|A|HA|01/15/2020|01/15/2030|||||||||||||||||||||||||||||||||||N|||||||||||01/15/2020|01/15/2020|||||||||||||||\n").unwrap();
 
         // EN record
-        zip.start_file("EN.dat", options.clone()).unwrap();
+        zip.start_file("EN.dat", options).unwrap();
         zip.write_all(b"EN|100001|||W1TEST|L|L00100001|DOE, JOHN|JOHN||DOE||||||||||||000|0001234567|I||||||\n").unwrap();
 
         // AM record
-        zip.start_file("AM.dat", options.clone()).unwrap();
+        zip.start_file("AM.dat", options).unwrap();
         zip.write_all(b"AM|100001|||W1TEST|E|D|6||||||||||\n")
             .unwrap();
 
         // HS record (history)
-        zip.start_file("HS.dat", options.clone()).unwrap();
+        zip.start_file("HS.dat", options).unwrap();
         zip.write_all(b"HS|100001||W1TEST|01/15/2020|LIISS\n")
             .unwrap();
 
         // CO record (comment)
-        zip.start_file("CO.dat", options.clone()).unwrap();
+        zip.start_file("CO.dat", options).unwrap();
         zip.write_all(b"CO|100001||W1TEST|01/15/2020|Test comment||\n")
             .unwrap();
 

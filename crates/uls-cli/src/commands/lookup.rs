@@ -29,7 +29,7 @@ pub async fn execute(
         .context("Failed to ensure data is available")?;
 
     let engine = QueryEngine::with_database(db);
-    let output_format = OutputFormat::from_str(format).unwrap_or_default();
+    let output_format = format.parse::<OutputFormat>().unwrap_or_default();
 
     // Look up the primary license
     let primary_license = match engine.lookup(callsign)? {

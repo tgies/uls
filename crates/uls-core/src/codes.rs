@@ -1594,7 +1594,9 @@ mod tests {
         ];
 
         for code in codes {
-            let rt: RecordType = code.parse().expect(&format!("Failed to parse {}", code));
+            let rt: RecordType = code
+                .parse()
+                .unwrap_or_else(|_| panic!("Failed to parse {}", code));
             assert_eq!(rt.as_str(), code);
         }
     }

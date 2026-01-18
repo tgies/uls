@@ -196,7 +196,7 @@ impl ServiceCatalog {
         Self::SERVICES
             .iter()
             .find(|(full, daily, _, codes)| {
-                *full == input || *daily == input || codes.iter().any(|c| *c == input)
+                *full == input || *daily == input || codes.contains(&input)
             })
             .map(|(full, _, _, _)| *full)
     }

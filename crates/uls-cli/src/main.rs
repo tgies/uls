@@ -31,7 +31,7 @@ struct Cli {
     #[command(subcommand)]
     command: Option<Commands>,
 
-    /// Callsign for quick lookup (shorthand for 'uls lookup <CALLSIGN>')
+    /// Callsign for quick lookup (shorthand for `uls lookup <CALLSIGN>`)
     #[arg(value_name = "CALLSIGN")]
     callsign: Option<String>,
 
@@ -57,74 +57,7 @@ enum Commands {
     },
 
     /// Search for licenses
-    Search {
-        /// Search query (name, callsign pattern, etc.)
-        query: Option<String>,
-
-        /// Name search (explicit, vs positional which auto-detects)
-        #[arg(short = 'n', long)]
-        name: Option<String>,
-
-        /// Filter by state (2-letter code)
-        #[arg(short, long)]
-        state: Option<String>,
-
-        /// Filter by city
-        #[arg(short = 'c', long)]
-        city: Option<String>,
-
-        /// Filter by ZIP code
-        #[arg(long)]
-        zip: Option<String>,
-
-        /// Filter by FRN
-        #[arg(long)]
-        frn: Option<String>,
-
-        /// Filter by operator class (T, G, A, E)
-        #[arg(short = 'C', long)]
-        class: Option<char>,
-
-        /// Filter by license status (A=Active, E=Expired, C=Cancelled)
-        #[arg(long)]
-        status: Option<char>,
-
-        /// Only show active licenses (shortcut for --status A)
-        #[arg(short = 'a', long)]
-        active: bool,
-
-        /// Licenses granted on or after this date (YYYY-MM-DD)
-        #[arg(long)]
-        granted_after: Option<String>,
-
-        /// Licenses granted on or before this date (YYYY-MM-DD)
-        #[arg(long)]
-        granted_before: Option<String>,
-
-        /// Licenses expiring on or before this date (YYYY-MM-DD)
-        #[arg(long)]
-        expires_before: Option<String>,
-
-        /// Generic filter expressions (repeatable, e.g., --filter "grant_date>2025-01-01")
-        #[arg(long = "filter", short = 'F')]
-        filters: Vec<String>,
-
-        /// Sort order: callsign, -callsign, name, state, granted, expires
-        #[arg(short = 'S', long, default_value = "callsign")]
-        sort: String,
-
-        /// Maximum results to return
-        #[arg(short, long, default_value = "50")]
-        limit: usize,
-
-        /// Radio service (amateur, gmrs)
-        #[arg(short = 'r', long, default_value = "amateur")]
-        service: String,
-
-        /// Output fields (comma-separated, e.g., call_sign,name,grant_date)
-        #[arg(long)]
-        fields: Option<String>,
-    },
+    Search(Box<SearchArgs>),
 
     /// Update the local database
     Update {
@@ -159,6 +92,77 @@ enum Commands {
         #[command(subcommand)]
         command: DbCommands,
     },
+}
+
+/// Arguments for the search command (boxed to reduce enum size)
+#[derive(clap::Args)]
+pub struct SearchArgs {
+    /// Search query (name, callsign pattern, etc.)
+    pub query: Option<String>,
+
+    /// Name search (explicit, vs positional which auto-detects)
+    #[arg(short = 'n', long)]
+    pub name: Option<String>,
+
+    /// Filter by state (2-letter code)
+    #[arg(short, long)]
+    pub state: Option<String>,
+
+    /// Filter by city
+    #[arg(short = 'c', long)]
+    pub city: Option<String>,
+
+    /// Filter by ZIP code
+    #[arg(long)]
+    pub zip: Option<String>,
+
+    /// Filter by FRN
+    #[arg(long)]
+    pub frn: Option<String>,
+
+    /// Filter by operator class (T, G, A, E)
+    #[arg(short = 'C', long)]
+    pub class: Option<char>,
+
+    /// Filter by license status (A=Active, E=Expired, C=Cancelled)
+    #[arg(long)]
+    pub status: Option<char>,
+
+    /// Only show active licenses (shortcut for --status A)
+    #[arg(short = 'a', long)]
+    pub active: bool,
+
+    /// Licenses granted on or after this date (YYYY-MM-DD)
+    #[arg(long)]
+    pub granted_after: Option<String>,
+
+    /// Licenses granted on or before this date (YYYY-MM-DD)
+    #[arg(long)]
+    pub granted_before: Option<String>,
+
+    /// Licenses expiring on or before this date (YYYY-MM-DD)
+    #[arg(long)]
+    pub expires_before: Option<String>,
+
+    /// Generic filter expressions (repeatable, e.g., --filter "grant_date>2025-01-01")
+    #[arg(long = "filter", short = 'F')]
+    pub filters: Vec<String>,
+
+    /// Sort order: callsign, -callsign, name, state, granted, expires
+    #[arg(short = 'S', long, default_value = "callsign")]
+    pub sort: String,
+
+    /// Maximum results to return
+    #[arg(short, long, default_value = "50")]
+    pub limit: usize,
+
+    /// Radio service (amateur, gmrs)
+    #[arg(short = 'r', long, default_value = "amateur")]
+    pub service: String,
+
+    /// Output fields (comma-separated, e.g., call_sign,name,grant_date)
+    #[arg(long)]
+    pub fields: Option<String>,
 }
 
 #[derive(Subcommand)]
@@ -227,44 +231,26 @@ async fn main() -> Result<()> {
             service,
             all,
         }) => commands::lookup::execute(&callsign, &service, all, &cli.format).await,
-        Some(Commands::Search {
-            query,
-            name,
-            state,
-            city,
-            zip,
-            frn,
-            class,
-            status,
-            active,
-            granted_after,
-            granted_before,
-            expires_before,
-            filters,
-            sort,
-            limit,
-            service,
-            fields,
-        }) => {
+        Some(Commands::Search(args)) => {
             commands::search::execute(
-                query,
-                name,
-                state,
-                city,
-                zip,
-                frn,
-                class,
-                status,
-                active,
-                granted_after,
-                granted_before,
-                expires_before,
-                filters,
-                &sort,
-                limit,
-                &service,
+                args.query,
+                args.name,
+                args.state,
+                args.city,
+                args.zip,
+                args.frn,
+                args.class,
+                args.status,
+                args.active,
+                args.granted_after,
+                args.granted_before,
+                args.expires_before,
+                args.filters,
+                &args.sort,
+                args.limit,
+                &args.service,
                 &cli.format,
-                fields,
+                args.fields,
             )
             .await
         }

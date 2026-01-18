@@ -20,17 +20,18 @@ pub enum OutputFormat {
     Compact,
 }
 
-impl OutputFormat {
-    /// Parse from string.
-    pub fn from_str(s: &str) -> Option<Self> {
+impl std::str::FromStr for OutputFormat {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_lowercase().as_str() {
-            "table" => Some(OutputFormat::Table),
-            "json" => Some(OutputFormat::Json),
-            "json-pretty" | "jsonpretty" => Some(OutputFormat::JsonPretty),
-            "csv" => Some(OutputFormat::Csv),
-            "yaml" | "yml" => Some(OutputFormat::Yaml),
-            "compact" | "oneline" => Some(OutputFormat::Compact),
-            _ => None,
+            "table" => Ok(OutputFormat::Table),
+            "json" => Ok(OutputFormat::Json),
+            "json-pretty" | "jsonpretty" => Ok(OutputFormat::JsonPretty),
+            "csv" => Ok(OutputFormat::Csv),
+            "yaml" | "yml" => Ok(OutputFormat::Yaml),
+            "compact" | "oneline" => Ok(OutputFormat::Compact),
+            _ => Err(()),
         }
     }
 }
@@ -64,7 +65,7 @@ impl FormatOutput for Vec<License> {
             OutputFormat::Yaml => format_licenses_yaml(self),
             OutputFormat::Compact => self
                 .iter()
-                .map(|l| format_license_compact(l))
+                .map(format_license_compact)
                 .collect::<Vec<_>>()
                 .join("\n"),
         }
@@ -413,19 +414,16 @@ mod tests {
 
     #[test]
     fn test_output_format_from_str() {
-        assert_eq!(OutputFormat::from_str("table"), Some(OutputFormat::Table));
-        assert_eq!(OutputFormat::from_str("json"), Some(OutputFormat::Json));
+        assert_eq!("table".parse::<OutputFormat>(), Ok(OutputFormat::Table));
+        assert_eq!("json".parse::<OutputFormat>(), Ok(OutputFormat::Json));
         assert_eq!(
-            OutputFormat::from_str("json-pretty"),
-            Some(OutputFormat::JsonPretty)
+            "json-pretty".parse::<OutputFormat>(),
+            Ok(OutputFormat::JsonPretty)
         );
-        assert_eq!(OutputFormat::from_str("csv"), Some(OutputFormat::Csv));
-        assert_eq!(OutputFormat::from_str("yaml"), Some(OutputFormat::Yaml));
-        assert_eq!(
-            OutputFormat::from_str("compact"),
-            Some(OutputFormat::Compact)
-        );
-        assert_eq!(OutputFormat::from_str("unknown"), None);
+        assert_eq!("csv".parse::<OutputFormat>(), Ok(OutputFormat::Csv));
+        assert_eq!("yaml".parse::<OutputFormat>(), Ok(OutputFormat::Yaml));
+        assert_eq!("compact".parse::<OutputFormat>(), Ok(OutputFormat::Compact));
+        assert!("unknown".parse::<OutputFormat>().is_err());
     }
 
     #[test]

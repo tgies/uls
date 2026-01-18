@@ -6,6 +6,9 @@
 //! NOTE: These tests require a pre-populated database or use --help/error cases.
 //! For tests requiring data, see setup_test_db() which creates a temp DB with fixtures.
 
+// TODO: Migrate from deprecated Command::cargo_bin to cargo_bin_cmd! macro
+#![allow(deprecated)]
+
 use std::fs::{self, File};
 use std::io::Write;
 use std::path::PathBuf;
@@ -50,10 +53,10 @@ fn setup_test_db(services: &[&str]) -> (TempDir, PathBuf) {
         for entry in fs::read_dir(&fixture_dir).unwrap() {
             let entry = entry.unwrap();
             let path = entry.path();
-            if path.extension().map_or(false, |e| e == "dat") {
+            if path.extension().is_some_and(|e| e == "dat") {
                 let filename = path.file_name().unwrap().to_str().unwrap();
                 let contents = fs::read(&path).unwrap();
-                zip.start_file(filename, options.clone()).unwrap();
+                zip.start_file(filename, options).unwrap();
                 zip.write_all(&contents).unwrap();
             }
         }
@@ -84,12 +87,10 @@ fn get_first_callsign(service: &str) -> String {
     let file = File::open(&hd_path).expect("HD.dat should exist");
     let reader = BufReader::new(file);
 
-    for line in reader.lines() {
-        if let Ok(line) = line {
-            let fields: Vec<&str> = line.split('|').collect();
-            if fields.len() > 4 && !fields[4].is_empty() {
-                return fields[4].to_string();
-            }
+    for line in reader.lines().map_while(Result::ok) {
+        let fields: Vec<&str> = line.split('|').collect();
+        if fields.len() > 4 && !fields[4].is_empty() {
+            return fields[4].to_string();
         }
     }
     panic!("No callsign found in fixture");

@@ -136,10 +136,10 @@ pub fn detect_service_from_callsign(callsign: &str) -> &'static str {
             // Has letters after digit = amateur callsign
             // Validate: 1-2 prefix letters, 1 digit, 1-3 suffix letters
             let prefix: String = chars[..digit_pos].iter().collect();
-            if prefix.len() >= 1
+            if !prefix.is_empty()
                 && prefix.len() <= 2
                 && prefix.chars().all(|c| c.is_ascii_alphabetic())
-                && after_digit.len() >= 1
+                && !after_digit.is_empty()
                 && after_digit.len() <= 3
             {
                 return "HA"; // Amateur

@@ -45,11 +45,11 @@ fn create_fixture_zip(temp_dir: &TempDir, service: &str) -> PathBuf {
     for entry in fs::read_dir(&fixture_dir).unwrap() {
         let entry = entry.unwrap();
         let path = entry.path();
-        if path.extension().map_or(false, |e| e == "dat") {
+        if path.extension().is_some_and(|e| e == "dat") {
             let filename = path.file_name().unwrap().to_str().unwrap();
             let contents = fs::read(&path).unwrap();
 
-            zip.start_file(filename, options.clone()).unwrap();
+            zip.start_file(filename, options).unwrap();
             zip.write_all(&contents).unwrap();
         }
     }
@@ -65,12 +65,10 @@ fn get_fixture_callsigns(service: &str) -> Vec<String> {
     let reader = BufReader::new(file);
 
     let mut callsigns = Vec::new();
-    for line in reader.lines() {
-        if let Ok(line) = line {
-            let fields: Vec<&str> = line.split('|').collect();
-            if fields.len() > 4 && !fields[4].is_empty() {
-                callsigns.push(fields[4].to_string());
-            }
+    for line in reader.lines().map_while(Result::ok) {
+        let fields: Vec<&str> = line.split('|').collect();
+        if fields.len() > 4 && !fields[4].is_empty() {
+            callsigns.push(fields[4].to_string());
         }
     }
     callsigns

@@ -16,7 +16,7 @@ pub async fn execute(frn: &str, service_override: &str, format: &str) -> Result<
         .context("Failed to ensure data is available")?;
 
     let engine = QueryEngine::with_database(db);
-    let output_format = OutputFormat::from_str(format).unwrap_or_default();
+    let output_format = format.parse::<OutputFormat>().unwrap_or_default();
 
     let licenses = engine.lookup_by_frn(frn)?;
 

@@ -12,7 +12,7 @@ pub async fn execute(format: &str) -> Result<()> {
         .context("Failed to open database. Run 'uls update' first to initialize.")?;
 
     let stats = engine.stats()?;
-    let output_format = OutputFormat::from_str(format).unwrap_or_default();
+    let output_format = format.parse::<OutputFormat>().unwrap_or_default();
 
     match output_format {
         OutputFormat::Json | OutputFormat::JsonPretty => {
