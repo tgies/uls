@@ -102,4 +102,28 @@ mod tests {
         assert_eq!(config.max_connections, 1);
         assert!(!config.enable_wal);
     }
+
+    #[test]
+    fn test_builder_pattern() {
+        let config = DatabaseConfig::default()
+            .with_max_connections(8)
+            .with_cache_size_mb(128);
+
+        assert_eq!(config.max_connections, 8);
+        // Cache size is stored as negative KB, so 128MB = -128000
+        assert_eq!(config.cache_size, -128000);
+    }
+
+    #[test]
+    fn test_with_max_connections() {
+        let config = DatabaseConfig::in_memory().with_max_connections(16);
+        assert_eq!(config.max_connections, 16);
+    }
+
+    #[test]
+    fn test_with_cache_size_mb() {
+        let config = DatabaseConfig::in_memory().with_cache_size_mb(256);
+        // 256MB * 1000 = 256000 pages, stored as negative
+        assert_eq!(config.cache_size, -256000);
+    }
 }

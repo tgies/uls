@@ -377,4 +377,369 @@ mod tests {
 
         assert_eq!(license.display_name(), "John Doe");
     }
+
+    #[test]
+    fn test_get_field_basic() {
+        let license = License {
+            unique_system_identifier: 12345,
+            call_sign: "W1AW".to_string(),
+            licensee_name: "ARRL".to_string(),
+            first_name: Some("John".to_string()),
+            middle_initial: Some("Q".to_string()),
+            last_name: Some("Public".to_string()),
+            status: 'A',
+            radio_service: "HA".to_string(),
+            grant_date: Some(NaiveDate::from_ymd_opt(2020, 1, 15).unwrap()),
+            expired_date: Some(NaiveDate::from_ymd_opt(2030, 1, 15).unwrap()),
+            cancellation_date: None,
+            frn: Some("0012345678".to_string()),
+            street_address: Some("123 Main St".to_string()),
+            city: Some("Newington".to_string()),
+            state: Some("CT".to_string()),
+            zip_code: Some("06111".to_string()),
+            operator_class: Some('E'),
+            previous_call_sign: Some("N1XYZ".to_string()),
+        };
+
+        // Test all field name variants
+        assert_eq!(license.get_field("call_sign"), Some("W1AW".to_string()));
+        assert_eq!(license.get_field("callsign"), Some("W1AW".to_string()));
+        assert_eq!(license.get_field("call"), Some("W1AW".to_string()));
+
+        assert_eq!(license.get_field("name"), Some("John Q Public".to_string()));
+        assert_eq!(
+            license.get_field("licensee"),
+            Some("John Q Public".to_string())
+        );
+
+        assert_eq!(license.get_field("first_name"), Some("John".to_string()));
+        assert_eq!(license.get_field("first"), Some("John".to_string()));
+
+        assert_eq!(license.get_field("last_name"), Some("Public".to_string()));
+        assert_eq!(license.get_field("last"), Some("Public".to_string()));
+
+        assert_eq!(license.get_field("middle_initial"), Some("Q".to_string()));
+        assert_eq!(license.get_field("mi"), Some("Q".to_string()));
+
+        assert_eq!(license.get_field("status"), Some("A".to_string()));
+        assert_eq!(license.get_field("status_desc"), Some("Active".to_string()));
+
+        assert_eq!(license.get_field("service"), Some("HA".to_string()));
+        assert_eq!(license.get_field("radio_service"), Some("HA".to_string()));
+
+        assert_eq!(license.get_field("class"), Some("E".to_string()));
+        assert_eq!(
+            license.get_field("class_desc"),
+            Some("Amateur Extra".to_string())
+        );
+
+        assert_eq!(license.get_field("city"), Some("Newington".to_string()));
+        assert_eq!(license.get_field("state"), Some("CT".to_string()));
+        assert_eq!(license.get_field("zip"), Some("06111".to_string()));
+        assert_eq!(license.get_field("zip_code"), Some("06111".to_string()));
+
+        assert_eq!(
+            license.get_field("location"),
+            Some("Newington, CT".to_string())
+        );
+
+        assert_eq!(
+            license.get_field("address"),
+            Some("123 Main St".to_string())
+        );
+        assert_eq!(
+            license.get_field("street_address"),
+            Some("123 Main St".to_string())
+        );
+
+        assert_eq!(license.get_field("frn"), Some("0012345678".to_string()));
+
+        assert_eq!(
+            license.get_field("grant_date"),
+            Some("2020-01-15".to_string())
+        );
+        assert_eq!(license.get_field("granted"), Some("2020-01-15".to_string()));
+
+        assert_eq!(
+            license.get_field("expired_date"),
+            Some("2030-01-15".to_string())
+        );
+        assert_eq!(license.get_field("expires"), Some("2030-01-15".to_string()));
+
+        assert_eq!(license.get_field("cancellation_date"), None);
+        assert_eq!(license.get_field("cancelled"), None);
+
+        assert_eq!(
+            license.get_field("previous_call_sign"),
+            Some("N1XYZ".to_string())
+        );
+        assert_eq!(
+            license.get_field("previous_call"),
+            Some("N1XYZ".to_string())
+        );
+
+        assert_eq!(license.get_field("usi"), Some("12345".to_string()));
+        assert_eq!(
+            license.get_field("unique_system_identifier"),
+            Some("12345".to_string())
+        );
+
+        // Unknown field
+        assert_eq!(license.get_field("unknown_field"), None);
+    }
+
+    #[test]
+    fn test_get_field_location_empty() {
+        let license = License {
+            unique_system_identifier: 1,
+            call_sign: "W1AW".to_string(),
+            licensee_name: "Test".to_string(),
+            first_name: None,
+            middle_initial: None,
+            last_name: None,
+            status: 'A',
+            radio_service: "HA".to_string(),
+            grant_date: None,
+            expired_date: None,
+            cancellation_date: None,
+            frn: None,
+            street_address: None,
+            city: None,
+            state: None,
+            zip_code: None,
+            operator_class: None,
+            previous_call_sign: None,
+        };
+
+        // Empty city and state should return None for location
+        assert_eq!(license.get_field("location"), None);
+    }
+
+    #[test]
+    fn test_get_field_no_operator_class() {
+        let license = License {
+            unique_system_identifier: 1,
+            call_sign: "W1AW".to_string(),
+            licensee_name: "Test".to_string(),
+            first_name: None,
+            middle_initial: None,
+            last_name: None,
+            status: 'A',
+            radio_service: "ZA".to_string(), // GMRS has no class
+            grant_date: None,
+            expired_date: None,
+            cancellation_date: None,
+            frn: None,
+            street_address: None,
+            city: None,
+            state: None,
+            zip_code: None,
+            operator_class: None,
+            previous_call_sign: None,
+        };
+
+        assert_eq!(license.get_field("class"), None);
+        assert_eq!(license.get_field("class_desc"), None);
+    }
+
+    #[test]
+    fn test_field_names() {
+        let names = License::field_names();
+        assert!(names.contains(&"call_sign"));
+        assert!(names.contains(&"name"));
+        assert!(names.contains(&"status"));
+        assert!(names.contains(&"city"));
+        assert!(names.contains(&"state"));
+        assert!(names.contains(&"frn"));
+        assert!(names.contains(&"grant_date"));
+        assert!(names.len() >= 15);
+    }
+
+    #[test]
+    fn test_is_active() {
+        let mut license = License {
+            unique_system_identifier: 1,
+            call_sign: "W1AW".to_string(),
+            licensee_name: "Test".to_string(),
+            first_name: None,
+            middle_initial: None,
+            last_name: None,
+            status: 'A',
+            radio_service: "HA".to_string(),
+            grant_date: None,
+            expired_date: None,
+            cancellation_date: None,
+            frn: None,
+            street_address: None,
+            city: None,
+            state: None,
+            zip_code: None,
+            operator_class: None,
+            previous_call_sign: None,
+        };
+
+        assert!(license.is_active());
+
+        license.status = 'E';
+        assert!(!license.is_active());
+
+        license.status = 'C';
+        assert!(!license.is_active());
+    }
+
+    #[test]
+    fn test_get_field_cancellation_date_with_value() {
+        // Tests the cancellation_date path when a date IS present
+        // (the lambda inside .map() was never exercised before)
+        let license = License {
+            unique_system_identifier: 1,
+            call_sign: "W1AW".to_string(),
+            licensee_name: "Test".to_string(),
+            first_name: None,
+            middle_initial: None,
+            last_name: None,
+            status: 'C',
+            radio_service: "HA".to_string(),
+            grant_date: None,
+            expired_date: None,
+            cancellation_date: Some(NaiveDate::from_ymd_opt(2023, 6, 15).unwrap()),
+            frn: None,
+            street_address: None,
+            city: None,
+            state: None,
+            zip_code: None,
+            operator_class: None,
+            previous_call_sign: None,
+        };
+
+        assert_eq!(
+            license.get_field("cancellation_date"),
+            Some("2023-06-15".to_string())
+        );
+        assert_eq!(
+            license.get_field("cancelled"),
+            Some("2023-06-15".to_string())
+        );
+    }
+
+    #[test]
+    fn test_get_field_location_partial() {
+        // Tests location field with only city or only state present
+        let mut license = License {
+            unique_system_identifier: 1,
+            call_sign: "W1AW".to_string(),
+            licensee_name: "Test".to_string(),
+            first_name: None,
+            middle_initial: None,
+            last_name: None,
+            status: 'A',
+            radio_service: "HA".to_string(),
+            grant_date: None,
+            expired_date: None,
+            cancellation_date: None,
+            frn: None,
+            street_address: None,
+            city: Some("Boston".to_string()),
+            state: None,
+            zip_code: None,
+            operator_class: None,
+            previous_call_sign: None,
+        };
+
+        // Only city, no state - should still format
+        assert_eq!(license.get_field("location"), Some("Boston, ".to_string()));
+
+        // Only state, no city
+        license.city = None;
+        license.state = Some("MA".to_string());
+        assert_eq!(license.get_field("location"), Some(", MA".to_string()));
+    }
+
+    #[test]
+    fn test_get_field_expiration_alias() {
+        // Ensure the "expiration" alias works for expired_date
+        let license = License {
+            unique_system_identifier: 1,
+            call_sign: "W1AW".to_string(),
+            licensee_name: "Test".to_string(),
+            first_name: None,
+            middle_initial: None,
+            last_name: None,
+            status: 'A',
+            radio_service: "HA".to_string(),
+            grant_date: None,
+            expired_date: Some(NaiveDate::from_ymd_opt(2030, 12, 31).unwrap()),
+            cancellation_date: None,
+            frn: None,
+            street_address: None,
+            city: None,
+            state: None,
+            zip_code: None,
+            operator_class: None,
+            previous_call_sign: None,
+        };
+
+        assert_eq!(
+            license.get_field("expiration"),
+            Some("2030-12-31".to_string())
+        );
+    }
+
+    #[test]
+    fn test_get_field_entity_name_alias() {
+        // Ensure the "entity_name" alias works for display_name
+        let license = License {
+            unique_system_identifier: 1,
+            call_sign: "W1AW".to_string(),
+            licensee_name: "ARRL HQ Station".to_string(),
+            first_name: None,
+            middle_initial: None,
+            last_name: None,
+            status: 'A',
+            radio_service: "HA".to_string(),
+            grant_date: None,
+            expired_date: None,
+            cancellation_date: None,
+            frn: None,
+            street_address: None,
+            city: None,
+            state: None,
+            zip_code: None,
+            operator_class: None,
+            previous_call_sign: None,
+        };
+
+        // When no first/last name, should return licensee_name
+        assert_eq!(
+            license.get_field("entity_name"),
+            Some("ARRL HQ Station".to_string())
+        );
+    }
+
+    #[test]
+    fn test_get_field_license_status_alias() {
+        // Ensure the "license_status" alias works for status
+        let license = License {
+            unique_system_identifier: 1,
+            call_sign: "W1AW".to_string(),
+            licensee_name: "Test".to_string(),
+            first_name: None,
+            middle_initial: None,
+            last_name: None,
+            status: 'E',
+            radio_service: "HA".to_string(),
+            grant_date: None,
+            expired_date: None,
+            cancellation_date: None,
+            frn: None,
+            street_address: None,
+            city: None,
+            state: None,
+            zip_code: None,
+            operator_class: None,
+            previous_call_sign: None,
+        };
+
+        assert_eq!(license.get_field("license_status"), Some("E".to_string()));
+    }
 }

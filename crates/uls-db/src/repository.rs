@@ -951,4 +951,75 @@ mod tests {
         let count = db.count_by_service(&[]).unwrap();
         assert_eq!(count, 0);
     }
+
+    #[test]
+    fn test_get_imported_types() {
+        let db = create_test_db();
+
+        // Initially empty
+        let types = db.get_imported_types("HA").unwrap();
+        assert!(types.is_empty());
+
+        // Mark some record types as imported
+        db.mark_imported("HA", "HD", 100).unwrap();
+        db.mark_imported("HA", "EN", 50).unwrap();
+        db.mark_imported("HA", "AM", 25).unwrap();
+
+        // Should retrieve them sorted
+        let types = db.get_imported_types("HA").unwrap();
+        assert_eq!(types, vec!["AM", "EN", "HD"]); // Sorted alphabetically
+
+        // Different service should be empty
+        let types = db.get_imported_types("ZA").unwrap();
+        assert!(types.is_empty());
+    }
+
+    #[test]
+    fn test_get_imported_count() {
+        let db = create_test_db();
+
+        // Initially not found
+        let count = db.get_imported_count("HA", "HD").unwrap();
+        assert!(count.is_none());
+
+        // Mark as imported with count
+        db.mark_imported("HA", "HD", 500).unwrap();
+
+        // Should retrieve the count
+        let count = db.get_imported_count("HA", "HD").unwrap();
+        assert_eq!(count, Some(500));
+
+        // Non-existent record type should return None
+        let count = db.get_imported_count("HA", "XX").unwrap();
+        assert!(count.is_none());
+
+        // Non-existent service should return None
+        let count = db.get_imported_count("ZZ", "HD").unwrap();
+        assert!(count.is_none());
+    }
+
+    #[test]
+    fn test_import_status_lifecycle() {
+        let db = create_test_db();
+
+        // Mark several types as imported
+        db.mark_imported("HA", "HD", 100).unwrap();
+        db.mark_imported("HA", "EN", 200).unwrap();
+
+        // Verify they're tracked
+        assert!(db.has_record_type("HA", "HD").unwrap());
+        assert!(db.has_record_type("HA", "EN").unwrap());
+        assert!(!db.has_record_type("HA", "AM").unwrap());
+
+        // Clear import status
+        db.clear_import_status("HA").unwrap();
+
+        // All should be cleared
+        assert!(!db.has_record_type("HA", "HD").unwrap());
+        assert!(!db.has_record_type("HA", "EN").unwrap());
+
+        // get_imported_types should return empty
+        let types = db.get_imported_types("HA").unwrap();
+        assert!(types.is_empty());
+    }
 }
