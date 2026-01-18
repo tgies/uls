@@ -28,7 +28,7 @@ pub mod error;
 pub mod progress;
 
 pub use catalog::{DataFile, ServiceCatalog};
-pub use client::{FccClient, DownloadResult};
+pub use client::{DownloadResult, FccClient};
 pub use config::DownloadConfig;
 pub use error::{DownloadError, Result};
 pub use progress::{DownloadProgress, ProgressCallback};

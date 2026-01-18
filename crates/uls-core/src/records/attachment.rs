@@ -1,6 +1,6 @@
 //! AT/AH/LA (Attachment) record types.
-use serde::{Deserialize, Serialize};
 use super::common::*;
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AttachmentRecord {
@@ -35,9 +35,19 @@ mod tests {
 
     #[test]
     fn test_attachment_from_fields() {
-        let fields = vec!["LA", "12345", "ULS123", "EBF456", "LETTER", "Formal letter attachment", "01/01/2020", "letter.pdf", "A"];
+        let fields = vec![
+            "LA",
+            "12345",
+            "ULS123",
+            "EBF456",
+            "LETTER",
+            "Formal letter attachment",
+            "01/01/2020",
+            "letter.pdf",
+            "A",
+        ];
         let at = AttachmentRecord::from_fields(&fields);
-        
+
         assert_eq!(at.unique_system_identifier, 12345);
         assert_eq!(at.attachment_code, Some("LETTER".to_string()));
         assert_eq!(at.attachment_file_name, Some("letter.pdf".to_string()));

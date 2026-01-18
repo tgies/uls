@@ -8,7 +8,12 @@ use super::auto_update;
 /// All supported services for cross-service lookup
 const ALL_SERVICES: &[&str] = &["HA", "ZA"];
 
-pub async fn execute(callsign: &str, service_override: &str, all_services: bool, format: &str) -> Result<()> {
+pub async fn execute(
+    callsign: &str,
+    service_override: &str,
+    all_services: bool,
+    format: &str,
+) -> Result<()> {
     // Use service override if provided, otherwise auto-detect from callsign
     let primary_service = if service_override == "auto" || service_override == "amateur" {
         // For "amateur" default, still auto-detect to catch GMRS
@@ -17,9 +22,10 @@ pub async fn execute(callsign: &str, service_override: &str, all_services: bool,
         auto_update::service_name_to_code(service_override)
             .ok_or_else(|| anyhow::anyhow!("Unknown service: {}", service_override))?
     };
-    
+
     // Ensure primary service data is available
-    let db = auto_update::ensure_data_available(primary_service).await
+    let db = auto_update::ensure_data_available(primary_service)
+        .await
         .context("Failed to ensure data is available")?;
 
     let engine = QueryEngine::with_database(db);

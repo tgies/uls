@@ -1,6 +1,6 @@
 //! BO/BL/BF (Buildout) record types.
-use serde::{Deserialize, Serialize};
 use super::common::*;
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BuildoutRecord {
@@ -33,12 +33,20 @@ mod tests {
 
     #[test]
     fn test_buildout_from_fields() {
-        let fields = vec!["BO", "12345", "W1TEST", "100", "12/31/2025", "06/15/2024", "A", "01/01/2024"];
+        let fields = vec![
+            "BO",
+            "12345",
+            "W1TEST",
+            "100",
+            "12/31/2025",
+            "06/15/2024",
+            "A",
+            "01/01/2024",
+        ];
         let bo = BuildoutRecord::from_fields(&fields);
-        
+
         assert_eq!(bo.unique_system_identifier, 12345);
         assert_eq!(bo.call_sign, Some("W1TEST".to_string()));
         assert_eq!(bo.buildout_code, Some(100));
     }
 }
-

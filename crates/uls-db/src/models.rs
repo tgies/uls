@@ -105,7 +105,9 @@ impl License {
             "status_desc" | "status_description" => Some(self.status_description().to_string()),
             "service" | "radio_service" => Some(self.radio_service.clone()),
             "class" | "operator_class" => self.operator_class.map(|c| c.to_string()),
-            "class_desc" | "class_description" => self.operator_class_description().map(|s| s.to_string()),
+            "class_desc" | "class_description" => {
+                self.operator_class_description().map(|s| s.to_string())
+            }
             "city" => self.city.clone(),
             "state" => self.state.clone(),
             "zip" | "zip_code" => self.zip_code.clone(),
@@ -132,10 +134,26 @@ impl License {
     /// Get list of available field names.
     pub fn field_names() -> &'static [&'static str] {
         &[
-            "call_sign", "name", "first_name", "last_name", "status", "status_desc",
-            "service", "class", "class_desc", "city", "state", "zip", "location",
-            "address", "frn", "grant_date", "expired_date", "cancellation_date",
-            "previous_call_sign", "usi"
+            "call_sign",
+            "name",
+            "first_name",
+            "last_name",
+            "status",
+            "status_desc",
+            "service",
+            "class",
+            "class_desc",
+            "city",
+            "state",
+            "zip",
+            "location",
+            "address",
+            "frn",
+            "grant_date",
+            "expired_date",
+            "cancellation_date",
+            "previous_call_sign",
+            "usi",
         ]
     }
 }
@@ -264,25 +282,25 @@ mod tests {
         };
 
         assert_eq!(license.status_description(), "Active");
-        
+
         license.status = 'C';
         assert_eq!(license.status_description(), "Cancelled");
-        
+
         license.status = 'E';
         assert_eq!(license.status_description(), "Expired");
-        
+
         license.status = 'L';
         assert_eq!(license.status_description(), "Pending Legal Status");
-        
+
         license.status = 'P';
         assert_eq!(license.status_description(), "Parent Station Cancelled");
-        
+
         license.status = 'T';
         assert_eq!(license.status_description(), "Terminated");
-        
+
         license.status = 'X';
         assert_eq!(license.status_description(), "Term Pending");
-        
+
         license.status = 'Z';
         assert_eq!(license.status_description(), "Unknown");
     }
@@ -311,22 +329,25 @@ mod tests {
         };
 
         assert_eq!(license.operator_class_description(), Some("Technician"));
-        
+
         license.operator_class = Some('G');
         assert_eq!(license.operator_class_description(), Some("General"));
-        
+
         license.operator_class = Some('A');
         assert_eq!(license.operator_class_description(), Some("Advanced"));
-        
+
         license.operator_class = Some('N');
         assert_eq!(license.operator_class_description(), Some("Novice"));
-        
+
         license.operator_class = Some('P');
-        assert_eq!(license.operator_class_description(), Some("Technician Plus"));
-        
+        assert_eq!(
+            license.operator_class_description(),
+            Some("Technician Plus")
+        );
+
         license.operator_class = Some('Z');
         assert_eq!(license.operator_class_description(), Some("Unknown"));
-        
+
         license.operator_class = None;
         assert_eq!(license.operator_class_description(), None);
     }
@@ -357,4 +378,3 @@ mod tests {
         assert_eq!(license.display_name(), "John Doe");
     }
 }
-

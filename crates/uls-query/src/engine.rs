@@ -36,7 +36,7 @@ impl QueryEngine {
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
         let config = DatabaseConfig::with_path(path.as_ref());
         let db = Database::with_config(config)?;
-        
+
         if !db.is_initialized()? {
             return Err(QueryError::NotInitialized);
         }
@@ -89,7 +89,7 @@ impl QueryEngine {
         debug!("Params: {:?}", params);
 
         let conn = self.db.conn()?;
-        
+
         let mut stmt = conn.prepare(&query)?;
         let iter = stmt.query_map(params_from_iter(params), |row| {
             Ok(License {
@@ -99,15 +99,19 @@ impl QueryEngine {
                 first_name: row.get(3)?,
                 middle_initial: row.get(4)?,
                 last_name: row.get(5)?,
-                status: row.get::<_, Option<String>>(6)?
+                status: row
+                    .get::<_, Option<String>>(6)?
                     .and_then(|s| s.chars().next())
                     .unwrap_or('?'),
                 radio_service: row.get::<_, Option<String>>(7)?.unwrap_or_default(),
-                grant_date: row.get::<_, Option<String>>(8)?
+                grant_date: row
+                    .get::<_, Option<String>>(8)?
                     .and_then(|s| chrono::NaiveDate::parse_from_str(&s, "%Y-%m-%d").ok()),
-                expired_date: row.get::<_, Option<String>>(9)?
+                expired_date: row
+                    .get::<_, Option<String>>(9)?
                     .and_then(|s| chrono::NaiveDate::parse_from_str(&s, "%Y-%m-%d").ok()),
-                cancellation_date: row.get::<_, Option<String>>(10)?
+                cancellation_date: row
+                    .get::<_, Option<String>>(10)?
                     .and_then(|s| chrono::NaiveDate::parse_from_str(&s, "%Y-%m-%d").ok()),
                 frn: row.get(11)?,
                 previous_call_sign: row.get(12)?,
@@ -115,7 +119,8 @@ impl QueryEngine {
                 city: row.get(14)?,
                 state: row.get(15)?,
                 zip_code: row.get(16)?,
-                operator_class: row.get::<_, Option<String>>(17)?
+                operator_class: row
+                    .get::<_, Option<String>>(17)?
                     .and_then(|s| s.chars().next()),
             })
         })?;
@@ -168,7 +173,7 @@ impl QueryEngine {
     // ========================================================================
 
     /// Determine which record types are required for basic queries.
-    /// 
+    ///
     /// Returns the minimal set of record types needed:
     /// - HD (licenses) - always needed
     /// - EN (entities) - needed for name/address/FRN
@@ -182,18 +187,22 @@ impl QueryEngine {
     }
 
     /// Check if any required record types are missing for a given service.
-    /// 
+    ///
     /// Returns a list of missing record types that need to be imported.
-    pub fn missing_data_for_query(&self, service: &str, filter: &SearchFilter) -> Result<Vec<String>> {
+    pub fn missing_data_for_query(
+        &self,
+        service: &str,
+        filter: &SearchFilter,
+    ) -> Result<Vec<String>> {
         let required = Self::required_record_types(filter);
         let mut missing = Vec::new();
-        
+
         for record_type in required {
             if !self.db.has_record_type(service, record_type)? {
                 missing.push(record_type.to_string());
             }
         }
-        
+
         Ok(missing)
     }
 
@@ -219,7 +228,7 @@ mod tests {
         let config = DatabaseConfig::in_memory();
         let db = Database::with_config(config).unwrap();
         db.initialize().unwrap();
-        
+
         let engine = QueryEngine::with_database(db);
         assert!(engine.is_ready().unwrap());
     }
@@ -229,7 +238,7 @@ mod tests {
         let config = DatabaseConfig::in_memory();
         let db = Database::with_config(config).unwrap();
         // Don't initialize - should return false, not error
-        
+
         let engine = QueryEngine::with_database(db);
         assert!(!engine.is_ready().unwrap());
     }
@@ -239,7 +248,7 @@ mod tests {
         let config = DatabaseConfig::in_memory();
         let db = Database::with_config(config).unwrap();
         db.initialize().unwrap();
-        
+
         let engine = QueryEngine::with_database(db);
         let result = engine.lookup("NONEXISTENT").unwrap();
         assert!(result.is_none());
@@ -250,7 +259,7 @@ mod tests {
         let config = DatabaseConfig::in_memory();
         let db = Database::with_config(config).unwrap();
         db.initialize().unwrap();
-        
+
         let engine = QueryEngine::with_database(db);
         let filter = SearchFilter::default();
         let results = engine.search(filter).unwrap();
@@ -262,7 +271,7 @@ mod tests {
         let config = DatabaseConfig::in_memory();
         let db = Database::with_config(config).unwrap();
         db.initialize().unwrap();
-        
+
         let engine = QueryEngine::with_database(db);
         let filter = SearchFilter::default();
         let count = engine.count(filter).unwrap();
@@ -274,7 +283,7 @@ mod tests {
         let config = DatabaseConfig::in_memory();
         let db = Database::with_config(config).unwrap();
         db.initialize().unwrap();
-        
+
         let engine = QueryEngine::with_database(db);
         let stats = engine.stats().unwrap();
         assert_eq!(stats.total_licenses, 0);
@@ -285,7 +294,7 @@ mod tests {
         let config = DatabaseConfig::in_memory();
         let db = Database::with_config(config).unwrap();
         db.initialize().unwrap();
-        
+
         let engine = QueryEngine::with_database(db);
         let results = engine.lookup_by_frn("0001234567").unwrap();
         assert!(results.is_empty());
@@ -296,7 +305,7 @@ mod tests {
         let config = DatabaseConfig::in_memory();
         let db = Database::with_config(config).unwrap();
         db.initialize().unwrap();
-        
+
         let engine = QueryEngine::with_database(db);
         assert!(engine.database().is_initialized().unwrap());
     }
@@ -304,11 +313,11 @@ mod tests {
     #[test]
     fn test_search_with_data() {
         use uls_core::records::{HeaderRecord, UlsRecord};
-        
+
         let config = DatabaseConfig::in_memory();
         let db = Database::with_config(config).unwrap();
         db.initialize().unwrap();
-        
+
         // Insert a test license
         let mut header = HeaderRecord::from_fields(&["HD", "12345"]);
         header.unique_system_identifier = 12345;
@@ -316,20 +325,18 @@ mod tests {
         header.license_status = Some('A');
         header.radio_service_code = Some("HA".to_string());
         db.insert_record(&UlsRecord::Header(header)).unwrap();
-        
+
         let engine = QueryEngine::with_database(db);
-        
+
         // Search with callsign filter
         let filter = SearchFilter::callsign("W1TEST");
         let results = engine.search(filter).unwrap();
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].call_sign, "W1TEST");
-        
+
         // Count should match
         let filter = SearchFilter::callsign("W1TEST");
         let count = engine.count(filter).unwrap();
         assert_eq!(count, 1);
     }
 }
-
-

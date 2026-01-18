@@ -26,16 +26,17 @@ impl FccClient {
     /// Create a new FCC download client.
     pub fn new(config: DownloadConfig) -> Result<Self> {
         // Ensure cache directory exists
-        fs::create_dir_all(&config.cache_dir).map_err(|_| {
-            DownloadError::CacheDirectoryError {
-                path: config.cache_dir.clone(),
-            }
+        fs::create_dir_all(&config.cache_dir).map_err(|_| DownloadError::CacheDirectoryError {
+            path: config.cache_dir.clone(),
         })?;
 
         let mut headers = HeaderMap::new();
         headers.insert(
             USER_AGENT,
-            config.user_agent.parse().unwrap_or_else(|_| "uls-cli/0.1.0".parse().unwrap()),
+            config
+                .user_agent
+                .parse()
+                .unwrap_or_else(|_| "uls-cli/0.1.0".parse().unwrap()),
         );
 
         let http = reqwest::Client::builder()
@@ -64,7 +65,8 @@ impl FccClient {
 
     /// Download the complete (weekly) license file for a service.
     pub async fn download_complete(&self, service: &str) -> Result<PathBuf> {
-        self.download_complete_with_progress(service, no_progress()).await
+        self.download_complete_with_progress(service, no_progress())
+            .await
     }
 
     /// Download the complete license file with progress callback.
@@ -136,17 +138,17 @@ impl FccClient {
         if cache_exists {
             if let Some(ref local_etag) = cached_etag {
                 info!("Checking if cached {} is current...", file.filename());
-                
+
                 // HEAD request to get remote ETag without downloading
                 let head_response = self.http.head(&url).send().await?;
-                
+
                 if head_response.status().is_success() {
                     let remote_etag = head_response
                         .headers()
                         .get(ETAG)
                         .and_then(|v| v.to_str().ok())
                         .map(|s| s.to_string());
-                    
+
                     if let Some(ref remote) = remote_etag {
                         if remote == local_etag {
                             info!("Cache is current (ETag match): {}", file.filename());
@@ -167,7 +169,10 @@ impl FccClient {
                 tokio::time::sleep(self.config.retry_delay).await;
             }
 
-            match self.do_download(&url, &dest_path, cached_etag.as_deref(), progress.clone()).await {
+            match self
+                .do_download(&url, &dest_path, cached_etag.as_deref(), progress.clone())
+                .await
+            {
                 Ok(DownloadResult::Downloaded) => {
                     info!("Downloaded: {}", file.filename());
                     return Ok((dest_path, DownloadResult::Downloaded));
@@ -236,7 +241,8 @@ impl FccClient {
 
                 // Download with progress tracking
                 let mut file = tokio::fs::File::create(dest_path).await?;
-                let filename = dest_path.file_name()
+                let filename = dest_path
+                    .file_name()
                     .and_then(|n| n.to_str())
                     .unwrap_or("unknown")
                     .to_string();
@@ -260,7 +266,8 @@ impl FccClient {
                         // Calculate ETA
                         if let Some(total) = total_bytes {
                             let remaining = total.saturating_sub(prog.downloaded_bytes);
-                            prog.eta_seconds = Some((remaining as f64 / prog.speed_bps.max(1) as f64) as u64);
+                            prog.eta_seconds =
+                                Some((remaining as f64 / prog.speed_bps.max(1) as f64) as u64);
                         }
                     }
 
@@ -291,7 +298,9 @@ impl FccClient {
                 Ok(DownloadResult::Downloaded)
             }
             StatusCode::NOT_MODIFIED => Ok(DownloadResult::NotModified),
-            StatusCode::NOT_FOUND => Err(DownloadError::NotFound { url: url.to_string() }),
+            StatusCode::NOT_FOUND => Err(DownloadError::NotFound {
+                url: url.to_string(),
+            }),
             _ => Err(DownloadError::ServerError {
                 status: status.as_u16(),
                 url: url.to_string(),
@@ -349,7 +358,10 @@ impl FccClient {
 
     /// Get the cached ETag for a file.
     pub fn get_cached_etag(&self, file: &DataFile) -> Option<String> {
-        let etag_path = self.config.cache_dir.join(format!("{}.etag", file.filename()));
+        let etag_path = self
+            .config
+            .cache_dir
+            .join(format!("{}.etag", file.filename()));
         fs::read_to_string(etag_path).ok()
     }
 
@@ -414,9 +426,6 @@ mod tests {
         let client = FccClient::new(config).unwrap();
 
         let file = DataFile::complete_license("amat");
-        assert_eq!(
-            client.cache_path(&file),
-            temp_dir.path().join("l_amat.zip")
-        );
+        assert_eq!(client.cache_path(&file), temp_dir.path().join("l_amat.zip"));
     }
 }

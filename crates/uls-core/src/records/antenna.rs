@@ -1,7 +1,7 @@
 //! AN (Antenna) record type - Antenna specifications.
 
-use serde::{Deserialize, Serialize};
 use super::common::*;
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AntennaRecord {
@@ -95,11 +95,11 @@ mod tests {
     #[test]
     fn test_antenna_from_fields() {
         let fields = vec![
-            "AN", "12345", "ULS123", "EBF456", "W1TEST", "A", "1", "2", "ZN1", "D",
-            "100.5", "50.0", "Yagi", "YA-1000", "15.0", "H", "60.0", "12.5", "180.0",
+            "AN", "12345", "ULS123", "EBF456", "W1TEST", "A", "1", "2", "ZN1", "D", "100.5",
+            "50.0", "Yagi", "YA-1000", "15.0", "H", "60.0", "12.5", "180.0",
         ];
         let an = AntennaRecord::from_fields(&fields);
-        
+
         assert_eq!(an.unique_system_identifier, 12345);
         assert_eq!(an.call_sign, Some("W1TEST".to_string()));
         assert_eq!(an.antenna_number, Some(1));
@@ -108,4 +108,3 @@ mod tests {
         assert_eq!(an.gain, Some(12.5));
     }
 }
-

@@ -76,17 +76,30 @@ mod tests {
     #[test]
     fn test_amateur_from_fields() {
         let fields: Vec<&str> = vec![
-            "AM", "123456789", "", "", "W1AW", "E", "D", "1",
-            "", "", "", "", "", "", "", "", "", "",
+            "AM",
+            "123456789",
+            "",
+            "",
+            "W1AW",
+            "E",
+            "D",
+            "1",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
         ];
         let record = AmateurRecord::from_fields(&fields);
         assert_eq!(record.unique_system_identifier, 123456789);
         assert_eq!(record.callsign, Some("W1AW".to_string()));
         assert_eq!(record.operator_class, Some('E'));
-        assert_eq!(
-            record.operator_class_description(),
-            Some("Amateur Extra")
-        );
+        assert_eq!(record.operator_class_description(), Some("Amateur Extra"));
         assert!(!record.is_club());
     }
 

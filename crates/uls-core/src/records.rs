@@ -3,47 +3,47 @@
 //! This module contains struct definitions for all 89 ULS record types.
 //! Each record type corresponds to a table in the FCC ULS database.
 
-pub mod common;
-pub mod header;
-pub mod entity;
+pub mod aircraft;
 pub mod amateur;
-pub mod location;
-pub mod frequency;
 pub mod antenna;
+pub mod attachment;
+pub mod buildout;
+pub mod coast_ground;
+pub mod common;
+pub mod control_point;
 pub mod emission;
-pub mod special_conditions;
+pub mod entity;
+pub mod frequency;
+pub mod header;
+pub mod history;
+pub mod lease;
+pub mod location;
 pub mod market;
 pub mod path;
 pub mod ship;
-pub mod aircraft;
-pub mod coast_ground;
-pub mod attachment;
-pub mod history;
-pub mod buildout;
-pub mod control_point;
+pub mod special_conditions;
 pub mod transfer;
-pub mod lease;
 
-pub use common::*;
-pub use header::*;
-pub use entity::*;
+pub use aircraft::*;
 pub use amateur::*;
-pub use location::*;
-pub use frequency::*;
 pub use antenna::*;
+pub use attachment::*;
+pub use buildout::*;
+pub use coast_ground::*;
+pub use common::*;
+pub use control_point::*;
 pub use emission::*;
-pub use special_conditions::*;
+pub use entity::*;
+pub use frequency::*;
+pub use header::*;
+pub use history::*;
+pub use lease::*;
+pub use location::*;
 pub use market::*;
 pub use path::*;
 pub use ship::*;
-pub use aircraft::*;
-pub use coast_ground::*;
-pub use attachment::*;
-pub use history::*;
-pub use buildout::*;
-pub use control_point::*;
+pub use special_conditions::*;
 pub use transfer::*;
-pub use lease::*;
 
 use crate::codes::RecordType;
 
@@ -180,13 +180,23 @@ mod tests {
 
     fn history_record() -> UlsRecord {
         UlsRecord::History(HistoryRecord::from_fields(&[
-            "HS", "100004", "", "W4TEST", "01/01/2020", "LIISS",
+            "HS",
+            "100004",
+            "",
+            "W4TEST",
+            "01/01/2020",
+            "LIISS",
         ]))
     }
 
     fn comment_record() -> UlsRecord {
         UlsRecord::Comment(CommentRecord::from_fields(&[
-            "CO", "100005", "", "W5TEST", "01/01/2020", "Test comment",
+            "CO",
+            "100005",
+            "",
+            "W5TEST",
+            "01/01/2020",
+            "Test comment",
         ]))
     }
 
@@ -237,7 +247,10 @@ mod tests {
         assert_eq!(comment_record().unique_system_identifier(), Some(100005));
         assert_eq!(location_record().unique_system_identifier(), Some(100006));
         assert_eq!(frequency_record().unique_system_identifier(), Some(100007));
-        assert_eq!(special_condition_record().unique_system_identifier(), Some(100008));
+        assert_eq!(
+            special_condition_record().unique_system_identifier(),
+            Some(100008)
+        );
         assert_eq!(raw_record().unique_system_identifier(), None);
     }
 
@@ -254,4 +267,3 @@ mod tests {
         assert_eq!(raw_record().call_sign(), None);
     }
 }
-

@@ -5,10 +5,10 @@
 //! - Enums for radio service codes and various status codes
 //! - Common traits and utilities for working with ULS data
 
+pub mod codes;
 pub mod error;
 pub mod records;
-pub mod codes;
 
+pub use codes::*;
 pub use error::{Error, Result};
 pub use records::*;
-pub use codes::*;

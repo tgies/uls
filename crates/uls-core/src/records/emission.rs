@@ -1,6 +1,6 @@
 //! EM (Emission) record type.
-use serde::{Deserialize, Serialize};
 use super::common::*;
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EmissionRecord {
@@ -50,11 +50,25 @@ mod tests {
     #[test]
     fn test_emission_from_fields() {
         let fields = vec![
-            "EM", "12345", "ULS123", "EBF456", "W1TEST", "1", "2", "146.52",
-            "A", "20K0F3E", "9600.0", "FSK", "1", "A", "01/01/2020", "100",
+            "EM",
+            "12345",
+            "ULS123",
+            "EBF456",
+            "W1TEST",
+            "1",
+            "2",
+            "146.52",
+            "A",
+            "20K0F3E",
+            "9600.0",
+            "FSK",
+            "1",
+            "A",
+            "01/01/2020",
+            "100",
         ];
         let em = EmissionRecord::from_fields(&fields);
-        
+
         assert_eq!(em.unique_system_identifier, 12345);
         assert_eq!(em.call_sign, Some("W1TEST".to_string()));
         assert_eq!(em.frequency_assigned, Some(146.52));
@@ -62,4 +76,3 @@ mod tests {
         assert_eq!(em.digital_mod_type, Some("FSK".to_string()));
     }
 }
-

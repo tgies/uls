@@ -13,11 +13,11 @@ enum MatchPattern {
 
 impl MatchPattern {
     /// Analyze a search term and determine the matching strategy.
-    /// 
+    ///
     /// Wildcards:
     /// - `*` matches any sequence of characters
     /// - `?` matches exactly one character
-    /// 
+    ///
     /// Examples:
     /// - `SMITH` → Exact match
     /// - `SMITH*` → Prefix match (`SMITH%`)
@@ -35,25 +35,21 @@ impl MatchPattern {
 }
 
 /// Generate a SQL condition and parameter for a text field match.
-/// 
+///
 /// Returns (condition_string, parameters).
 fn text_match_condition(column: &str, value: &str) -> (String, Vec<String>) {
     match MatchPattern::from_search_term(value) {
-        MatchPattern::Exact(v) => {
-            (format!("{} = ?", column), vec![v])
-        }
-        MatchPattern::Like(pattern) => {
-            (format!("{} LIKE ?", column), vec![pattern])
-        }
+        MatchPattern::Exact(v) => (format!("{} = ?", column), vec![v]),
+        MatchPattern::Like(pattern) => (format!("{} LIKE ?", column), vec![pattern]),
     }
 }
 
 /// Generate SQL condition for matching across multiple columns (OR).
-/// 
+///
 /// Useful for name searches that span entity_name, first_name, last_name.
 fn multi_column_match_condition(columns: &[&str], value: &str) -> (String, Vec<String>) {
     let pattern = MatchPattern::from_search_term(value);
-    
+
     let (conditions, params): (Vec<_>, Vec<_>) = columns
         .iter()
         .map(|col| match &pattern {
@@ -61,7 +57,7 @@ fn multi_column_match_condition(columns: &[&str], value: &str) -> (String, Vec<S
             MatchPattern::Like(p) => (format!("{} LIKE ?", col), p.clone()),
         })
         .unzip();
-    
+
     (format!("({})", conditions.join(" OR ")), params)
 }
 
@@ -270,7 +266,10 @@ impl SearchFilter {
         if let Some(ref services) = self.radio_service {
             if !services.is_empty() {
                 let placeholders: Vec<String> = services.iter().map(|_| "?".to_string()).collect();
-                conditions.push(format!("l.radio_service_code IN ({})", placeholders.join(", ")));
+                conditions.push(format!(
+                    "l.radio_service_code IN ({})",
+                    placeholders.join(", ")
+                ));
                 params.extend(services.iter().cloned());
             }
         }
@@ -301,7 +300,7 @@ impl SearchFilter {
                 } else {
                     expr.op
                 };
-                
+
                 // Validate operator for field type
                 if op.valid_for(field_def.field_type) {
                     if op == crate::fields::FilterOp::Like {
@@ -335,7 +334,7 @@ impl SearchFilter {
                 return format!("ORDER BY {} {}", field_def.column, dir);
             }
         }
-        
+
         // Fall back to legacy SortOrder enum
         match self.sort {
             SortOrder::CallSign => "ORDER BY l.call_sign ASC".to_string(),
@@ -440,7 +439,8 @@ mod tests {
     #[test]
     fn test_location_filter() {
         // Use wildcards for contains match
-        let filter = SearchFilter::location(Some("*NEWINGTON*".to_string()), Some("CT".to_string()));
+        let filter =
+            SearchFilter::location(Some("*NEWINGTON*".to_string()), Some("CT".to_string()));
         let (clause, params) = filter.to_where_clause();
         assert!(clause.contains("city"));
         assert!(clause.contains("state"));
@@ -480,19 +480,19 @@ mod tests {
     fn test_sort_orders() {
         let filter = SearchFilter::new().with_sort(SortOrder::CallSign);
         assert!(filter.order_clause().contains("call_sign ASC"));
-        
+
         let filter = SearchFilter::new().with_sort(SortOrder::CallSignDesc);
         assert!(filter.order_clause().contains("call_sign DESC"));
-        
+
         let filter = SearchFilter::new().with_sort(SortOrder::Name);
         assert!(filter.order_clause().contains("entity_name"));
-        
+
         let filter = SearchFilter::new().with_sort(SortOrder::State);
         assert!(filter.order_clause().contains("state"));
-        
+
         let filter = SearchFilter::new().with_sort(SortOrder::GrantDate);
         assert!(filter.order_clause().contains("grant_date"));
-        
+
         let filter = SearchFilter::new().with_sort(SortOrder::ExpirationDate);
         assert!(filter.order_clause().contains("expired_date"));
     }
@@ -612,5 +612,3 @@ mod tests {
         assert!(params.iter().any(|p| p == "%Smith%"));
     }
 }
-
-

@@ -48,7 +48,7 @@ const SQL_INSERT_SPECIAL_CONDITION: &str = r#"INSERT OR REPLACE INTO special_con
 ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)"#;
 
 /// Bulk inserter with pre-prepared statements for maximum performance.
-/// 
+///
 /// Statements are prepared once when the inserter is created, then reused
 /// for every insert operation - eliminating SQL parsing overhead.
 pub struct BulkInserter<'conn> {
@@ -212,61 +212,177 @@ mod tests {
     // All records share USI=100001 for foreign key consistency.
     const TEST_USI: &str = "100001";
     const TEST_CALLSIGN: &str = "W1TEST";
-    
+
     fn create_header() -> HeaderRecord {
         // Structure matches: HD|USI|ULS_FILE|EBF|CALLSIGN|STATUS|SERVICE|GRANT|EXPIRE|...
         HeaderRecord::from_fields(&[
-            "HD", TEST_USI, "0000000001", "", TEST_CALLSIGN, "A", "HA",
-            "01/15/2020", "01/15/2030", "", "", "", "", "", "", "", "", "",
-            "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "",
-            "", "", "", "", "", "", "N", "", "", "", "", "", "", "", "", "",
-            "01/15/2020", "01/15/2020", "", "", "", "", "", "", "", "", "", "", "", "", "",
+            "HD",
+            TEST_USI,
+            "0000000001",
+            "",
+            TEST_CALLSIGN,
+            "A",
+            "HA",
+            "01/15/2020",
+            "01/15/2030",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "N",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "01/15/2020",
+            "01/15/2020",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
         ])
     }
 
     fn create_entity() -> EntityRecord {
         // Structure matches: EN|USI|ULS_FILE|EBF|CALLSIGN|TYPE|LIC_ID|NAME|FIRST|MI|LAST|...
         EntityRecord::from_fields(&[
-            "EN", TEST_USI, "", "", TEST_CALLSIGN, "L", "L00100001",
-            "DOE, JOHN A", "JOHN", "A", "DOE", "",
-            "555-555-1234", "", "test@example.com", "123 Main St", "ANYTOWN", "CA", "90210",
-            "", "", "000", "0001234567", "I", "", "", "", "", "", "",
+            "EN",
+            TEST_USI,
+            "",
+            "",
+            TEST_CALLSIGN,
+            "L",
+            "L00100001",
+            "DOE, JOHN A",
+            "JOHN",
+            "A",
+            "DOE",
+            "",
+            "555-555-1234",
+            "",
+            "test@example.com",
+            "123 Main St",
+            "ANYTOWN",
+            "CA",
+            "90210",
+            "",
+            "",
+            "000",
+            "0001234567",
+            "I",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
         ])
     }
 
     fn create_amateur() -> AmateurRecord {
         // Structure matches: AM|USI|ULS_FILE|EBF|CALLSIGN|CLASS|GROUP|REGION|...
         AmateurRecord::from_fields(&[
-            "AM", TEST_USI, "", "", TEST_CALLSIGN, "E", "D", "6",
-            "", "", "", "", "", "", "", "", "", "",
+            "AM",
+            TEST_USI,
+            "",
+            "",
+            TEST_CALLSIGN,
+            "E",
+            "D",
+            "6",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
         ])
     }
 
     fn create_history() -> HistoryRecord {
         // Structure matches: HS|USI|ULS_FILE|CALLSIGN|DATE|CODE
-        HistoryRecord::from_fields(&[
-            "HS", TEST_USI, "", TEST_CALLSIGN, "01/15/2020", "LIISS",
-        ])
+        HistoryRecord::from_fields(&["HS", TEST_USI, "", TEST_CALLSIGN, "01/15/2020", "LIISS"])
     }
 
     fn create_comment() -> CommentRecord {
         // Structure matches: CO|USI|ULS_FILE|CALLSIGN|DATE|DESCRIPTION|STATUS|STATUS_DATE
         CommentRecord::from_fields(&[
-            "CO", TEST_USI, "", TEST_CALLSIGN, "01/15/2020",
-            "Test comment for unit testing purposes.", "", "",
+            "CO",
+            TEST_USI,
+            "",
+            TEST_CALLSIGN,
+            "01/15/2020",
+            "Test comment for unit testing purposes.",
+            "",
+            "",
         ])
     }
 
     fn create_special_condition() -> SpecialConditionRecord {
         // Structure matches: SC|USI|ULS_FILE|EBF|CALLSIGN|TYPE|CODE|STATUS|STATUS_DATE
         SpecialConditionRecord::from_fields(&[
-            "SC", TEST_USI, "", "", TEST_CALLSIGN, "P", "999", "", "",
+            "SC",
+            TEST_USI,
+            "",
+            "",
+            TEST_CALLSIGN,
+            "P",
+            "999",
+            "",
+            "",
         ])
     }
 
     /// Helper to insert the parent header record for foreign key constraints
     fn insert_parent_header(inserter: &mut BulkInserter) {
-        inserter.insert(&UlsRecord::Header(create_header())).unwrap();
+        inserter
+            .insert(&UlsRecord::Header(create_header()))
+            .unwrap();
     }
 
     #[test]
@@ -280,15 +396,17 @@ mod tests {
     fn test_insert_header() {
         let conn = setup_db();
         let mut inserter = BulkInserter::new(&conn).unwrap();
-        
+
         let result = inserter.insert(&UlsRecord::Header(create_header()));
         assert!(result.is_ok());
-        
-        let count: i64 = conn.query_row(
-            "SELECT COUNT(*) FROM licenses WHERE call_sign = ?",
-            [TEST_CALLSIGN],
-            |r| r.get(0)
-        ).unwrap();
+
+        let count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM licenses WHERE call_sign = ?",
+                [TEST_CALLSIGN],
+                |r| r.get(0),
+            )
+            .unwrap();
         assert_eq!(count, 1);
     }
 
@@ -296,18 +414,20 @@ mod tests {
     fn test_insert_entity() {
         let conn = setup_db();
         let mut inserter = BulkInserter::new(&conn).unwrap();
-        
+
         // Insert parent header first for foreign key
         insert_parent_header(&mut inserter);
-        
+
         let result = inserter.insert(&UlsRecord::Entity(create_entity()));
         assert!(result.is_ok());
-        
-        let count: i64 = conn.query_row(
-            "SELECT COUNT(*) FROM entities WHERE call_sign = ?",
-            [TEST_CALLSIGN],
-            |r| r.get(0)
-        ).unwrap();
+
+        let count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM entities WHERE call_sign = ?",
+                [TEST_CALLSIGN],
+                |r| r.get(0),
+            )
+            .unwrap();
         assert_eq!(count, 1);
     }
 
@@ -315,17 +435,19 @@ mod tests {
     fn test_insert_amateur() {
         let conn = setup_db();
         let mut inserter = BulkInserter::new(&conn).unwrap();
-        
+
         insert_parent_header(&mut inserter);
-        
+
         let result = inserter.insert(&UlsRecord::Amateur(create_amateur()));
         assert!(result.is_ok());
-        
-        let count: i64 = conn.query_row(
-            "SELECT COUNT(*) FROM amateur_operators WHERE call_sign = ?",
-            [TEST_CALLSIGN],
-            |r| r.get(0)
-        ).unwrap();
+
+        let count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM amateur_operators WHERE call_sign = ?",
+                [TEST_CALLSIGN],
+                |r| r.get(0),
+            )
+            .unwrap();
         assert_eq!(count, 1);
     }
 
@@ -333,17 +455,19 @@ mod tests {
     fn test_insert_history() {
         let conn = setup_db();
         let mut inserter = BulkInserter::new(&conn).unwrap();
-        
+
         insert_parent_header(&mut inserter);
-        
+
         let result = inserter.insert(&UlsRecord::History(create_history()));
         assert!(result.is_ok());
-        
-        let count: i64 = conn.query_row(
-            "SELECT COUNT(*) FROM history WHERE callsign = ?",
-            [TEST_CALLSIGN],
-            |r| r.get(0)
-        ).unwrap();
+
+        let count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM history WHERE callsign = ?",
+                [TEST_CALLSIGN],
+                |r| r.get(0),
+            )
+            .unwrap();
         assert_eq!(count, 1);
     }
 
@@ -351,17 +475,19 @@ mod tests {
     fn test_insert_comment() {
         let conn = setup_db();
         let mut inserter = BulkInserter::new(&conn).unwrap();
-        
+
         insert_parent_header(&mut inserter);
-        
+
         let result = inserter.insert(&UlsRecord::Comment(create_comment()));
         assert!(result.is_ok());
-        
-        let count: i64 = conn.query_row(
-            "SELECT COUNT(*) FROM comments WHERE callsign = ?",
-            [TEST_CALLSIGN],
-            |r| r.get(0)
-        ).unwrap();
+
+        let count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM comments WHERE callsign = ?",
+                [TEST_CALLSIGN],
+                |r| r.get(0),
+            )
+            .unwrap();
         assert_eq!(count, 1);
     }
 
@@ -369,33 +495,35 @@ mod tests {
     fn test_insert_special_condition() {
         let conn = setup_db();
         let mut inserter = BulkInserter::new(&conn).unwrap();
-        
+
         insert_parent_header(&mut inserter);
-        
+
         let result = inserter.insert(&UlsRecord::SpecialCondition(create_special_condition()));
         assert!(result.is_ok());
-        
-        let count: i64 = conn.query_row(
-            "SELECT COUNT(*) FROM special_conditions WHERE callsign = ?",
-            [TEST_CALLSIGN],
-            |r| r.get(0)
-        ).unwrap();
+
+        let count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM special_conditions WHERE callsign = ?",
+                [TEST_CALLSIGN],
+                |r| r.get(0),
+            )
+            .unwrap();
         assert_eq!(count, 1);
     }
 
     #[test]
     fn test_insert_unsupported_record() {
         use uls_core::codes::RecordType;
-        
+
         let conn = setup_db();
         let mut inserter = BulkInserter::new(&conn).unwrap();
-        
+
         // Raw/unsupported records should be skipped silently
         let raw = UlsRecord::Raw {
             record_type: RecordType::AC,
             fields: vec!["AC".to_string(), "123".to_string()],
         };
-        
+
         let result = inserter.insert(&raw);
         assert!(result.is_ok());
     }
@@ -404,23 +532,47 @@ mod tests {
     fn test_bulk_insert_multiple_records() {
         let conn = setup_db();
         let mut inserter = BulkInserter::new(&conn).unwrap();
-        
+
         // Insert parent first, then all child records
-        inserter.insert(&UlsRecord::Header(create_header())).unwrap();
-        inserter.insert(&UlsRecord::Entity(create_entity())).unwrap();
-        inserter.insert(&UlsRecord::Amateur(create_amateur())).unwrap();
-        inserter.insert(&UlsRecord::History(create_history())).unwrap();
-        inserter.insert(&UlsRecord::Comment(create_comment())).unwrap();
-        inserter.insert(&UlsRecord::SpecialCondition(create_special_condition())).unwrap();
-        
+        inserter
+            .insert(&UlsRecord::Header(create_header()))
+            .unwrap();
+        inserter
+            .insert(&UlsRecord::Entity(create_entity()))
+            .unwrap();
+        inserter
+            .insert(&UlsRecord::Amateur(create_amateur()))
+            .unwrap();
+        inserter
+            .insert(&UlsRecord::History(create_history()))
+            .unwrap();
+        inserter
+            .insert(&UlsRecord::Comment(create_comment()))
+            .unwrap();
+        inserter
+            .insert(&UlsRecord::SpecialCondition(create_special_condition()))
+            .unwrap();
+
         // Verify all record types were inserted
-        let license_count: i64 = conn.query_row("SELECT COUNT(*) FROM licenses", [], |r| r.get(0)).unwrap();
-        let entity_count: i64 = conn.query_row("SELECT COUNT(*) FROM entities", [], |r| r.get(0)).unwrap();
-        let amateur_count: i64 = conn.query_row("SELECT COUNT(*) FROM amateur_operators", [], |r| r.get(0)).unwrap();
-        let history_count: i64 = conn.query_row("SELECT COUNT(*) FROM history", [], |r| r.get(0)).unwrap();
-        let comment_count: i64 = conn.query_row("SELECT COUNT(*) FROM comments", [], |r| r.get(0)).unwrap();
-        let sc_count: i64 = conn.query_row("SELECT COUNT(*) FROM special_conditions", [], |r| r.get(0)).unwrap();
-        
+        let license_count: i64 = conn
+            .query_row("SELECT COUNT(*) FROM licenses", [], |r| r.get(0))
+            .unwrap();
+        let entity_count: i64 = conn
+            .query_row("SELECT COUNT(*) FROM entities", [], |r| r.get(0))
+            .unwrap();
+        let amateur_count: i64 = conn
+            .query_row("SELECT COUNT(*) FROM amateur_operators", [], |r| r.get(0))
+            .unwrap();
+        let history_count: i64 = conn
+            .query_row("SELECT COUNT(*) FROM history", [], |r| r.get(0))
+            .unwrap();
+        let comment_count: i64 = conn
+            .query_row("SELECT COUNT(*) FROM comments", [], |r| r.get(0))
+            .unwrap();
+        let sc_count: i64 = conn
+            .query_row("SELECT COUNT(*) FROM special_conditions", [], |r| r.get(0))
+            .unwrap();
+
         assert_eq!(license_count, 1);
         assert_eq!(entity_count, 1);
         assert_eq!(amateur_count, 1);
@@ -433,12 +585,18 @@ mod tests {
     fn test_insert_replace_behavior() {
         let conn = setup_db();
         let mut inserter = BulkInserter::new(&conn).unwrap();
-        
+
         // Insert same record twice - should replace, not duplicate
-        inserter.insert(&UlsRecord::Header(create_header())).unwrap();
-        inserter.insert(&UlsRecord::Header(create_header())).unwrap();
-        
-        let count: i64 = conn.query_row("SELECT COUNT(*) FROM licenses", [], |r| r.get(0)).unwrap();
+        inserter
+            .insert(&UlsRecord::Header(create_header()))
+            .unwrap();
+        inserter
+            .insert(&UlsRecord::Header(create_header()))
+            .unwrap();
+
+        let count: i64 = conn
+            .query_row("SELECT COUNT(*) FROM licenses", [], |r| r.get(0))
+            .unwrap();
         assert_eq!(count, 1); // Should be 1, not 2
     }
 }

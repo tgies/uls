@@ -1,6 +1,6 @@
 //! HS (History) and CO (Comment) record types.
-use serde::{Deserialize, Serialize};
 use super::common::*;
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HistoryRecord {
@@ -89,7 +89,7 @@ mod tests {
     fn test_history_from_fields() {
         let fields = vec!["HS", "12345", "ULS123", "W1TEST", "01/01/2020", "LIISS"];
         let hs = HistoryRecord::from_fields(&fields);
-        
+
         assert_eq!(hs.unique_system_identifier, 12345);
         assert_eq!(hs.uls_file_number, Some("ULS123".to_string()));
         assert_eq!(hs.callsign, Some("W1TEST".to_string()));
@@ -100,11 +100,17 @@ mod tests {
     #[test]
     fn test_comment_from_fields() {
         let fields = vec![
-            "CO", "12345", "ULS123", "W1TEST", "01/01/2020",
-            "This is a test comment", "A", "01/01/2020"
+            "CO",
+            "12345",
+            "ULS123",
+            "W1TEST",
+            "01/01/2020",
+            "This is a test comment",
+            "A",
+            "01/01/2020",
         ];
         let co = CommentRecord::from_fields(&fields);
-        
+
         assert_eq!(co.unique_system_identifier, 12345);
         assert_eq!(co.callsign, Some("W1TEST".to_string()));
         assert_eq!(co.description, Some("This is a test comment".to_string()));
@@ -114,11 +120,22 @@ mod tests {
     #[test]
     fn test_application_detail_from_fields() {
         let fields = vec![
-            "AD", "12345", "ULS123", "EBF456", "NE", "G", "N", "N", "E",
-            "", "01/01/2020", "A", "01/02/2020"
+            "AD",
+            "12345",
+            "ULS123",
+            "EBF456",
+            "NE",
+            "G",
+            "N",
+            "N",
+            "E",
+            "",
+            "01/01/2020",
+            "A",
+            "01/02/2020",
         ];
         let ad = ApplicationDetailRecord::from_fields(&fields);
-        
+
         assert_eq!(ad.unique_system_identifier, 12345);
         assert_eq!(ad.application_purpose, Some("NE".to_string()));
         assert_eq!(ad.application_status, Some('G'));
@@ -127,4 +144,3 @@ mod tests {
         assert_eq!(ad.notification_code, Some('A'));
     }
 }
-

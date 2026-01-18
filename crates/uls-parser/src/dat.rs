@@ -12,13 +12,12 @@ use crate::{ParseError, Result};
 /// Known valid record type codes (2 uppercase letters).
 /// Used to detect continuation lines.
 const VALID_RECORD_TYPES: &[&str] = &[
-    "A2", "A3", "AC", "AD", "AM", "AN", "AS", "AT", "BC", "BD", "BF", "BL",
-    "BO", "CF", "CG", "CH", "CL", "CO", "CP", "CS", "CW", "EM", "EN", "F2",
-    "FA", "FC", "FF", "FH", "FR", "FT", "HD", "HS", "IR", "L2", "L3", "L4",
-    "LA", "LF", "LH", "LM", "LO", "LS", "MC", "MF", "MH", "MI", "MK", "ML",
-    "MP", "MW", "O2", "OP", "PA", "PC", "PF", "PH", "PI", "PL", "RA", "RC",
-    "RE", "RG", "RI", "RS", "SA", "SC", "SE", "SF", "SG", "SH", "SL", "SR",
-    "SS", "SV", "TA", "TP", "UA", "UC", "UF", "UL", "UM", "VC",
+    "A2", "A3", "AC", "AD", "AM", "AN", "AS", "AT", "BC", "BD", "BF", "BL", "BO", "CF", "CG", "CH",
+    "CL", "CO", "CP", "CS", "CW", "EM", "EN", "F2", "FA", "FC", "FF", "FH", "FR", "FT", "HD", "HS",
+    "IR", "L2", "L3", "L4", "LA", "LF", "LH", "LM", "LO", "LS", "MC", "MF", "MH", "MI", "MK", "ML",
+    "MP", "MW", "O2", "OP", "PA", "PC", "PF", "PH", "PI", "PL", "RA", "RC", "RE", "RG", "RI", "RS",
+    "SA", "SC", "SE", "SF", "SG", "SH", "SL", "SR", "SS", "SV", "TA", "TP", "UA", "UC", "UF", "UL",
+    "UM", "VC",
 ];
 
 /// Check if a string looks like a valid record type prefix.
@@ -78,13 +77,13 @@ impl ParsedLine {
         // Find the last field that looks like it could have content (description field)
         // For most records with continuation, this is field 5 (description) or similar
         // We append to the last field before the trailing empty fields
-        
+
         // Trim trailing empty fields to find the real last field
         let mut last_content_idx = self.fields.len().saturating_sub(1);
         while last_content_idx > 0 && self.fields[last_content_idx].is_empty() {
             last_content_idx -= 1;
         }
-        
+
         // Append the continuation (with a space separator if there's existing content)
         if !self.fields[last_content_idx].is_empty() {
             self.fields[last_content_idx].push(' ');
@@ -147,12 +146,12 @@ fn is_continuation_line(line: &str) -> bool {
     if line.is_empty() {
         return true;
     }
-    
+
     let fields = parse_raw_fields(line);
     if fields.is_empty() {
         return true;
     }
-    
+
     let first_field = &fields[0];
     !is_valid_record_type(first_field)
 }
@@ -220,10 +219,10 @@ impl<R: Read> DatReader<R> {
 
                     // This is a new record
                     let new_record = ParsedLine::from_line(&line, self.line_number)?;
-                    
+
                     // Return the previous pending record (if any) and buffer this new one
                     let to_return = self.pending_record.replace(new_record);
-                    
+
                     if to_return.is_some() {
                         return Ok(to_return);
                     }
@@ -307,17 +306,17 @@ mod tests {
         let data = "CO|123||W1AW|01/01/2024|First line of comment||\n\
                     continued text here||\n\
                     HD|456||W1AW|A|HA||\n";
-        
+
         let reader = DatReader::new(data.as_bytes());
         let lines: Vec<_> = reader.collect();
-        
+
         assert_eq!(lines.len(), 2);
-        
+
         // First record should have continuation merged
         let co_record = lines[0].as_ref().unwrap();
         assert_eq!(co_record.record_type, "CO");
         assert!(co_record.field(5).contains("continued text here"));
-        
+
         // Second record should be HD
         let hd_record = lines[1].as_ref().unwrap();
         assert_eq!(hd_record.record_type, "HD");

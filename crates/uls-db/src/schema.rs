@@ -24,7 +24,7 @@ impl Schema {
             );
             "#,
         )?;
-        
+
         // Set schema version
         conn.execute(
             "INSERT OR REPLACE INTO metadata (key, value) VALUES ('schema_version', ?1)",
@@ -261,7 +261,9 @@ impl Schema {
         match result {
             Ok(v) => Ok(v.parse().ok()),
             Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
-            Err(rusqlite::Error::SqliteFailure(_, Some(ref msg))) if msg.contains("no such table") => {
+            Err(rusqlite::Error::SqliteFailure(_, Some(ref msg)))
+                if msg.contains("no such table") =>
+            {
                 // Table doesn't exist = not initialized
                 Ok(None)
             }
@@ -280,11 +282,9 @@ impl Schema {
 
     /// Get a metadata value.
     pub fn get_metadata(conn: &Connection, key: &str) -> Result<Option<String>> {
-        let result = conn.query_row(
-            "SELECT value FROM metadata WHERE key = ?1",
-            [key],
-            |row| row.get(0),
-        );
+        let result = conn.query_row("SELECT value FROM metadata WHERE key = ?1", [key], |row| {
+            row.get(0)
+        });
 
         match result {
             Ok(v) => Ok(Some(v)),
@@ -331,31 +331,32 @@ mod tests {
         let missing = Schema::get_metadata(&conn, "nonexistent").unwrap();
         assert_eq!(missing, None);
     }
-    
+
     #[test]
     fn test_unique_constraints() {
         let conn = Connection::open_in_memory().unwrap();
         Schema::initialize(&conn).unwrap();
-        
+
         // Insert a license
         conn.execute(
             "INSERT INTO licenses (unique_system_identifier, call_sign) VALUES (1, 'W1AW')",
             [],
-        ).unwrap();
-        
+        )
+        .unwrap();
+
         // Insert entity
         conn.execute(
             "INSERT INTO entities (unique_system_identifier, entity_type, entity_name) VALUES (1, 'L', 'Test')",
             [],
         ).unwrap();
-        
+
         // Duplicate should fail
         let result = conn.execute(
             "INSERT INTO entities (unique_system_identifier, entity_type, entity_name) VALUES (1, 'L', 'Test2')",
             [],
         );
         assert!(result.is_err());
-        
+
         // Different entity_type should succeed
         conn.execute(
             "INSERT INTO entities (unique_system_identifier, entity_type, entity_name) VALUES (1, 'C', 'Contact')",

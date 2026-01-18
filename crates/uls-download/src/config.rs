@@ -37,7 +37,10 @@ impl Default for DownloadConfig {
             cache_dir: default_cache_dir(),
             base_url: "https://data.fcc.gov/download/pub/uls".to_string(),
             timeout: Duration::from_secs(300), // 5 minutes
-            user_agent: format!("uls-cli/{} (https://github.com/tgies/uls)", env!("CARGO_PKG_VERSION")),
+            user_agent: format!(
+                "uls-cli/{} (https://github.com/tgies/uls)",
+                env!("CARGO_PKG_VERSION")
+            ),
             verify_ssl: true,
             max_retries: 3,
             retry_delay: Duration::from_secs(5),

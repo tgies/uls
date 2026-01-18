@@ -1,6 +1,6 @@
 //! Market-based license record types (MK, MP, MF, MC).
-use serde::{Deserialize, Serialize};
 use super::common::*;
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MarketRecord {
@@ -43,9 +43,12 @@ mod tests {
 
     #[test]
     fn test_market_from_fields() {
-        let fields = vec!["MK", "12345", "ULS123", "EBF456", "W1TEST", "MKT001", "A", "1", "New York", "Y", "N", "5", "8000000"];
+        let fields = vec![
+            "MK", "12345", "ULS123", "EBF456", "W1TEST", "MKT001", "A", "1", "New York", "Y", "N",
+            "5", "8000000",
+        ];
         let mk = MarketRecord::from_fields(&fields);
-        
+
         assert_eq!(mk.unique_system_identifier, 12345);
         assert_eq!(mk.call_sign, Some("W1TEST".to_string()));
         assert_eq!(mk.market_code, Some("MKT001".to_string()));
@@ -53,4 +56,3 @@ mod tests {
         assert_eq!(mk.population, Some(8000000));
     }
 }
-

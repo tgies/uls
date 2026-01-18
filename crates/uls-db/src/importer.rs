@@ -36,7 +36,7 @@ impl ImportStats {
             0.0
         }
     }
-    
+
     /// Whether the import completed without errors.
     pub fn is_successful(&self) -> bool {
         self.insert_errors == 0
@@ -75,24 +75,24 @@ pub enum ImportMode {
 impl ImportMode {
     /// Record types to import for minimal mode (for amateur service).
     pub const MINIMAL_TYPES: &'static [&'static str] = &["HD", "EN", "AM"];
-    
+
     /// Check if a record type should be imported.
     pub fn should_import(&self, record_type: &str) -> bool {
         match self {
-            ImportMode::Minimal => Self::MINIMAL_TYPES.contains(&record_type.to_uppercase().as_str()),
+            ImportMode::Minimal => {
+                Self::MINIMAL_TYPES.contains(&record_type.to_uppercase().as_str())
+            }
             ImportMode::Full => true,
-            ImportMode::Selective(types) => types.iter().any(|t| t.eq_ignore_ascii_case(record_type)),
+            ImportMode::Selective(types) => {
+                types.iter().any(|t| t.eq_ignore_ascii_case(record_type))
+            }
         }
     }
-    
+
     /// Check if a file should be imported based on its name.
     pub fn should_import_file(&self, filename: &str) -> bool {
         // Extract record type from filename like "HD.dat" or "EN.dat"
-        let record_type = filename
-            .split('.')
-            .next()
-            .unwrap_or("")
-            .to_uppercase();
+        let record_type = filename.split('.').next().unwrap_or("").to_uppercase();
         self.should_import(&record_type)
     }
 }
@@ -142,58 +142,69 @@ impl<'a> Importer<'a> {
         progress: Option<ProgressCallback>,
     ) -> Result<ImportStats> {
         let start = Instant::now();
-        
+
         let mut extractor = ZipExtractor::open(zip_path)?;
         let all_dat_files = extractor.list_dat_files();
-        
+
         // Filter files based on import mode
         let mut dat_files: Vec<String> = all_dat_files
             .into_iter()
             .filter(|f| mode.should_import_file(f))
             .collect();
-        
+
         // Sort by processing order: HD (licenses) first, then EN (entities), then others
         dat_files.sort_by(|a, b| {
             let priority = |s: &str| -> u8 {
                 let upper = s.to_uppercase();
-                if upper.contains("HD") { 0 }
-                else if upper.contains("EN") { 1 }
-                else if upper.contains("AM") { 2 }
-                else { 3 }
+                if upper.contains("HD") {
+                    0
+                } else if upper.contains("EN") {
+                    1
+                } else if upper.contains("AM") {
+                    2
+                } else {
+                    3
+                }
             };
             priority(a).cmp(&priority(b))
         });
-        
-        info!("Processing {} DAT files (mode={:?}): {:?}", dat_files.len(), mode, dat_files);
-        
+
+        info!(
+            "Processing {} DAT files (mode={:?}): {:?}",
+            dat_files.len(),
+            mode,
+            dat_files
+        );
+
         // Optimize SQLite for bulk import
         let conn = self.db.conn()?;
         conn.execute_batch(
             "PRAGMA synchronous = OFF;
              PRAGMA journal_mode = MEMORY;
              PRAGMA temp_store = MEMORY;
-             PRAGMA cache_size = -64000;"
+             PRAGMA cache_size = -64000;",
         )?;
-        
+
         // Begin transaction
         conn.execute("BEGIN TRANSACTION", [])?;
-        
+
         // Create bulk inserter with prepared statements (statements compiled ONCE)
         let mut inserter = BulkInserter::new(&conn)?;
-        
+
         let mut stats = ImportStats {
             files: dat_files.len(),
             ..Default::default()
         };
-        
+
         // Track records per file type for import_status updates
-        let mut records_per_type: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
-        
+        let mut records_per_type: std::collections::HashMap<String, usize> =
+            std::collections::HashMap::new();
+
         for (idx, dat_file) in dat_files.iter().enumerate() {
             let mut file_records = 0usize;
             let mut file_parse_errors = 0usize;
             let mut file_insert_errors = 0usize;
-            
+
             extractor.process_dat_streaming(dat_file, |line| {
                 match line.to_record() {
                     Ok(record) => {
@@ -213,7 +224,7 @@ impl<'a> Importer<'a> {
                         }
                     }
                 }
-                
+
                 // Send progress update every 10k records
                 if let Some(ref cb) = progress {
                     if (file_records + file_parse_errors) % 10_000 == 0 {
@@ -222,28 +233,31 @@ impl<'a> Importer<'a> {
                             total_files: dat_files.len(),
                             file_name: dat_file.clone(),
                             records: stats.records + file_records,
-                            errors: stats.parse_errors + stats.insert_errors + file_parse_errors + file_insert_errors,
+                            errors: stats.parse_errors
+                                + stats.insert_errors
+                                + file_parse_errors
+                                + file_insert_errors,
                         });
                     }
                 }
                 true
             })?;
-            
+
             stats.records += file_records;
             stats.parse_errors += file_parse_errors;
             stats.insert_errors += file_insert_errors;
-            
+
             // Track per-file-type records
             let record_type = dat_file.split('.').next().unwrap_or("").to_uppercase();
             *records_per_type.entry(record_type).or_insert(0) += file_records;
-            
+
             if file_parse_errors > 0 || file_insert_errors > 0 {
                 warn!(
                     "{}: {} records, {} parse errors, {} insert errors",
                     dat_file, file_records, file_parse_errors, file_insert_errors
                 );
             }
-            
+
             // Final progress update for this file
             if let Some(ref cb) = progress {
                 cb(&ImportProgress {
@@ -255,31 +269,33 @@ impl<'a> Importer<'a> {
                 });
             }
         }
-        
+
         // Drop inserter to release statement borrows before commit
         drop(inserter);
-        
+
         // Commit transaction
         conn.execute("COMMIT", [])?;
-        
+
         // Reset SQLite settings
         conn.execute_batch(
             "PRAGMA synchronous = NORMAL;
-             PRAGMA journal_mode = WAL;"
+             PRAGMA journal_mode = WAL;",
         )?;
-        
+
         stats.duration_secs = start.elapsed().as_secs_f64();
-        
+
         info!(
             "Import complete: {} records in {:.1}s ({:.0}/sec)",
-            stats.records, stats.duration_secs, stats.rate()
+            stats.records,
+            stats.duration_secs,
+            stats.rate()
         );
-        
+
         Ok(stats)
     }
 
     /// Import records from a ZIP file for a specific service and track import status.
-    /// 
+    ///
     /// This wraps `import_zip_with_mode` and records which record types were imported
     /// to enable lazy loading detection.
     pub fn import_for_service(
@@ -291,27 +307,27 @@ impl<'a> Importer<'a> {
     ) -> Result<ImportStats> {
         // Clear previous import status for this service
         self.db.clear_import_status(service)?;
-        
+
         let mut extractor = uls_parser::archive::ZipExtractor::open(zip_path)?;
         let all_dat_files = extractor.list_dat_files();
-        
+
         // Determine which record types will be imported
         let imported_types: Vec<String> = all_dat_files
             .iter()
             .filter(|f| mode.should_import_file(f))
             .map(|f| f.split('.').next().unwrap_or("").to_uppercase())
             .collect();
-        
+
         // Perform the import
         let stats = self.import_zip_with_mode(zip_path, mode, progress)?;
-        
+
         // Record import status for each record type
         // Note: We estimate record counts per type based on file structure
         // For now, we just mark them as imported with 0 as placeholder count
         for record_type in imported_types {
             self.db.mark_imported(service, &record_type, 0)?;
         }
-        
+
         Ok(stats)
     }
 }
@@ -350,7 +366,8 @@ mod tests {
 
         // AM record - amateur
         zip.start_file("AM.dat", options.clone()).unwrap();
-        zip.write_all(b"AM|100001|||W1TEST|E|D|6||||||||||\n").unwrap();
+        zip.write_all(b"AM|100001|||W1TEST|E|D|6||||||||||\n")
+            .unwrap();
 
         zip.finish().unwrap();
         zip_path
@@ -413,10 +430,10 @@ mod tests {
     fn test_import_zip_basic() {
         let (temp_dir, db) = create_test_db();
         let zip_path = create_test_zip(&temp_dir);
-        
+
         let importer = Importer::new(&db);
         let stats = importer.import_zip(&zip_path, None).unwrap();
-        
+
         assert_eq!(stats.files, 3); // HD, EN, AM
         assert_eq!(stats.records, 3);
         assert_eq!(stats.parse_errors, 0);
@@ -428,17 +445,17 @@ mod tests {
     fn test_import_zip_with_progress_callback() {
         let (temp_dir, db) = create_test_db();
         let zip_path = create_test_zip(&temp_dir);
-        
+
         let progress_called = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
         let progress_called_clone = progress_called.clone();
-        
+
         let callback: ProgressCallback = Box::new(move |_progress| {
             progress_called_clone.store(true, std::sync::atomic::Ordering::SeqCst);
         });
-        
+
         let importer = Importer::new(&db);
         let stats = importer.import_zip(&zip_path, Some(callback)).unwrap();
-        
+
         assert!(stats.is_successful());
         // Progress callback may or may not be called depending on record count
     }
@@ -447,7 +464,7 @@ mod tests {
     fn test_import_zip_nonexistent_file() {
         let (_temp_dir, db) = create_test_db();
         let importer = Importer::new(&db);
-        
+
         let result = importer.import_zip(Path::new("/nonexistent/file.zip"), None);
         assert!(result.is_err());
     }
@@ -456,10 +473,10 @@ mod tests {
     fn test_import_zip_verifies_data() {
         let (temp_dir, db) = create_test_db();
         let zip_path = create_test_zip(&temp_dir);
-        
+
         let importer = Importer::new(&db);
         importer.import_zip(&zip_path, None).unwrap();
-        
+
         // Verify data was actually imported
         if let Some(license) = db.get_license_by_callsign("W1TEST").unwrap() {
             assert_eq!(license.call_sign, "W1TEST");
@@ -476,13 +493,13 @@ mod tests {
     #[test]
     fn test_import_mode_should_import_minimal() {
         let mode = ImportMode::Minimal;
-        
+
         // Minimal should only allow HD, EN, AM
         assert!(mode.should_import("HD"));
         assert!(mode.should_import("EN"));
         assert!(mode.should_import("AM"));
         assert!(mode.should_import("hd")); // Case insensitive
-        
+
         // Minimal should NOT import other record types
         assert!(!mode.should_import("HS"));
         assert!(!mode.should_import("CO"));
@@ -494,7 +511,7 @@ mod tests {
     #[test]
     fn test_import_mode_should_import_full() {
         let mode = ImportMode::Full;
-        
+
         // Full should allow all record types
         assert!(mode.should_import("HD"));
         assert!(mode.should_import("EN"));
@@ -510,11 +527,11 @@ mod tests {
     #[test]
     fn test_import_mode_should_import_selective() {
         let mode = ImportMode::Selective(vec!["HD".to_string(), "CO".to_string()]);
-        
+
         assert!(mode.should_import("HD"));
         assert!(mode.should_import("CO"));
         assert!(mode.should_import("hd")); // Case insensitive
-        
+
         assert!(!mode.should_import("EN"));
         assert!(!mode.should_import("AM"));
         assert!(!mode.should_import("HS"));
@@ -523,11 +540,11 @@ mod tests {
     #[test]
     fn test_import_mode_should_import_file() {
         let mode = ImportMode::Minimal;
-        
+
         assert!(mode.should_import_file("HD.dat"));
         assert!(mode.should_import_file("EN.dat"));
         assert!(mode.should_import_file("AM.dat"));
-        
+
         assert!(!mode.should_import_file("HS.dat"));
         assert!(!mode.should_import_file("CO.dat"));
     }
@@ -554,15 +571,18 @@ mod tests {
 
         // AM record
         zip.start_file("AM.dat", options.clone()).unwrap();
-        zip.write_all(b"AM|100001|||W1TEST|E|D|6||||||||||\n").unwrap();
+        zip.write_all(b"AM|100001|||W1TEST|E|D|6||||||||||\n")
+            .unwrap();
 
         // HS record (history)
         zip.start_file("HS.dat", options.clone()).unwrap();
-        zip.write_all(b"HS|100001||W1TEST|01/15/2020|LIISS\n").unwrap();
+        zip.write_all(b"HS|100001||W1TEST|01/15/2020|LIISS\n")
+            .unwrap();
 
         // CO record (comment)
         zip.start_file("CO.dat", options.clone()).unwrap();
-        zip.write_all(b"CO|100001||W1TEST|01/15/2020|Test comment||\n").unwrap();
+        zip.write_all(b"CO|100001||W1TEST|01/15/2020|Test comment||\n")
+            .unwrap();
 
         zip.finish().unwrap();
         zip_path
@@ -572,15 +592,17 @@ mod tests {
     fn test_import_zip_with_mode_minimal() {
         let (temp_dir, db) = create_test_db();
         let zip_path = create_multi_type_test_zip(&temp_dir);
-        
+
         let importer = Importer::new(&db);
-        let stats = importer.import_zip_with_mode(&zip_path, ImportMode::Minimal, None).unwrap();
-        
+        let stats = importer
+            .import_zip_with_mode(&zip_path, ImportMode::Minimal, None)
+            .unwrap();
+
         // Minimal should only import HD, EN, AM (3 files, 3 records)
         assert_eq!(stats.files, 3);
         assert_eq!(stats.records, 3);
         assert!(stats.is_successful());
-        
+
         // Verify license was imported
         assert!(db.get_license_by_callsign("W1TEST").unwrap().is_some());
     }
@@ -589,10 +611,12 @@ mod tests {
     fn test_import_zip_with_mode_full() {
         let (temp_dir, db) = create_test_db();
         let zip_path = create_multi_type_test_zip(&temp_dir);
-        
+
         let importer = Importer::new(&db);
-        let stats = importer.import_zip_with_mode(&zip_path, ImportMode::Full, None).unwrap();
-        
+        let stats = importer
+            .import_zip_with_mode(&zip_path, ImportMode::Full, None)
+            .unwrap();
+
         // Full should import all 5 files
         assert_eq!(stats.files, 5);
         assert_eq!(stats.records, 5);
@@ -603,15 +627,16 @@ mod tests {
     fn test_import_zip_with_mode_selective() {
         let (temp_dir, db) = create_test_db();
         let zip_path = create_multi_type_test_zip(&temp_dir);
-        
+
         let importer = Importer::new(&db);
         let mode = ImportMode::Selective(vec!["HD".to_string(), "EN".to_string()]);
-        let stats = importer.import_zip_with_mode(&zip_path, mode, None).unwrap();
-        
+        let stats = importer
+            .import_zip_with_mode(&zip_path, mode, None)
+            .unwrap();
+
         // Selective should only import HD and EN (2 files, 2 records)
         assert_eq!(stats.files, 2);
         assert_eq!(stats.records, 2);
         assert!(stats.is_successful());
     }
 }
-

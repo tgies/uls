@@ -138,7 +138,8 @@ impl<R: Read + Seek> ZipExtractor<R> {
     /// Returns a reader that can be used with DatReader.
     pub fn stream_dat(&mut self, name: &str) -> Result<impl Read + '_, ZipError> {
         // Find the index first to avoid borrow issues
-        let index = self.find_file_index(name)
+        let index = self
+            .find_file_index(name)
             .ok_or_else(|| ZipError::DatFileNotFound(name.to_string()))?;
 
         self.archive.by_index(index).map_err(ZipError::Zip)

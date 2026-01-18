@@ -92,9 +92,35 @@ mod tests {
     #[test]
     fn test_frequency_from_fields() {
         let fields: Vec<&str> = vec![
-            "FR", "123456789", "", "", "W1AW", "", "1", "1", "FB", "",
-            "146.94000000", "", "", "0", "2400", "50.0", "", "", "", "",
-            "", "", "", "", "", "", "", "", "",
+            "FR",
+            "123456789",
+            "",
+            "",
+            "W1AW",
+            "",
+            "1",
+            "1",
+            "FB",
+            "",
+            "146.94000000",
+            "",
+            "",
+            "0",
+            "2400",
+            "50.0",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
         ];
         let record = FrequencyRecord::from_fields(&fields);
         assert_eq!(record.unique_system_identifier, 123456789);

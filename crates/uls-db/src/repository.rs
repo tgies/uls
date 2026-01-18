@@ -68,10 +68,7 @@ impl Database {
         }
 
         // Set cache size
-        conn.execute_batch(&format!(
-            "PRAGMA cache_size = {};",
-            self.config.cache_size
-        ))?;
+        conn.execute_batch(&format!("PRAGMA cache_size = {};", self.config.cache_size))?;
 
         // Enable foreign keys
         if self.config.foreign_keys {
@@ -94,7 +91,10 @@ impl Database {
     pub fn initialize(&self) -> Result<()> {
         let conn = self.conn()?;
         Schema::initialize(&conn)?;
-        info!("Database initialized with schema version {}", crate::schema::SCHEMA_VERSION);
+        info!(
+            "Database initialized with schema version {}",
+            crate::schema::SCHEMA_VERSION
+        );
         Ok(())
     }
 
@@ -127,7 +127,10 @@ impl Database {
             UlsRecord::Comment(co) => Self::insert_comment(conn, co),
             UlsRecord::SpecialCondition(sc) => Self::insert_special_condition(conn, sc),
             _ => {
-                debug!("Skipping unsupported record type: {:?}", record.record_type());
+                debug!(
+                    "Skipping unsupported record type: {:?}",
+                    record.record_type()
+                );
                 Ok(())
             }
         }
@@ -321,15 +324,19 @@ impl Database {
                     first_name: row.get(3)?,
                     middle_initial: row.get(4)?,
                     last_name: row.get(5)?,
-                    status: row.get::<_, Option<String>>(6)?
+                    status: row
+                        .get::<_, Option<String>>(6)?
                         .and_then(|s| s.chars().next())
                         .unwrap_or('?'),
                     radio_service: row.get::<_, Option<String>>(7)?.unwrap_or_default(),
-                    grant_date: row.get::<_, Option<String>>(8)?
+                    grant_date: row
+                        .get::<_, Option<String>>(8)?
                         .and_then(|s| chrono::NaiveDate::parse_from_str(&s, "%Y-%m-%d").ok()),
-                    expired_date: row.get::<_, Option<String>>(9)?
+                    expired_date: row
+                        .get::<_, Option<String>>(9)?
                         .and_then(|s| chrono::NaiveDate::parse_from_str(&s, "%Y-%m-%d").ok()),
-                    cancellation_date: row.get::<_, Option<String>>(10)?
+                    cancellation_date: row
+                        .get::<_, Option<String>>(10)?
                         .and_then(|s| chrono::NaiveDate::parse_from_str(&s, "%Y-%m-%d").ok()),
                     frn: row.get(11)?,
                     previous_call_sign: row.get(12)?,
@@ -337,7 +344,8 @@ impl Database {
                     city: row.get(14)?,
                     state: row.get(15)?,
                     zip_code: row.get(16)?,
-                    operator_class: row.get::<_, Option<String>>(17)?
+                    operator_class: row
+                        .get::<_, Option<String>>(17)?
                         .and_then(|s| s.chars().next()),
                 })
             },
@@ -383,15 +391,19 @@ impl Database {
                 first_name: row.get(3)?,
                 middle_initial: row.get(4)?,
                 last_name: row.get(5)?,
-                status: row.get::<_, Option<String>>(6)?
+                status: row
+                    .get::<_, Option<String>>(6)?
                     .and_then(|s| s.chars().next())
                     .unwrap_or('?'),
                 radio_service: row.get::<_, Option<String>>(7)?.unwrap_or_default(),
-                grant_date: row.get::<_, Option<String>>(8)?
+                grant_date: row
+                    .get::<_, Option<String>>(8)?
                     .and_then(|s| chrono::NaiveDate::parse_from_str(&s, "%Y-%m-%d").ok()),
-                expired_date: row.get::<_, Option<String>>(9)?
+                expired_date: row
+                    .get::<_, Option<String>>(9)?
                     .and_then(|s| chrono::NaiveDate::parse_from_str(&s, "%Y-%m-%d").ok()),
-                cancellation_date: row.get::<_, Option<String>>(10)?
+                cancellation_date: row
+                    .get::<_, Option<String>>(10)?
                     .and_then(|s| chrono::NaiveDate::parse_from_str(&s, "%Y-%m-%d").ok()),
                 frn: row.get(11)?,
                 previous_call_sign: row.get(12)?,
@@ -399,7 +411,8 @@ impl Database {
                 city: row.get(14)?,
                 state: row.get(15)?,
                 zip_code: row.get(16)?,
-                operator_class: row.get::<_, Option<String>>(17)?
+                operator_class: row
+                    .get::<_, Option<String>>(17)?
                     .and_then(|s| s.chars().next()),
             })
         })?;
@@ -415,11 +428,8 @@ impl Database {
     pub fn get_stats(&self) -> Result<LicenseStats> {
         let conn = self.conn()?;
 
-        let total_licenses: u64 = conn.query_row(
-            "SELECT COUNT(*) FROM licenses",
-            [],
-            |row| row.get(0),
-        )?;
+        let total_licenses: u64 =
+            conn.query_row("SELECT COUNT(*) FROM licenses", [], |row| row.get(0))?;
 
         let active_licenses: u64 = conn.query_row(
             "SELECT COUNT(*) FROM licenses WHERE license_status = 'A'",
@@ -460,20 +470,24 @@ impl Database {
         if service_codes.is_empty() {
             return Ok(0);
         }
-        
+
         let conn = self.conn()?;
-        let placeholders: String = service_codes.iter().map(|_| "?").collect::<Vec<_>>().join(",");
+        let placeholders: String = service_codes
+            .iter()
+            .map(|_| "?")
+            .collect::<Vec<_>>()
+            .join(",");
         let sql = format!(
             "SELECT COUNT(*) FROM licenses WHERE radio_service_code IN ({})",
             placeholders
         );
-        
+
         let mut stmt = conn.prepare(&sql)?;
-        let count: u64 = stmt.query_row(
-            rusqlite::params_from_iter(service_codes.iter()),
-            |row| row.get(0),
-        )?;
-        
+        let count: u64 = stmt
+            .query_row(rusqlite::params_from_iter(service_codes.iter()), |row| {
+                row.get(0)
+            })?;
+
         Ok(count)
     }
 
@@ -620,7 +634,7 @@ mod tests {
     #[test]
     fn test_insert_and_query() {
         let db = create_test_db();
-        
+
         let header = create_test_header();
         db.insert_record(&UlsRecord::Header(header)).unwrap();
 
@@ -636,7 +650,7 @@ mod tests {
     #[test]
     fn test_case_insensitive_lookup() {
         let db = create_test_db();
-        
+
         let header = create_test_header();
         db.insert_record(&UlsRecord::Header(header)).unwrap();
 
@@ -648,7 +662,7 @@ mod tests {
     #[test]
     fn test_stats() {
         let db = create_test_db();
-        
+
         let header = create_test_header();
         db.insert_record(&UlsRecord::Header(header)).unwrap();
 
@@ -660,9 +674,9 @@ mod tests {
     #[test]
     fn test_transaction() {
         let db = create_test_db();
-        
+
         let tx = db.begin_transaction().unwrap();
-        
+
         let header = create_test_header();
         tx.insert_record(&UlsRecord::Header(header)).unwrap();
         tx.commit().unwrap();
@@ -674,19 +688,45 @@ mod tests {
     #[test]
     fn test_insert_entity() {
         use uls_core::records::EntityRecord;
-        
+
         let db = create_test_db();
-        
+
         // Insert header first for FK constraint
         let header = create_test_header();
         db.insert_record(&UlsRecord::Header(header)).unwrap();
-        
+
         // Insert entity
         let entity = EntityRecord::from_fields(&[
-            "EN", "12345", "", "", "W1TEST", "L", "L00100001",
-            "DOE, JOHN A", "JOHN", "A", "DOE", "",
-            "555-555-1234", "", "test@example.com", "123 Main St", "ANYTOWN", "CA", "90210",
-            "", "", "000", "0001234567", "I", "", "", "", "", "", "",
+            "EN",
+            "12345",
+            "",
+            "",
+            "W1TEST",
+            "L",
+            "L00100001",
+            "DOE, JOHN A",
+            "JOHN",
+            "A",
+            "DOE",
+            "",
+            "555-555-1234",
+            "",
+            "test@example.com",
+            "123 Main St",
+            "ANYTOWN",
+            "CA",
+            "90210",
+            "",
+            "",
+            "000",
+            "0001234567",
+            "I",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
         ]);
         db.insert_record(&UlsRecord::Entity(entity)).unwrap();
     }
@@ -694,15 +734,14 @@ mod tests {
     #[test]
     fn test_insert_amateur() {
         use uls_core::records::AmateurRecord;
-        
+
         let db = create_test_db();
-        
+
         let header = create_test_header();
         db.insert_record(&UlsRecord::Header(header)).unwrap();
-        
+
         let amateur = AmateurRecord::from_fields(&[
-            "AM", "12345", "", "", "W1TEST", "E", "D", "6",
-            "", "", "", "", "", "", "", "", "", "",
+            "AM", "12345", "", "", "W1TEST", "E", "D", "6", "", "", "", "", "", "", "", "", "", "",
         ]);
         db.insert_record(&UlsRecord::Amateur(amateur)).unwrap();
     }
@@ -710,29 +749,33 @@ mod tests {
     #[test]
     fn test_insert_history() {
         use uls_core::records::HistoryRecord;
-        
+
         let db = create_test_db();
-        
+
         let header = create_test_header();
         db.insert_record(&UlsRecord::Header(header)).unwrap();
-        
-        let history = HistoryRecord::from_fields(&[
-            "HS", "12345", "", "W1TEST", "01/01/2020", "LIISS",
-        ]);
+
+        let history =
+            HistoryRecord::from_fields(&["HS", "12345", "", "W1TEST", "01/01/2020", "LIISS"]);
         db.insert_record(&UlsRecord::History(history)).unwrap();
     }
 
     #[test]
     fn test_insert_comment() {
         use uls_core::records::CommentRecord;
-        
+
         let db = create_test_db();
-        
+
         let header = create_test_header();
         db.insert_record(&UlsRecord::Header(header)).unwrap();
-        
+
         let comment = CommentRecord::from_fields(&[
-            "CO", "12345", "", "W1TEST", "01/01/2020", "Test comment",
+            "CO",
+            "12345",
+            "",
+            "W1TEST",
+            "01/01/2020",
+            "Test comment",
         ]);
         db.insert_record(&UlsRecord::Comment(comment)).unwrap();
     }
@@ -740,12 +783,12 @@ mod tests {
     #[test]
     fn test_insert_special_condition() {
         use uls_core::records::SpecialConditionRecord;
-        
+
         let db = create_test_db();
-        
+
         let header = create_test_header();
         db.insert_record(&UlsRecord::Header(header)).unwrap();
-        
+
         let sc = SpecialConditionRecord::from_fields(&[
             "SC", "12345", "", "", "W1TEST", "P", "999", "", "",
         ]);
@@ -755,21 +798,47 @@ mod tests {
     #[test]
     fn test_get_licenses_by_frn() {
         use uls_core::records::EntityRecord;
-        
+
         let db = create_test_db();
-        
+
         let header = create_test_header();
         db.insert_record(&UlsRecord::Header(header)).unwrap();
-        
+
         // Insert entity with FRN
         let entity = EntityRecord::from_fields(&[
-            "EN", "12345", "", "", "W1TEST", "L", "L00100001",
-            "DOE, JOHN A", "JOHN", "A", "DOE", "",
-            "", "", "", "", "", "", "",
-            "", "", "000", "0001234567", "I", "", "", "", "", "", "",
+            "EN",
+            "12345",
+            "",
+            "",
+            "W1TEST",
+            "L",
+            "L00100001",
+            "DOE, JOHN A",
+            "JOHN",
+            "A",
+            "DOE",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "000",
+            "0001234567",
+            "I",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
         ]);
         db.insert_record(&UlsRecord::Entity(entity)).unwrap();
-        
+
         let licenses = db.get_licenses_by_frn("0001234567").unwrap();
         assert_eq!(licenses.len(), 1);
         assert_eq!(licenses[0].call_sign, "W1TEST");
@@ -778,7 +847,7 @@ mod tests {
     #[test]
     fn test_get_licenses_by_frn_not_found() {
         let db = create_test_db();
-        
+
         let licenses = db.get_licenses_by_frn("9999999999").unwrap();
         assert!(licenses.is_empty());
     }
@@ -786,13 +855,13 @@ mod tests {
     #[test]
     fn test_count_by_service() {
         let db = create_test_db();
-        
+
         let header = create_test_header(); // Has radio_service_code = "HA"
         db.insert_record(&UlsRecord::Header(header)).unwrap();
-        
+
         let count = db.count_by_service(&["HA"]).unwrap();
         assert_eq!(count, 1);
-        
+
         let count = db.count_by_service(&["ZA"]).unwrap(); // GMRS, shouldn't match
         assert_eq!(count, 0);
     }
@@ -800,18 +869,18 @@ mod tests {
     #[test]
     fn test_etag_operations() {
         let db = create_test_db();
-        
+
         // Initially no etag
         let etag = db.get_imported_etag("l_amat").unwrap();
         assert!(etag.is_none());
-        
+
         // Set etag
         db.set_imported_etag("l_amat", "abc123").unwrap();
-        
+
         // Should retrieve it
         let etag = db.get_imported_etag("l_amat").unwrap();
         assert_eq!(etag, Some("abc123".to_string()));
-        
+
         // Update etag
         db.set_imported_etag("l_amat", "xyz789").unwrap();
         let etag = db.get_imported_etag("l_amat").unwrap();
@@ -821,7 +890,7 @@ mod tests {
     #[test]
     fn test_set_last_updated() {
         let db = create_test_db();
-        
+
         db.set_last_updated("2025-01-17T12:00:00Z").unwrap();
         // Just verify it doesn't error - metadata retrieval would need Schema::get_metadata
     }
@@ -829,7 +898,7 @@ mod tests {
     #[test]
     fn test_license_not_found() {
         let db = create_test_db();
-        
+
         let license = db.get_license_by_callsign("NOTEXIST").unwrap();
         assert!(license.is_none());
     }
@@ -837,7 +906,7 @@ mod tests {
     #[test]
     fn test_transaction_rollback() {
         let db = create_test_db();
-        
+
         let tx = db.begin_transaction().unwrap();
         let header = create_test_header();
         tx.insert_record(&UlsRecord::Header(header)).unwrap();
@@ -851,10 +920,10 @@ mod tests {
     #[test]
     fn test_open_database_with_path() {
         use tempfile::TempDir;
-        
+
         let temp_dir = TempDir::new().unwrap();
         let db_path = temp_dir.path().join("subdir").join("test.db");
-        
+
         // Database::open should work and create parent directory
         let db = Database::open(&db_path).unwrap();
         db.initialize().unwrap();
@@ -865,13 +934,11 @@ mod tests {
     #[test]
     fn test_insert_unsupported_record_type() {
         use uls_core::records::LocationRecord;
-        
+
         let db = create_test_db();
-        
+
         // Location is not supported in repository insert_record
-        let location = LocationRecord::from_fields(&[
-            "LO", "12345", "", "", "W1TEST",
-        ]);
+        let location = LocationRecord::from_fields(&["LO", "12345", "", "", "W1TEST"]);
         // Should not error, just skip
         db.insert_record(&UlsRecord::Location(location)).unwrap();
     }
@@ -879,11 +946,9 @@ mod tests {
     #[test]
     fn test_count_by_service_empty() {
         let db = create_test_db();
-        
+
         // Empty service codes should return 0
         let count = db.count_by_service(&[]).unwrap();
         assert_eq!(count, 0);
     }
 }
-
-

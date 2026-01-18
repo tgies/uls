@@ -1,7 +1,7 @@
 //! Search command - search for licenses.
 
 use anyhow::{Context, Result};
-use uls_query::{FormatOutput, OutputFormat, QueryEngine, SearchFilter, License};
+use uls_query::{FormatOutput, License, OutputFormat, QueryEngine, SearchFilter};
 
 use super::auto_update;
 
@@ -19,26 +19,24 @@ fn format_table_with_fields(licenses: &[License], fields: &[&str]) -> String {
     if licenses.is_empty() {
         return "No results found.\n".to_string();
     }
-    
+
     // Calculate column widths (min 6, max 30)
-    let widths: Vec<usize> = fields.iter()
-        .map(|f| f.len().max(6).min(30))
-        .collect();
-    
+    let widths: Vec<usize> = fields.iter().map(|f| f.len().max(6).min(30)).collect();
+
     let mut output = String::new();
-    
+
     // Header
     for (i, field) in fields.iter().enumerate() {
         output.push_str(&format!("{:width$} ", field, width = widths[i]));
     }
     output.push('\n');
-    
+
     // Separator
     for width in &widths {
         output.push_str(&format!("{:-<width$} ", "", width = *width));
     }
     output.push('\n');
-    
+
     // Rows
     for license in licenses {
         for (i, field) in fields.iter().enumerate() {
@@ -52,21 +50,22 @@ fn format_table_with_fields(licenses: &[License], fields: &[&str]) -> String {
         }
         output.push('\n');
     }
-    
+
     output.push_str(&format!("\n{} result(s)\n", licenses.len()));
     output
 }
 
 fn format_csv_with_fields(licenses: &[License], fields: &[&str]) -> String {
     let mut output = String::new();
-    
+
     // Header
     output.push_str(&fields.join(","));
     output.push('\n');
-    
+
     // Rows
     for license in licenses {
-        let values: Vec<String> = fields.iter()
+        let values: Vec<String> = fields
+            .iter()
             .map(|f| {
                 let v = license.get_field(f).unwrap_or_default();
                 if v.contains(',') || v.contains('"') || v.contains('\n') {
@@ -79,7 +78,7 @@ fn format_csv_with_fields(licenses: &[License], fields: &[&str]) -> String {
         output.push_str(&values.join(","));
         output.push('\n');
     }
-    
+
     output
 }
 
@@ -107,22 +106,23 @@ pub async fn execute(
     // Use service override (defaulting to amateur for searches)
     let service_code = auto_update::service_name_to_code(service_override)
         .ok_or_else(|| anyhow::anyhow!("Unknown service: {}", service_override))?;
-    
+
     // Ensure data is available, auto-download if needed
-    let db = auto_update::ensure_data_available(service_code).await
+    let db = auto_update::ensure_data_available(service_code)
+        .await
         .context("Failed to ensure data is available")?;
 
     let engine = QueryEngine::with_database(db);
     let output_format = OutputFormat::from_str(format).unwrap_or_default();
 
     // Require at least one search filter
-    let has_filter = query.is_some() 
+    let has_filter = query.is_some()
         || name.is_some()
-        || state.is_some() 
-        || city.is_some() 
+        || state.is_some()
+        || city.is_some()
         || zip.is_some()
         || frn.is_some()
-        || class.is_some() 
+        || class.is_some()
         || status.is_some()
         || active
         || granted_after.is_some()
@@ -210,7 +210,7 @@ pub async fn execute(
     // Map the service code to the appropriate radio service codes
     filter.radio_service = Some(match service_code {
         "HA" => vec!["HA".to_string(), "HV".to_string()], // Amateur includes HV (vanity)
-        "ZA" => vec!["ZA".to_string()], // GMRS
+        "ZA" => vec!["ZA".to_string()],                   // GMRS
         _ => vec![service_code.to_string()],
     });
 
@@ -224,10 +224,13 @@ pub async fn execute(
     // Output with custom fields if specified
     if let Some(ref field_list) = fields {
         let field_vec: Vec<&str> = field_list.split(',').map(|s| s.trim()).collect();
-        println!("{}", format_with_fields(&results, &field_vec, output_format));
+        println!(
+            "{}",
+            format_with_fields(&results, &field_vec, output_format)
+        );
     } else {
         println!("{}", results.format(output_format));
     }
-    
+
     Ok(())
 }

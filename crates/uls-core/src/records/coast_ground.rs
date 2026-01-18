@@ -1,6 +1,6 @@
 //! CG (Coast & Ground) record type.
-use serde::{Deserialize, Serialize};
 use super::common::*;
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CoastGroundRecord {
@@ -35,12 +35,13 @@ mod tests {
 
     #[test]
     fn test_coast_ground_from_fields() {
-        let fields = vec!["CG", "12345", "ULS123", "EBF456", "WLO", "Y", "Y", "STNID123"];
+        let fields = vec![
+            "CG", "12345", "ULS123", "EBF456", "WLO", "Y", "Y", "STNID123",
+        ];
         let cg = CoastGroundRecord::from_fields(&fields);
-        
+
         assert_eq!(cg.unique_system_identifier, Some(12345));
         assert_eq!(cg.call_sign, Some("WLO".to_string()));
         assert_eq!(cg.station_available, Some('Y'));
     }
 }
-

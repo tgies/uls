@@ -1,6 +1,6 @@
 //! SH (Ship) record type.
-use serde::{Deserialize, Serialize};
 use super::common::*;
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ShipRecord {
@@ -52,11 +52,26 @@ mod tests {
     #[test]
     fn test_ship_from_fields() {
         let fields = vec![
-            "SH", "12345", "ULS123", "EBF456", "WDA1234", "S", "5",
-            "CARGO", "TANKER", "SS MINNOW", "IMO12345", "Y", "Y", "N", "Y", "5000", "100",
+            "SH",
+            "12345",
+            "ULS123",
+            "EBF456",
+            "WDA1234",
+            "S",
+            "5",
+            "CARGO",
+            "TANKER",
+            "SS MINNOW",
+            "IMO12345",
+            "Y",
+            "Y",
+            "N",
+            "Y",
+            "5000",
+            "100",
         ];
         let sh = ShipRecord::from_fields(&fields);
-        
+
         assert_eq!(sh.unique_system_identifier, Some(12345));
         assert_eq!(sh.callsign, Some("WDA1234".to_string()));
         assert_eq!(sh.ship_name, Some("SS MINNOW".to_string()));
@@ -64,4 +79,3 @@ mod tests {
         assert_eq!(sh.ship_length, Some(100));
     }
 }
-

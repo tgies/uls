@@ -11,7 +11,10 @@ pub enum Error {
 
     /// Failed to parse a field value.
     #[error("failed to parse field '{field}': {message}")]
-    ParseField { field: &'static str, message: String },
+    ParseField {
+        field: &'static str,
+        message: String,
+    },
 
     /// Invalid date format.
     #[error("invalid date format: {0}")]

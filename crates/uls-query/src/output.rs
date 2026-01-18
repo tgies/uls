@@ -62,7 +62,11 @@ impl FormatOutput for Vec<License> {
             OutputFormat::JsonPretty => serde_json::to_string_pretty(self).unwrap_or_default(),
             OutputFormat::Csv => format_licenses_csv(self),
             OutputFormat::Yaml => format_licenses_yaml(self),
-            OutputFormat::Compact => self.iter().map(|l| format_license_compact(l)).collect::<Vec<_>>().join("\n"),
+            OutputFormat::Compact => self
+                .iter()
+                .map(|l| format_license_compact(l))
+                .collect::<Vec<_>>()
+                .join("\n"),
         }
     }
 }
@@ -72,35 +76,38 @@ fn format_license_table(license: &License) -> String {
     let mut output = String::new();
     output.push_str(&format!("Call Sign:      {}\n", license.call_sign));
     output.push_str(&format!("Name:           {}\n", license.display_name()));
-    output.push_str(&format!("Status:         {} ({})\n", 
-        license.status, license.status_description()));
+    output.push_str(&format!(
+        "Status:         {} ({})\n",
+        license.status,
+        license.status_description()
+    ));
     output.push_str(&format!("Service:        {}\n", license.radio_service));
-    
+
     if let Some(class) = license.operator_class_description() {
         output.push_str(&format!("Operator Class: {}\n", class));
     }
-    
+
     if let Some(ref addr) = license.street_address {
         output.push_str(&format!("Address:        {}\n", addr));
     }
-    
+
     let location = format_location(license);
     if !location.is_empty() {
         output.push_str(&format!("Location:       {}\n", location));
     }
-    
+
     if let Some(ref frn) = license.frn {
         output.push_str(&format!("FRN:            {}\n", frn));
     }
-    
+
     if let Some(date) = license.grant_date {
         output.push_str(&format!("Granted:        {}\n", date));
     }
-    
+
     if let Some(date) = license.expired_date {
         output.push_str(&format!("Expires:        {}\n", date));
     }
-    
+
     output
 }
 
@@ -111,25 +118,34 @@ fn format_licenses_table(licenses: &[License]) -> String {
     }
 
     let mut output = String::new();
-    output.push_str(&format!("{:<10} {:<30} {:<6} {:<5} {:<20}\n",
-        "CALL", "NAME", "STATUS", "CLASS", "LOCATION"));
-    output.push_str(&format!("{:-<10} {:-<30} {:-<6} {:-<5} {:-<20}\n",
-        "", "", "", "", ""));
+    output.push_str(&format!(
+        "{:<10} {:<30} {:<6} {:<5} {:<20}\n",
+        "CALL", "NAME", "STATUS", "CLASS", "LOCATION"
+    ));
+    output.push_str(&format!(
+        "{:-<10} {:-<30} {:-<6} {:-<5} {:-<20}\n",
+        "", "", "", "", ""
+    ));
 
     for license in licenses {
-        let class = license.operator_class
+        let class = license
+            .operator_class
             .map(|c| c.to_string())
             .unwrap_or_else(|| "-".to_string());
-        let location = format!("{}, {}",
+        let location = format!(
+            "{}, {}",
             license.city.as_deref().unwrap_or("-"),
-            license.state.as_deref().unwrap_or("-"));
+            license.state.as_deref().unwrap_or("-")
+        );
 
-        output.push_str(&format!("{:<10} {:<30} {:<6} {:<5} {:<20}\n",
+        output.push_str(&format!(
+            "{:<10} {:<30} {:<6} {:<5} {:<20}\n",
             license.call_sign,
             truncate(&license.display_name(), 30),
             license.status,
             class,
-            truncate(&location, 20)));
+            truncate(&location, 20)
+        ));
     }
 
     output.push_str(&format!("\n{} result(s)\n", licenses.len()));
@@ -138,33 +154,48 @@ fn format_licenses_table(licenses: &[License]) -> String {
 
 /// Format a license as compact one-liner.
 fn format_license_compact(license: &License) -> String {
-    let class = license.operator_class
+    let class = license
+        .operator_class
         .map(|c| format!(" ({})", c))
         .unwrap_or_default();
-    format!("{}{} - {} [{}]",
+    format!(
+        "{}{} - {} [{}]",
         license.call_sign,
         class,
         license.display_name(),
-        license.status_description())
+        license.status_description()
+    )
 }
 
 /// Format a license as CSV row.
 fn format_license_csv(license: &License) -> String {
-    format!("{},{},{},{},{},{},{},{},{}",
+    format!(
+        "{},{},{},{},{},{},{},{},{}",
         csv_escape(&license.call_sign),
         csv_escape(&license.display_name()),
         license.status,
         &license.radio_service,
-        license.operator_class.map(|c| c.to_string()).unwrap_or_default(),
+        license
+            .operator_class
+            .map(|c| c.to_string())
+            .unwrap_or_default(),
         csv_escape(license.city.as_deref().unwrap_or("")),
         csv_escape(license.state.as_deref().unwrap_or("")),
-        license.grant_date.map(|d| d.to_string()).unwrap_or_default(),
-        license.expired_date.map(|d| d.to_string()).unwrap_or_default())
+        license
+            .grant_date
+            .map(|d| d.to_string())
+            .unwrap_or_default(),
+        license
+            .expired_date
+            .map(|d| d.to_string())
+            .unwrap_or_default()
+    )
 }
 
 /// Format multiple licenses as CSV.
 fn format_licenses_csv(licenses: &[License]) -> String {
-    let mut output = String::from("call_sign,name,status,service,class,city,state,grant_date,expiration_date\n");
+    let mut output =
+        String::from("call_sign,name,status,service,class,city,state,grant_date,expiration_date\n");
     for license in licenses {
         output.push_str(&format_license_csv(license));
         output.push('\n');
@@ -223,11 +254,18 @@ fn format_location(license: &License) -> String {
     .into_iter()
     .flatten()
     .collect();
-    
+
     if parts.is_empty() {
         String::new()
     } else if parts.len() >= 2 {
-        format!("{}, {} {}", parts[0], parts.get(1).unwrap_or(&""), parts.get(2).unwrap_or(&"")).trim().to_string()
+        format!(
+            "{}, {} {}",
+            parts[0],
+            parts.get(1).unwrap_or(&""),
+            parts.get(2).unwrap_or(&"")
+        )
+        .trim()
+        .to_string()
     } else {
         parts[0].to_string()
     }
@@ -377,10 +415,16 @@ mod tests {
     fn test_output_format_from_str() {
         assert_eq!(OutputFormat::from_str("table"), Some(OutputFormat::Table));
         assert_eq!(OutputFormat::from_str("json"), Some(OutputFormat::Json));
-        assert_eq!(OutputFormat::from_str("json-pretty"), Some(OutputFormat::JsonPretty));
+        assert_eq!(
+            OutputFormat::from_str("json-pretty"),
+            Some(OutputFormat::JsonPretty)
+        );
         assert_eq!(OutputFormat::from_str("csv"), Some(OutputFormat::Csv));
         assert_eq!(OutputFormat::from_str("yaml"), Some(OutputFormat::Yaml));
-        assert_eq!(OutputFormat::from_str("compact"), Some(OutputFormat::Compact));
+        assert_eq!(
+            OutputFormat::from_str("compact"),
+            Some(OutputFormat::Compact)
+        );
         assert_eq!(OutputFormat::from_str("unknown"), None);
     }
 
@@ -404,7 +448,11 @@ mod tests {
         let license = test_license();
         let output = license.format(OutputFormat::Json);
         let parsed: serde_json::Result<serde_json::Value> = serde_json::from_str(&output);
-        assert!(parsed.is_ok(), "JSON output should be valid JSON: {}", output);
+        assert!(
+            parsed.is_ok(),
+            "JSON output should be valid JSON: {}",
+            output
+        );
     }
 
     #[test]
@@ -412,7 +460,11 @@ mod tests {
         let license = test_license();
         let output = license.format(OutputFormat::JsonPretty);
         let parsed: serde_json::Result<serde_json::Value> = serde_json::from_str(&output);
-        assert!(parsed.is_ok(), "JSON-pretty output should be valid JSON: {}", output);
+        assert!(
+            parsed.is_ok(),
+            "JSON-pretty output should be valid JSON: {}",
+            output
+        );
     }
 
     #[test]
@@ -420,7 +472,11 @@ mod tests {
         let licenses = vec![test_license(), test_license()];
         let output = licenses.format(OutputFormat::Json);
         let parsed: serde_json::Result<Vec<serde_json::Value>> = serde_json::from_str(&output);
-        assert!(parsed.is_ok(), "Vec JSON output should be valid JSON array: {}", output);
+        assert!(
+            parsed.is_ok(),
+            "Vec JSON output should be valid JSON array: {}",
+            output
+        );
         assert_eq!(parsed.unwrap().len(), 2);
     }
 
@@ -429,7 +485,11 @@ mod tests {
         let licenses = vec![test_license()];
         let output = licenses.format(OutputFormat::JsonPretty);
         let parsed: serde_json::Result<Vec<serde_json::Value>> = serde_json::from_str(&output);
-        assert!(parsed.is_ok(), "Vec JSON-pretty output should be valid JSON array: {}", output);
+        assert!(
+            parsed.is_ok(),
+            "Vec JSON-pretty output should be valid JSON array: {}",
+            output
+        );
     }
 
     #[test]
@@ -441,4 +501,3 @@ mod tests {
         assert_eq!(parsed.unwrap().len(), 0);
     }
 }
-

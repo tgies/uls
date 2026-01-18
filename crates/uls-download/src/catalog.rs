@@ -164,7 +164,12 @@ pub struct ServiceCatalog;
 impl ServiceCatalog {
     /// All supported services with their full and daily abbreviations.
     /// Format: (full_name, daily_abbreviation, description, radio_service_codes)
-    const SERVICES: &'static [(&'static str, &'static str, &'static str, &'static [&'static str])] = &[
+    const SERVICES: &'static [(
+        &'static str,
+        &'static str,
+        &'static str,
+        &'static [&'static str],
+    )] = &[
         ("amat", "am", "Amateur Radio", &["HA", "HV"]),
         ("gmrs", "gm", "General Mobile Radio Service", &["ZA"]),
         ("ship", "sh", "Ship Stations", &["SA", "SB"]),
@@ -191,9 +196,7 @@ impl ServiceCatalog {
         Self::SERVICES
             .iter()
             .find(|(full, daily, _, codes)| {
-                *full == input 
-                    || *daily == input 
-                    || codes.iter().any(|c| *c == input)
+                *full == input || *daily == input || codes.iter().any(|c| *c == input)
             })
             .map(|(full, _, _, _)| *full)
     }
@@ -220,25 +223,22 @@ impl ServiceCatalog {
 
     /// Get complete license file for a service.
     pub fn complete_license(service: &str) -> Result<DataFile> {
-        let full_name = Self::full_name(service).ok_or_else(|| {
-            DownloadError::UnknownService(service.to_string())
-        })?;
+        let full_name = Self::full_name(service)
+            .ok_or_else(|| DownloadError::UnknownService(service.to_string()))?;
         Ok(DataFile::complete_license(full_name))
     }
 
     /// Get complete application file for a service.
     pub fn complete_application(service: &str) -> Result<DataFile> {
-        let full_name = Self::full_name(service).ok_or_else(|| {
-            DownloadError::UnknownService(service.to_string())
-        })?;
+        let full_name = Self::full_name(service)
+            .ok_or_else(|| DownloadError::UnknownService(service.to_string()))?;
         Ok(DataFile::complete_application(full_name))
     }
 
     /// Get all daily license files for a service.
     pub fn daily_licenses(service: &str) -> Result<Vec<DataFile>> {
-        let full_name = Self::full_name(service).ok_or_else(|| {
-            DownloadError::UnknownService(service.to_string())
-        })?;
+        let full_name = Self::full_name(service)
+            .ok_or_else(|| DownloadError::UnknownService(service.to_string()))?;
 
         Ok(Weekday::ALL
             .iter()
@@ -248,9 +248,8 @@ impl ServiceCatalog {
 
     /// Get the daily license file for a specific date.
     pub fn daily_license_for_date(service: &str, date: NaiveDate) -> Result<Option<DataFile>> {
-        let full_name = Self::full_name(service).ok_or_else(|| {
-            DownloadError::UnknownService(service.to_string())
-        })?;
+        let full_name = Self::full_name(service)
+            .ok_or_else(|| DownloadError::UnknownService(service.to_string()))?;
 
         Ok(Weekday::for_date(date).map(|day| DataFile::daily_license(full_name, day)))
     }

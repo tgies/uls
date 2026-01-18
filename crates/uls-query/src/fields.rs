@@ -93,16 +93,16 @@ impl FilterExpr {
         // Find the operator
         let op_chars = ['>', '<', '=', '!'];
         let op_pos = s.find(|c: char| op_chars.contains(&c))?;
-        
+
         let field = s[..op_pos].trim().to_lowercase();
         let rest = &s[op_pos..];
         let (op, value_str) = FilterOp::parse(rest);
         let value = value_str.trim().to_string();
-        
+
         if field.is_empty() || value.is_empty() {
             return None;
         }
-        
+
         Some(FilterExpr { field, op, value })
     }
 }
@@ -129,7 +129,7 @@ impl FieldRegistry {
     /// Create the default field registry with all license fields.
     pub fn new() -> Self {
         let mut fields = HashMap::new();
-        
+
         let defs = [
             FieldDef {
                 name: "call_sign",
@@ -216,7 +216,7 @@ impl FieldRegistry {
                 aliases: &["cancelled"],
             },
         ];
-        
+
         for def in defs {
             // Register by name
             fields.insert(def.name, def.clone());
@@ -225,20 +225,18 @@ impl FieldRegistry {
                 fields.insert(alias, def.clone());
             }
         }
-        
+
         FieldRegistry { fields }
     }
-    
+
     /// Look up a field by name or alias.
     pub fn get(&self, name: &str) -> Option<&FieldDef> {
         self.fields.get(name.to_lowercase().as_str())
     }
-    
+
     /// Get all canonical field names (no aliases).
     pub fn field_names(&self) -> Vec<&'static str> {
-        let mut names: Vec<_> = self.fields.values()
-            .map(|f| f.name)
-            .collect();
+        let mut names: Vec<_> = self.fields.values().map(|f| f.name).collect();
         names.sort();
         names.dedup();
         names
@@ -281,16 +279,16 @@ mod tests {
     #[test]
     fn test_field_registry() {
         let reg = FieldRegistry::new();
-        
+
         // By name
         assert!(reg.get("call_sign").is_some());
         assert!(reg.get("grant_date").is_some());
-        
+
         // By alias
         assert!(reg.get("callsign").is_some());
         assert!(reg.get("granted").is_some());
         assert!(reg.get("zip").is_some());
-        
+
         // Unknown
         assert!(reg.get("unknown_field").is_none());
     }
@@ -301,11 +299,11 @@ mod tests {
         assert!(FilterOp::Eq.valid_for(FieldType::String));
         assert!(FilterOp::Like.valid_for(FieldType::String));
         assert!(!FilterOp::Gt.valid_for(FieldType::String));
-        
+
         // Date: all ops
         assert!(FilterOp::Gt.valid_for(FieldType::Date));
         assert!(FilterOp::Le.valid_for(FieldType::Date));
-        
+
         // Char: only =, !=
         assert!(FilterOp::Eq.valid_for(FieldType::Char));
         assert!(!FilterOp::Gt.valid_for(FieldType::Char));

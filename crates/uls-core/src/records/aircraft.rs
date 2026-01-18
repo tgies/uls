@@ -1,6 +1,6 @@
 //! AC (Aircraft) record type.
-use serde::{Deserialize, Serialize};
 use super::common::*;
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AircraftRecord {
@@ -37,9 +37,11 @@ mod tests {
 
     #[test]
     fn test_aircraft_from_fields() {
-        let fields = vec!["AC", "12345", "ULS123", "EBF456", "W1TEST", "5", "C", "Y", "N", "N12345"];
+        let fields = vec![
+            "AC", "12345", "ULS123", "EBF456", "W1TEST", "5", "C", "Y", "N", "N12345",
+        ];
         let ac = AircraftRecord::from_fields(&fields);
-        
+
         assert_eq!(ac.unique_system_identifier, 12345);
         assert_eq!(ac.call_sign, Some("W1TEST".to_string()));
         assert_eq!(ac.aircraft_count, Some(5));
@@ -47,4 +49,3 @@ mod tests {
         assert_eq!(ac.n_number, Some("N12345".to_string()));
     }
 }
-
