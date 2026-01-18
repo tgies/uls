@@ -217,6 +217,30 @@ mod tests {
         buf
     }
 
+    fn create_zip_with_mixed_case() -> Vec<u8> {
+        let mut buf = Vec::new();
+        {
+            let cursor = Cursor::new(&mut buf);
+            let mut writer = zip::ZipWriter::new(cursor);
+
+            let options = zip::write::SimpleFileOptions::default()
+                .compression_method(zip::CompressionMethod::Stored);
+
+            // Mixed case filenames
+            writer.start_file("hd.DAT", options).unwrap();
+            writer.write_all(b"HD|1|||LOWERCASE|A|HA|\n").unwrap();
+
+            writer.start_file("en.Dat", options).unwrap();
+            writer.write_all(b"EN|1|||MIXEDCASE|L||Test||\n").unwrap();
+
+            writer.start_file("readme.txt", options).unwrap();
+            writer.write_all(b"Not a DAT file\n").unwrap();
+
+            writer.finish().unwrap();
+        }
+        buf
+    }
+
     #[test]
     fn test_list_dat_files() {
         let data = create_test_zip();
@@ -245,5 +269,125 @@ mod tests {
             .unwrap();
 
         assert_eq!(count, 2);
+    }
+
+    #[test]
+    fn test_list_all_files() {
+        let data = create_zip_with_mixed_case();
+        let cursor = Cursor::new(data);
+        let archive = ZipArchive::new(cursor).unwrap();
+        let mut extractor = ZipExtractor::new(archive);
+
+        let files = extractor.list_files();
+        assert_eq!(files.len(), 3);
+        assert!(files.contains(&"hd.DAT".to_string()));
+        assert!(files.contains(&"en.Dat".to_string()));
+        assert!(files.contains(&"readme.txt".to_string()));
+    }
+
+    #[test]
+    fn test_list_dat_files_mixed_case() {
+        let data = create_zip_with_mixed_case();
+        let cursor = Cursor::new(data);
+        let archive = ZipArchive::new(cursor).unwrap();
+        let mut extractor = ZipExtractor::new(archive);
+
+        // Should find DAT files regardless of case
+        let dat_files = extractor.list_dat_files();
+        assert_eq!(dat_files.len(), 2);
+    }
+
+    #[test]
+    fn test_file_size() {
+        let data = create_test_zip();
+        let cursor = Cursor::new(data);
+        let archive = ZipArchive::new(cursor).unwrap();
+        let mut extractor = ZipExtractor::new(archive);
+
+        let size = extractor.file_size("HD.dat").unwrap();
+        assert!(size > 0);
+    }
+
+    #[test]
+    fn test_file_size_not_found() {
+        let data = create_test_zip();
+        let cursor = Cursor::new(data);
+        let archive = ZipArchive::new(cursor).unwrap();
+        let mut extractor = ZipExtractor::new(archive);
+
+        let result = extractor.file_size("nonexistent.dat");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_stream_dat_case_insensitive() {
+        let data = create_zip_with_mixed_case();
+        let cursor = Cursor::new(data);
+        let archive = ZipArchive::new(cursor).unwrap();
+        let mut extractor = ZipExtractor::new(archive);
+
+        // Should find "hd.DAT" when looking for "HD.dat"
+        let count = extractor
+            .process_dat_streaming("HD.dat", |line| {
+                assert_eq!(line.record_type, "HD");
+                true
+            })
+            .unwrap();
+
+        assert_eq!(count, 1);
+    }
+
+    #[test]
+    fn test_stream_dat_not_found() {
+        let data = create_test_zip();
+        let cursor = Cursor::new(data);
+        let archive = ZipArchive::new(cursor).unwrap();
+        let mut extractor = ZipExtractor::new(archive);
+
+        let result = extractor.stream_dat("NONEXISTENT.dat");
+        assert!(result.is_err());
+
+        match result {
+            Err(ZipError::DatFileNotFound(name)) => {
+                assert_eq!(name, "NONEXISTENT.dat");
+            }
+            _ => panic!("Expected DatFileNotFound error"),
+        }
+    }
+
+    #[test]
+    fn test_process_dat_early_termination() {
+        let data = create_test_zip();
+        let cursor = Cursor::new(data);
+        let archive = ZipArchive::new(cursor).unwrap();
+        let mut extractor = ZipExtractor::new(archive);
+
+        let mut processed = 0;
+        let count = extractor
+            .process_dat_streaming("HD.dat", |_line| {
+                processed += 1;
+                false // Stop after first record
+            })
+            .unwrap();
+
+        // Should have processed exactly 1 record before stopping
+        assert_eq!(count, 1);
+        assert_eq!(processed, 1);
+    }
+
+    #[test]
+    fn test_zip_error_to_parse_error() {
+        let err = ZipError::DatFileNotFound("test.dat".to_string());
+        let parse_err: crate::ParseError = err.into();
+        let msg = parse_err.to_string();
+        assert!(msg.contains("test.dat"));
+    }
+
+    #[test]
+    fn test_zip_error_io_conversion() {
+        let io_err = std::io::Error::new(std::io::ErrorKind::NotFound, "test error");
+        let zip_err = ZipError::from(io_err);
+        let parse_err: crate::ParseError = zip_err.into();
+        assert!(matches!(parse_err, crate::ParseError::Io(_)));
     }
 }
