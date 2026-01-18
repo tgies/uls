@@ -308,4 +308,81 @@ mod tests {
         assert!(FilterOp::Eq.valid_for(FieldType::Char));
         assert!(!FilterOp::Gt.valid_for(FieldType::Char));
     }
+
+    #[test]
+    fn test_filter_op_parse_not_equal() {
+        // Test the != operator which wasn't covered
+        assert_eq!(FilterOp::parse("!=value"), (FilterOp::Ne, "value"));
+    }
+
+    #[test]
+    fn test_filter_op_sql() {
+        // Test all SQL operator conversions
+        assert_eq!(FilterOp::Eq.sql(), "=");
+        assert_eq!(FilterOp::Ne.sql(), "!=");
+        assert_eq!(FilterOp::Lt.sql(), "<");
+        assert_eq!(FilterOp::Le.sql(), "<=");
+        assert_eq!(FilterOp::Gt.sql(), ">");
+        assert_eq!(FilterOp::Ge.sql(), ">=");
+        assert_eq!(FilterOp::Like.sql(), "LIKE");
+    }
+
+    #[test]
+    fn test_field_registry_field_names() {
+        let reg = FieldRegistry::new();
+        let names = reg.field_names();
+
+        // Should contain canonical field names
+        assert!(names.contains(&"call_sign"));
+        assert!(names.contains(&"city"));
+        assert!(names.contains(&"state"));
+        assert!(names.contains(&"grant_date"));
+        assert!(names.contains(&"expired_date"));
+
+        // Should not contain aliases (deduped by canonical name)
+        // All returned values should be unique
+        let unique_count = names.len();
+        let mut sorted_names = names.clone();
+        sorted_names.sort();
+        sorted_names.dedup();
+        assert_eq!(unique_count, sorted_names.len());
+    }
+
+    #[test]
+    fn test_field_registry_default() {
+        // Test the Default implementation
+        let reg: FieldRegistry = FieldRegistry::default();
+
+        // Should work the same as new()
+        assert!(reg.get("call_sign").is_some());
+        assert!(reg.get("callsign").is_some()); // alias
+    }
+
+    #[test]
+    fn test_filter_expr_parse_invalid() {
+        // No operator found
+        assert!(FilterExpr::parse("nooperator").is_none());
+
+        // Empty field
+        assert!(FilterExpr::parse("=value").is_none());
+
+        // Empty value
+        assert!(FilterExpr::parse("field=").is_none());
+    }
+
+    #[test]
+    fn test_filter_expr_parse_not_equal() {
+        let expr = FilterExpr::parse("status!=A").unwrap();
+        assert_eq!(expr.field, "status");
+        assert_eq!(expr.op, FilterOp::Ne);
+        assert_eq!(expr.value, "A");
+    }
+
+    #[test]
+    fn test_op_validity_ne() {
+        // Test Ne validity for all types
+        assert!(FilterOp::Ne.valid_for(FieldType::String));
+        assert!(FilterOp::Ne.valid_for(FieldType::Date));
+        assert!(FilterOp::Ne.valid_for(FieldType::Char));
+    }
 }

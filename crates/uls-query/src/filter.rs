@@ -611,4 +611,139 @@ mod tests {
         // Wildcards converted to SQL LIKE pattern
         assert!(params.iter().any(|p| p == "%Smith%"));
     }
+
+    #[test]
+    fn test_with_filter() {
+        let filter = SearchFilter::new().with_filter("grant_date>2025-01-01");
+        assert_eq!(filter.filters.len(), 1);
+        assert_eq!(filter.filters[0].field, "grant_date");
+        assert_eq!(filter.filters[0].op, crate::fields::FilterOp::Gt);
+        assert_eq!(filter.filters[0].value, "2025-01-01");
+    }
+
+    #[test]
+    fn test_with_filter_invalid_ignored() {
+        // Invalid filter expressions should be silently ignored
+        let filter = SearchFilter::new().with_filter("invalid");
+        assert_eq!(filter.filters.len(), 0);
+    }
+
+    #[test]
+    fn test_with_sort_field_descending() {
+        let filter = SearchFilter::new().with_sort_field("-call_sign");
+        assert_eq!(filter.sort_field, Some("call_sign".to_string()));
+        assert!(filter.sort_desc);
+
+        // Test that order_clause produces DESC
+        let clause = filter.order_clause();
+        assert!(clause.contains("DESC"), "Expected DESC in: {}", clause);
+    }
+
+    #[test]
+    fn test_with_sort_field_ascending() {
+        let filter = SearchFilter::new().with_sort_field("grant_date");
+        assert_eq!(filter.sort_field, Some("grant_date".to_string()));
+        assert!(!filter.sort_desc);
+
+        // Test that order_clause produces ASC
+        let clause = filter.order_clause();
+        assert!(clause.contains("ASC"), "Expected ASC in: {}", clause);
+    }
+
+    #[test]
+    fn test_granted_after_filter() {
+        let mut filter = SearchFilter::new();
+        filter.granted_after = Some("2025-01-01".to_string());
+        let (clause, params) = filter.to_where_clause();
+        assert!(clause.contains("grant_date >="));
+        assert!(params.contains(&"2025-01-01".to_string()));
+    }
+
+    #[test]
+    fn test_granted_before_filter() {
+        let mut filter = SearchFilter::new();
+        filter.granted_before = Some("2025-12-31".to_string());
+        let (clause, params) = filter.to_where_clause();
+        assert!(clause.contains("grant_date <="));
+        assert!(params.contains(&"2025-12-31".to_string()));
+    }
+
+    #[test]
+    fn test_expires_before_filter() {
+        let mut filter = SearchFilter::new();
+        filter.expires_before = Some("2026-01-01".to_string());
+        let (clause, params) = filter.to_where_clause();
+        assert!(clause.contains("expired_date <="));
+        assert!(params.contains(&"2026-01-01".to_string()));
+    }
+
+    #[test]
+    fn test_date_range_combined() {
+        let mut filter = SearchFilter::new();
+        filter.granted_after = Some("2025-01-01".to_string());
+        filter.granted_before = Some("2025-12-31".to_string());
+        filter.expires_before = Some("2030-01-01".to_string());
+        let (clause, params) = filter.to_where_clause();
+
+        assert!(clause.contains("grant_date >="));
+        assert!(clause.contains("grant_date <="));
+        assert!(clause.contains("expired_date <="));
+        assert_eq!(params.len(), 3);
+    }
+
+    #[test]
+    fn test_generic_filter_expression_date() {
+        let filter = SearchFilter::new().with_filter("grant_date>2025-01-01");
+        let (clause, params) = filter.to_where_clause();
+
+        // Should contain the date filter
+        assert!(clause.contains("grant_date"));
+        assert!(clause.contains(">"));
+        assert!(params.contains(&"2025-01-01".to_string()));
+    }
+
+    #[test]
+    fn test_generic_filter_expression_with_wildcard() {
+        // Wildcards in filter values should trigger LIKE
+        let filter = SearchFilter::new().with_filter("city=NEW*");
+        let (clause, params) = filter.to_where_clause();
+
+        // Should use LIKE due to wildcard
+        assert!(clause.contains("LIKE"));
+        assert!(params.contains(&"NEW%".to_string()));
+    }
+
+    #[test]
+    fn test_generic_filter_unknown_field() {
+        // Unknown fields should be silently ignored
+        let filter = SearchFilter::new().with_filter("unknown_field=value");
+        let (clause, _params) = filter.to_where_clause();
+
+        // Should not include unknown field, just default 1=1
+        assert_eq!(clause, "1=1");
+    }
+
+    #[test]
+    fn test_zip_with_explicit_wildcard() {
+        // ZIP with explicit wildcard should preserve it
+        let mut filter = SearchFilter::new();
+        filter.zip_code = Some("061*".to_string());
+        let (clause, params) = filter.to_where_clause();
+
+        assert!(clause.contains("LIKE"));
+        // Should use the explicit wildcard pattern, not add another
+        assert!(params.contains(&"061%".to_string()));
+    }
+
+    #[test]
+    fn test_empty_radio_service_list() {
+        // Empty radio service list should not add a condition
+        let mut filter = SearchFilter::new();
+        filter.radio_service = Some(vec![]);
+        let (clause, params) = filter.to_where_clause();
+
+        // Should be empty filter (1=1)
+        assert_eq!(clause, "1=1");
+        assert!(params.is_empty());
+    }
 }

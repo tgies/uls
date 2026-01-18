@@ -339,4 +339,70 @@ mod tests {
         let count = engine.count(filter).unwrap();
         assert_eq!(count, 1);
     }
+
+    #[test]
+    fn test_required_record_types_basic() {
+        let filter = SearchFilter::default();
+        let types = QueryEngine::required_record_types(&filter);
+        assert_eq!(types, vec!["HD", "EN"]);
+    }
+
+    #[test]
+    fn test_required_record_types_with_operator_class() {
+        let filter = SearchFilter::new().with_operator_class('E');
+        let types = QueryEngine::required_record_types(&filter);
+        assert_eq!(types, vec!["HD", "EN", "AM"]);
+    }
+
+    #[test]
+    fn test_has_basic_data_empty_db() {
+        let config = DatabaseConfig::in_memory();
+        let db = Database::with_config(config).unwrap();
+        db.initialize().unwrap();
+
+        let engine = QueryEngine::with_database(db);
+        // Empty database has no record types
+        let has_data = engine.has_basic_data("HA").unwrap();
+        assert!(!has_data);
+    }
+
+    #[test]
+    fn test_imported_types_empty_db() {
+        let config = DatabaseConfig::in_memory();
+        let db = Database::with_config(config).unwrap();
+        db.initialize().unwrap();
+
+        let engine = QueryEngine::with_database(db);
+        let types = engine.imported_types("HA").unwrap();
+        assert!(types.is_empty());
+    }
+
+    #[test]
+    fn test_missing_data_for_query_empty_db() {
+        let config = DatabaseConfig::in_memory();
+        let db = Database::with_config(config).unwrap();
+        db.initialize().unwrap();
+
+        let engine = QueryEngine::with_database(db);
+        let filter = SearchFilter::default();
+        let missing = engine.missing_data_for_query("HA", &filter).unwrap();
+        // Should be missing HD and EN since db is empty
+        assert!(missing.contains(&"HD".to_string()));
+        assert!(missing.contains(&"EN".to_string()));
+    }
+
+    #[test]
+    fn test_missing_data_for_query_with_operator_class() {
+        let config = DatabaseConfig::in_memory();
+        let db = Database::with_config(config).unwrap();
+        db.initialize().unwrap();
+
+        let engine = QueryEngine::with_database(db);
+        let filter = SearchFilter::new().with_operator_class('E');
+        let missing = engine.missing_data_for_query("HA", &filter).unwrap();
+        // Should be missing HD, EN, and AM
+        assert!(missing.contains(&"HD".to_string()));
+        assert!(missing.contains(&"EN".to_string()));
+        assert!(missing.contains(&"AM".to_string()));
+    }
 }

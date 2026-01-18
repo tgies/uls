@@ -498,4 +498,105 @@ mod tests {
         assert!(parsed.is_ok(), "Empty vec JSON should be valid: {}", output);
         assert_eq!(parsed.unwrap().len(), 0);
     }
+
+    #[test]
+    fn test_format_location_empty() {
+        let mut license = test_license();
+        license.city = None;
+        license.state = None;
+        license.zip_code = None;
+        let location = format_location(&license);
+        assert!(location.is_empty());
+    }
+
+    #[test]
+    fn test_format_location_single_part() {
+        let mut license = test_license();
+        license.city = Some("ONLY_CITY".to_string());
+        license.state = None;
+        license.zip_code = None;
+        let location = format_location(&license);
+        assert_eq!(location, "ONLY_CITY");
+    }
+
+    #[test]
+    fn test_yaml_format_minimal_fields() {
+        // License with only required fields, no optional ones
+        let license = License {
+            unique_system_identifier: 999,
+            call_sign: "W0MIN".to_string(),
+            licensee_name: "Minimal".to_string(),
+            first_name: None,
+            middle_initial: None,
+            last_name: None,
+            status: 'A',
+            radio_service: "HA".to_string(),
+            grant_date: None,
+            expired_date: None,
+            cancellation_date: None,
+            frn: None,
+            street_address: None,
+            city: None,
+            state: None,
+            zip_code: None,
+            operator_class: None,
+            previous_call_sign: None,
+        };
+        let output = license.format(OutputFormat::Yaml);
+        // Should have call_sign, name, status, service
+        assert!(output.contains("call_sign: W0MIN"));
+        assert!(output.contains("status: A"));
+        // Should NOT have operator_class, city, state since they're None
+        assert!(!output.contains("operator_class:"));
+        assert!(!output.contains("city:"));
+        assert!(!output.contains("state:"));
+    }
+
+    #[test]
+    fn test_compact_format_no_operator_class() {
+        let mut license = test_license();
+        license.operator_class = None;
+        let output = license.format(OutputFormat::Compact);
+        // Should not contain class in parentheses
+        assert!(!output.contains("("));
+        assert!(output.contains("W1TEST"));
+    }
+
+    #[test]
+    fn test_table_format_minimal() {
+        let license = License {
+            unique_system_identifier: 999,
+            call_sign: "W0MIN".to_string(),
+            licensee_name: "Minimal".to_string(),
+            first_name: None,
+            middle_initial: None,
+            last_name: None,
+            status: 'A',
+            radio_service: "HA".to_string(),
+            grant_date: None,
+            expired_date: None,
+            cancellation_date: None,
+            frn: None,
+            street_address: None,
+            city: None,
+            state: None,
+            zip_code: None,
+            operator_class: None,
+            previous_call_sign: None,
+        };
+        let output = license.format(OutputFormat::Table);
+        assert!(output.contains("W0MIN"));
+        // Should not have Location line since city/state/zip are all None
+    }
+
+    #[test]
+    fn test_output_format_aliases() {
+        // Test alternative format names
+        assert_eq!("yml".parse::<OutputFormat>(), Ok(OutputFormat::Yaml));
+        assert_eq!(
+            "jsonpretty".parse::<OutputFormat>(),
+            Ok(OutputFormat::JsonPretty)
+        );
+        assert_eq!("oneline".parse::<OutputFormat>(), Ok(OutputFormat::Compact));
+    }
 }
