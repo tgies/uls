@@ -1,0 +1,26 @@
+# Cross configuration for local cross-compilation
+# https://github.com/cross-rs/cross
+
+# To use MSVC locally, you need to build the container first:
+#   git clone https://github.com/cross-rs/cross
+#   cd cross
+#   git submodule update --init --remote
+#   cargo build-docker-image x86_64-pc-windows-msvc-cross --tag local
+#
+# Then uncomment the [target.x86_64-pc-windows-msvc] section below.
+
+# For now, use the pre-built GNU target which works out of the box:
+#   cross build --release --target x86_64-pc-windows-gnu
+
+[build.env]
+passthrough = ["RUST_BACKTRACE"]
+
+# MSVC container built locally:
+[target.x86_64-pc-windows-msvc]
+image = "ghcr.io/cross-rs/x86_64-pc-windows-msvc-cross:local"
+
+[target.x86_64-unknown-linux-musl]
+# Uses the default pre-built image
+
+[target.aarch64-unknown-linux-musl]
+# Uses the default pre-built image
