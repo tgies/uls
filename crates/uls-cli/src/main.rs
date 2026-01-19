@@ -49,7 +49,7 @@ enum Commands {
         callsigns: Vec<String>,
 
         /// Radio service (amateur, gmrs, auto)
-        #[arg(long, default_value = "auto")]
+        #[arg(short = 'r', long, default_value = "auto")]
         service: String,
 
         /// Also show licenses from other services for the same FRN
@@ -63,7 +63,7 @@ enum Commands {
     /// Update the local database
     Update {
         /// Radio service to update (amateur, gmrs, all)
-        #[arg(short, long, default_value = "amateur")]
+        #[arg(short = 'r', long, default_value = "amateur")]
         service: String,
 
         /// Force full download even if cached
@@ -82,7 +82,7 @@ enum Commands {
         frns: Vec<String>,
 
         /// Radio service (amateur, gmrs)
-        #[arg(long, default_value = "amateur")]
+        #[arg(short = 'r', long, default_value = "amateur")]
         service: String,
     },
 
