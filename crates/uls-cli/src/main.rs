@@ -15,6 +15,7 @@ use tracing_subscriber::EnvFilter;
 
 mod commands;
 mod config;
+mod staleness;
 
 #[derive(Parser)]
 #[command(name = "uls")]
@@ -27,6 +28,18 @@ struct Cli {
     /// Output format (table, json, csv, yaml)
     #[arg(short, long, default_value = "table", global = true)]
     format: String,
+
+    /// Staleness threshold in days (warn if data older than this)
+    #[arg(long, default_value = "3", global = true, value_name = "DAYS")]
+    warn_stale: i64,
+
+    /// Disable staleness warnings
+    #[arg(long, global = true)]
+    no_stale_warning: bool,
+
+    /// Automatically update stale data before queries
+    #[arg(long, global = true)]
+    auto_update: bool,
 
     #[command(subcommand)]
     command: Option<Commands>,
@@ -73,6 +86,14 @@ enum Commands {
         /// Import only HD+EN+AM records (sufficient for callsign/FRN lookups)
         #[arg(long)]
         minimal: bool,
+
+        /// Only apply daily patches (skip weekly check)
+        #[arg(long)]
+        daily_only: bool,
+
+        /// Check for available updates without downloading
+        #[arg(long)]
+        check: bool,
     },
 
     /// Look up all licenses by FRN (FCC Registration Number)
@@ -226,13 +247,22 @@ async fn main() -> Result<()> {
         )
         .init();
 
+    // Create staleness options from CLI flags
+    let staleness_opts = staleness::StalenessOptions::from_cli(
+        cli.warn_stale,
+        cli.no_stale_warning,
+        cli.auto_update,
+    );
+
     // Execute command
     match cli.command {
         Some(Commands::Lookup {
             callsigns,
             service,
             all,
-        }) => commands::lookup::execute(&callsigns, &service, all, &cli.format).await,
+        }) => {
+            commands::lookup::execute(&callsigns, &service, all, &cli.format, &staleness_opts).await
+        }
         Some(Commands::Search(args)) => {
             commands::search::execute(
                 args.query,
@@ -260,7 +290,12 @@ async fn main() -> Result<()> {
             service,
             force,
             minimal,
-        }) => commands::update::execute(&service, force, minimal).await,
+            daily_only,
+            check,
+        }) => {
+            commands::update::execute_with_options(&service, force, minimal, daily_only, check)
+                .await
+        }
         Some(Commands::Frn { frns, service }) => {
             commands::frn::execute(&frns, &service, &cli.format).await
         }
@@ -275,7 +310,14 @@ async fn main() -> Result<()> {
             if !cli.callsigns.is_empty() {
                 // Validate all args look like callsigns
                 if cli.callsigns.iter().all(|c| looks_like_callsign(c)) {
-                    commands::lookup::execute(&cli.callsigns, "auto", cli.all, &cli.format).await
+                    commands::lookup::execute(
+                        &cli.callsigns,
+                        "auto",
+                        cli.all,
+                        &cli.format,
+                        &staleness_opts,
+                    )
+                    .await
                 } else {
                     // Find first non-callsign to report
                     let bad = cli

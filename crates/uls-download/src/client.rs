@@ -372,6 +372,18 @@ impl FccClient {
         file.write_all(etag.as_bytes())?;
         Ok(())
     }
+
+    /// Get the modification time of a cached file.
+    ///
+    /// Returns the file's modification time (which should match the FCC server's
+    /// Last-Modified header if we preserved it), or None if the file doesn't exist.
+    pub fn get_cached_file_date(&self, file: &DataFile) -> Option<chrono::DateTime<Utc>> {
+        let path = self.cache_path(file);
+        std::fs::metadata(&path)
+            .ok()
+            .and_then(|m| m.modified().ok())
+            .map(chrono::DateTime::<Utc>::from)
+    }
 }
 
 /// Result of a download operation.

@@ -6,6 +6,7 @@ use anyhow::{Context, Result};
 use uls_query::{FormatOutput, OutputFormat, QueryEngine};
 
 use super::auto_update;
+use crate::staleness::{warn_if_stale_after_query, StalenessOptions};
 
 /// All supported services for cross-service lookup
 const ALL_SERVICES: &[&str] = &["HA", "ZA"];
@@ -15,6 +16,7 @@ pub async fn execute(
     service_override: &str,
     all_services: bool,
     format: &str,
+    staleness_opts: &StalenessOptions,
 ) -> Result<()> {
     if callsigns.is_empty() {
         anyhow::bail!("At least one callsign is required");
@@ -71,13 +73,12 @@ pub async fn execute(
 
     // If not requesting cross-service lookup, output what we have
     if !all_services {
-        // For single callsign lookup, use detailed single-license format
-        // For multiple callsigns, use collection format
         if callsigns.len() == 1 && results.len() == 1 {
             println!("{}", results[0].format(output_format));
         } else {
             println!("{}", results.format(output_format));
         }
+        let _ = warn_if_stale_after_query(primary_service, staleness_opts);
         return Ok(());
     }
 
@@ -135,6 +136,9 @@ pub async fn execute(
     } else {
         println!("{}", all_licenses.format(output_format));
     }
+
+    // Check staleness after query output
+    let _ = warn_if_stale_after_query(primary_service, staleness_opts);
 
     Ok(())
 }

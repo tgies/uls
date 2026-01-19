@@ -346,6 +346,166 @@ impl<'a> Importer<'a> {
 
         Ok(stats)
     }
+
+    /// Import a daily patch file incrementally without dropping indexes.
+    ///
+    /// Unlike `import_for_service`, this method:
+    /// - Does NOT drop indexes (maintains lookup performance during patch)
+    /// - Does NOT clear import status (patches are additive)
+    /// - Uses `INSERT OR REPLACE` to update existing records or add new ones
+    ///
+    /// This is optimized for applying daily transaction files on top of
+    /// an existing weekly database.
+    pub fn import_patch(
+        &self,
+        zip_path: &Path,
+        mode: ImportMode,
+        progress: Option<ProgressCallback>,
+    ) -> Result<ImportStats> {
+        let start = Instant::now();
+
+        let mut extractor = ZipExtractor::open(zip_path)?;
+        let all_dat_files = extractor.list_dat_files();
+
+        // Filter files based on import mode
+        let mut dat_files: Vec<String> = all_dat_files
+            .into_iter()
+            .filter(|f| mode.should_import_file(f))
+            .collect();
+
+        // Sort by processing order
+        dat_files.sort_by(|a, b| {
+            let priority = |s: &str| -> u8 {
+                let upper = s.to_uppercase();
+                if upper.contains("HD") {
+                    0
+                } else if upper.contains("EN") {
+                    1
+                } else if upper.contains("AM") {
+                    2
+                } else {
+                    3
+                }
+            };
+            priority(a).cmp(&priority(b))
+        });
+
+        info!(
+            "Applying patch with {} DAT files (mode={:?}): {:?}",
+            dat_files.len(),
+            mode,
+            dat_files
+        );
+
+        // Optimize SQLite but DON'T drop indexes (unlike full import)
+        let conn = self.db.conn()?;
+        conn.execute_batch(
+            "PRAGMA synchronous = OFF;
+             PRAGMA journal_mode = MEMORY;
+             PRAGMA temp_store = MEMORY;
+             PRAGMA cache_size = -64000;",
+        )?;
+
+        // Begin transaction
+        conn.execute("BEGIN TRANSACTION", [])?;
+
+        // Create bulk inserter
+        let mut inserter = BulkInserter::new(&conn)?;
+
+        let mut stats = ImportStats {
+            files: dat_files.len(),
+            ..Default::default()
+        };
+
+        for (idx, dat_file) in dat_files.iter().enumerate() {
+            let mut file_records = 0usize;
+            let mut file_parse_errors = 0usize;
+            let mut file_insert_errors = 0usize;
+
+            extractor.process_dat_streaming(dat_file, |line| {
+                match line.to_record() {
+                    Ok(record) => {
+                        if let Err(e) = inserter.insert(&record) {
+                            file_insert_errors += 1;
+                            if file_insert_errors <= 5 {
+                                warn!("Insert error in {}: {}", dat_file, e);
+                            }
+                        } else {
+                            file_records += 1;
+                        }
+                    }
+                    Err(e) => {
+                        file_parse_errors += 1;
+                        if file_parse_errors <= 5 {
+                            warn!("Parse error in {}: {}", dat_file, e);
+                        }
+                    }
+                }
+
+                // Send progress update every 1k records (patches are smaller)
+                if let Some(ref cb) = progress {
+                    if (file_records + file_parse_errors) % 1_000 == 0 {
+                        cb(&ImportProgress {
+                            current_file: idx + 1,
+                            total_files: dat_files.len(),
+                            file_name: dat_file.clone(),
+                            records: stats.records + file_records,
+                            errors: stats.parse_errors
+                                + stats.insert_errors
+                                + file_parse_errors
+                                + file_insert_errors,
+                        });
+                    }
+                }
+                true
+            })?;
+
+            stats.records += file_records;
+            stats.parse_errors += file_parse_errors;
+            stats.insert_errors += file_insert_errors;
+
+            if file_parse_errors > 0 || file_insert_errors > 0 {
+                warn!(
+                    "{}: {} records, {} parse errors, {} insert errors",
+                    dat_file, file_records, file_parse_errors, file_insert_errors
+                );
+            }
+
+            // Final progress update for this file
+            if let Some(ref cb) = progress {
+                cb(&ImportProgress {
+                    current_file: idx + 1,
+                    total_files: dat_files.len(),
+                    file_name: dat_file.clone(),
+                    records: stats.records,
+                    errors: stats.parse_errors + stats.insert_errors,
+                });
+            }
+        }
+
+        // Drop inserter to release statement borrows before commit
+        drop(inserter);
+
+        // Commit transaction
+        conn.execute("COMMIT", [])?;
+
+        // Reset SQLite settings
+        conn.execute_batch(
+            "PRAGMA synchronous = NORMAL;
+             PRAGMA journal_mode = WAL;",
+        )?;
+
+        stats.duration_secs = start.elapsed().as_secs_f64();
+
+        info!(
+            "Patch applied: {} records in {:.2}s ({:.0}/sec)",
+            stats.records,
+            stats.duration_secs,
+            stats.rate()
+        );
+
+        Ok(stats)
+    }
 }
 
 #[cfg(test)]

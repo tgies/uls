@@ -104,6 +104,14 @@ impl Database {
         Ok(Schema::get_version(&conn)?.is_some())
     }
 
+    /// Migrate the database schema if needed.
+    ///
+    /// Call this on an existing database to upgrade it to the current schema version.
+    pub fn migrate_if_needed(&self) -> Result<()> {
+        let conn = self.conn()?;
+        Schema::migrate_if_needed(&conn)
+    }
+
     /// Begin a transaction for bulk operations.
     pub fn begin_transaction(&self) -> Result<Transaction> {
         let conn = self.pool.get()?;
@@ -576,6 +584,149 @@ impl Database {
             Ok(count) => Ok(Some(count as usize)),
             Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
             Err(e) => Err(e.into()),
+        }
+    }
+
+    // ========================================================================
+    // Data Freshness and Patch Tracking
+    // ========================================================================
+
+    /// Get the last updated timestamp for a service.
+    pub fn get_last_updated(&self) -> Result<Option<String>> {
+        let conn = self.conn()?;
+        Schema::get_metadata(&conn, "last_updated")
+    }
+
+    /// Get data freshness information for a service.
+    pub fn get_freshness(
+        &self,
+        service: &str,
+        threshold_days: i64,
+    ) -> Result<crate::freshness::DataFreshness> {
+        let last_updated = self.get_last_updated()?;
+        let mut freshness = crate::freshness::DataFreshness::from_timestamp(
+            service,
+            last_updated.as_deref(),
+            threshold_days,
+        );
+
+        // Get last weekly date from metadata
+        let weekly_key = format!("last_weekly_date_{}", service);
+        let conn = self.conn()?;
+        if let Some(date_str) = Schema::get_metadata(&conn, &weekly_key)? {
+            freshness.last_weekly_date =
+                chrono::NaiveDate::parse_from_str(&date_str, "%Y-%m-%d").ok();
+        }
+
+        // Get applied patches
+        freshness.applied_patch_dates = self
+            .get_applied_patches(service)?
+            .into_iter()
+            .map(|p| p.patch_date)
+            .collect();
+
+        Ok(freshness)
+    }
+
+    /// Check if data for a service is stale.
+    pub fn is_stale(&self, service: &str, threshold_days: i64) -> Result<bool> {
+        let freshness = self.get_freshness(service, threshold_days)?;
+        Ok(freshness.is_stale)
+    }
+
+    /// Record that a daily patch has been applied.
+    pub fn record_applied_patch(
+        &self,
+        service: &str,
+        patch_date: chrono::NaiveDate,
+        weekday: &str,
+        etag: Option<&str>,
+        record_count: Option<usize>,
+    ) -> Result<()> {
+        let conn = self.conn()?;
+        let now = chrono::Utc::now().to_rfc3339();
+        let date_str = patch_date.format("%Y-%m-%d").to_string();
+
+        conn.execute(
+            "INSERT OR REPLACE INTO applied_patches 
+             (radio_service_code, patch_date, patch_weekday, applied_at, etag, record_count)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            params![
+                service,
+                date_str,
+                weekday,
+                now,
+                etag,
+                record_count.map(|c| c as i64)
+            ],
+        )?;
+        Ok(())
+    }
+
+    /// Get all applied patches for a service since last weekly.
+    pub fn get_applied_patches(
+        &self,
+        service: &str,
+    ) -> Result<Vec<crate::freshness::AppliedPatch>> {
+        let conn = self.conn()?;
+        let mut stmt = conn.prepare(
+            "SELECT radio_service_code, patch_date, patch_weekday, applied_at, etag, record_count 
+             FROM applied_patches 
+             WHERE radio_service_code = ?1 
+             ORDER BY patch_date",
+        )?;
+
+        let iter = stmt.query_map(params![service], |row| {
+            let date_str: String = row.get(1)?;
+            let applied_at_str: String = row.get(3)?;
+
+            Ok(crate::freshness::AppliedPatch {
+                service: row.get(0)?,
+                patch_date: chrono::NaiveDate::parse_from_str(&date_str, "%Y-%m-%d")
+                    .unwrap_or_else(|_| chrono::NaiveDate::from_ymd_opt(1970, 1, 1).unwrap()),
+                weekday: row.get(2)?,
+                applied_at: chrono::DateTime::parse_from_rfc3339(&applied_at_str)
+                    .map(|dt| dt.with_timezone(&chrono::Utc))
+                    .unwrap_or_else(|_| chrono::Utc::now()),
+                etag: row.get(4)?,
+                record_count: row.get::<_, Option<i64>>(5)?.map(|c| c as usize),
+            })
+        })?;
+
+        let mut patches = Vec::new();
+        for patch in iter {
+            patches.push(patch?);
+        }
+        Ok(patches)
+    }
+
+    /// Clear applied patches for a service (called when new weekly is imported).
+    pub fn clear_applied_patches(&self, service: &str) -> Result<()> {
+        let conn = self.conn()?;
+        conn.execute(
+            "DELETE FROM applied_patches WHERE radio_service_code = ?1",
+            params![service],
+        )?;
+        Ok(())
+    }
+
+    /// Set the date of the last weekly import for a service.
+    pub fn set_last_weekly_date(&self, service: &str, date: chrono::NaiveDate) -> Result<()> {
+        let conn = self.conn()?;
+        let key = format!("last_weekly_date_{}", service);
+        let date_str = date.format("%Y-%m-%d").to_string();
+        Schema::set_metadata(&conn, &key, &date_str)?;
+        Ok(())
+    }
+
+    /// Get the date of the last weekly import for a service.
+    pub fn get_last_weekly_date(&self, service: &str) -> Result<Option<chrono::NaiveDate>> {
+        let conn = self.conn()?;
+        let key = format!("last_weekly_date_{}", service);
+        if let Some(date_str) = Schema::get_metadata(&conn, &key)? {
+            Ok(chrono::NaiveDate::parse_from_str(&date_str, "%Y-%m-%d").ok())
+        } else {
+            Ok(None)
         }
     }
 }

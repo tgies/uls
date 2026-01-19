@@ -168,6 +168,32 @@ impl<R: Read + Seek> ZipExtractor<R> {
 
         Ok(count)
     }
+
+    /// Extract the canonical file creation date from the `counts` file in the archive.
+    ///
+    /// FCC data files contain a `counts` file with a line like:
+    /// `File Creation Date: Sun Jan 18 12:01:25 EST 2026`
+    ///
+    /// This is the authoritative date for when the FCC generated the data file.
+    /// Returns None if the counts file doesn't exist or can't be parsed.
+    pub fn get_file_creation_date(&mut self) -> Option<String> {
+        // Try to find and read the counts file
+        let index = self.find_file_index("counts")?;
+        let mut file = self.archive.by_index(index).ok()?;
+
+        let mut contents = String::new();
+        file.read_to_string(&mut contents).ok()?;
+
+        // Parse "File Creation Date: Sun Jan 18 12:01:25 EST 2026"
+        for line in contents.lines() {
+            if line.starts_with("File Creation Date:") {
+                let date_str = line.trim_start_matches("File Creation Date:").trim();
+                return Some(date_str.to_string());
+            }
+        }
+
+        None
+    }
 }
 
 impl From<ZipError> for crate::ParseError {
@@ -389,5 +415,54 @@ mod tests {
         let zip_err = ZipError::from(io_err);
         let parse_err: crate::ParseError = zip_err.into();
         assert!(matches!(parse_err, crate::ParseError::Io(_)));
+    }
+
+    fn create_zip_with_counts() -> Vec<u8> {
+        let mut buf = Vec::new();
+        {
+            let cursor = Cursor::new(&mut buf);
+            let mut writer = zip::ZipWriter::new(cursor);
+
+            let options = zip::write::SimpleFileOptions::default()
+                .compression_method(zip::CompressionMethod::Stored);
+
+            // Add counts file with FCC format
+            writer.start_file("counts", options).unwrap();
+            writer
+                .write_all(b"File Creation Date: Sun Jan 18 12:01:25 EST 2026\n")
+                .unwrap();
+            writer
+                .write_all(b"  1669550 /home/pubacc/scripts/licweekzipdata/AM.dat\n")
+                .unwrap();
+
+            writer.start_file("HD.dat", options).unwrap();
+            writer.write_all(b"HD|1|||TEST|A|HA|\n").unwrap();
+
+            writer.finish().unwrap();
+        }
+        buf
+    }
+
+    #[test]
+    fn test_get_file_creation_date() {
+        let data = create_zip_with_counts();
+        let cursor = Cursor::new(data);
+        let archive = ZipArchive::new(cursor).unwrap();
+        let mut extractor = ZipExtractor::new(archive);
+
+        let date = extractor.get_file_creation_date();
+        assert!(date.is_some());
+        assert_eq!(date.unwrap(), "Sun Jan 18 12:01:25 EST 2026");
+    }
+
+    #[test]
+    fn test_get_file_creation_date_no_counts_file() {
+        let data = create_test_zip(); // This ZIP doesn't have counts file
+        let cursor = Cursor::new(data);
+        let archive = ZipArchive::new(cursor).unwrap();
+        let mut extractor = ZipExtractor::new(archive);
+
+        let date = extractor.get_file_creation_date();
+        assert!(date.is_none());
     }
 }

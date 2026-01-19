@@ -253,6 +253,68 @@ impl ServiceCatalog {
 
         Ok(Weekday::for_date(date).map(|day| DataFile::daily_license(full_name, day)))
     }
+
+    /// Get daily license files for a date range (inclusive).
+    ///
+    /// Returns files for each date between `start` and `end` that has a daily file
+    /// (Monday-Saturday only; Sundays are skipped).
+    pub fn daily_licenses_for_range(
+        service: &str,
+        start: NaiveDate,
+        end: NaiveDate,
+    ) -> Result<Vec<(NaiveDate, DataFile)>> {
+        let full_name = Self::full_name(service)
+            .ok_or_else(|| DownloadError::UnknownService(service.to_string()))?;
+
+        let mut files = Vec::new();
+        let mut current = start;
+
+        while current <= end {
+            if let Some(weekday) = Weekday::for_date(current) {
+                files.push((current, DataFile::daily_license(full_name, weekday)));
+            }
+            current = current.succ_opt().unwrap_or(current);
+        }
+
+        Ok(files)
+    }
+
+    /// Calculate which daily files are needed to bring data up to date.
+    ///
+    /// Given the date of the last weekly import and any already-applied patches,
+    /// returns the list of dates and files that still need to be applied.
+    ///
+    /// Note: Returns an empty list if `today` is Sunday (weekly day).
+    pub fn get_missing_daily_files(
+        service: &str,
+        last_weekly_date: NaiveDate,
+        applied_patch_dates: &[NaiveDate],
+        today: NaiveDate,
+    ) -> Result<Vec<(NaiveDate, DataFile)>> {
+        // FCC weekly files are released on Sundays
+        // Daily files Mon-Sat contain changes since the previous day
+        // So if we imported Sunday's weekly, we need Mon, Tue, Wed... up to today
+
+        // If today is Sunday, we should just get the new weekly instead
+        if today.weekday() == chrono::Weekday::Sun {
+            return Ok(Vec::new());
+        }
+
+        // Start from day after weekly (Monday)
+        let start = last_weekly_date.succ_opt().unwrap_or(last_weekly_date);
+
+        // Get all daily files from start to today
+        let all_files = Self::daily_licenses_for_range(service, start, today)?;
+
+        // Filter out already-applied patches
+        let applied_set: std::collections::HashSet<_> = applied_patch_dates.iter().collect();
+        let missing: Vec<_> = all_files
+            .into_iter()
+            .filter(|(date, _)| !applied_set.contains(date))
+            .collect();
+
+        Ok(missing)
+    }
 }
 
 /// Information about a supported service.
@@ -349,5 +411,77 @@ mod tests {
     #[test]
     fn test_unknown_service() {
         assert!(ServiceCatalog::complete_license("UNKNOWN").is_err());
+    }
+
+    #[test]
+    fn test_daily_licenses_for_range() {
+        // Monday Jan 12 to Friday Jan 16, 2026
+        let start = NaiveDate::from_ymd_opt(2026, 1, 12).unwrap();
+        let end = NaiveDate::from_ymd_opt(2026, 1, 16).unwrap();
+
+        let files = ServiceCatalog::daily_licenses_for_range("amat", start, end).unwrap();
+
+        assert_eq!(files.len(), 5);
+        assert_eq!(files[0].1.filename(), "l_am_mon.zip");
+        assert_eq!(files[4].1.filename(), "l_am_fri.zip");
+    }
+
+    #[test]
+    fn test_daily_licenses_for_range_skips_sunday() {
+        // Sunday Jan 11 to Monday Jan 12
+        let start = NaiveDate::from_ymd_opt(2026, 1, 11).unwrap();
+        let end = NaiveDate::from_ymd_opt(2026, 1, 12).unwrap();
+
+        let files = ServiceCatalog::daily_licenses_for_range("amat", start, end).unwrap();
+
+        // Only Monday should be included
+        assert_eq!(files.len(), 1);
+        assert_eq!(files[0].0, NaiveDate::from_ymd_opt(2026, 1, 12).unwrap());
+    }
+
+    #[test]
+    fn test_get_missing_daily_files() {
+        // Suppose we imported weekly on Sunday Jan 11, and today is Thursday Jan 15
+        let weekly = NaiveDate::from_ymd_opt(2026, 1, 11).unwrap();
+        let today = NaiveDate::from_ymd_opt(2026, 1, 15).unwrap();
+
+        // No patches applied yet
+        let missing = ServiceCatalog::get_missing_daily_files("amat", weekly, &[], today).unwrap();
+
+        // Should need Mon, Tue, Wed, Thu
+        assert_eq!(missing.len(), 4);
+        assert_eq!(missing[0].1.filename(), "l_am_mon.zip");
+        assert_eq!(missing[3].1.filename(), "l_am_thu.zip");
+    }
+
+    #[test]
+    fn test_get_missing_daily_files_with_applied() {
+        let weekly = NaiveDate::from_ymd_opt(2026, 1, 11).unwrap();
+        let today = NaiveDate::from_ymd_opt(2026, 1, 15).unwrap();
+
+        // Mon and Tue already applied (Jan 12, Jan 13)
+        let applied = vec![
+            NaiveDate::from_ymd_opt(2026, 1, 12).unwrap(),
+            NaiveDate::from_ymd_opt(2026, 1, 13).unwrap(),
+        ];
+
+        let missing =
+            ServiceCatalog::get_missing_daily_files("amat", weekly, &applied, today).unwrap();
+
+        // Should only need Wed, Thu
+        assert_eq!(missing.len(), 2);
+        assert_eq!(missing[0].1.filename(), "l_am_wed.zip");
+        assert_eq!(missing[1].1.filename(), "l_am_thu.zip");
+    }
+
+    #[test]
+    fn test_get_missing_daily_files_on_sunday() {
+        let weekly = NaiveDate::from_ymd_opt(2026, 1, 11).unwrap();
+        let today = NaiveDate::from_ymd_opt(2026, 1, 18).unwrap(); // Next Sunday
+
+        let missing = ServiceCatalog::get_missing_daily_files("amat", weekly, &[], today).unwrap();
+
+        // Should return empty - get new weekly instead
+        assert!(missing.is_empty());
     }
 }

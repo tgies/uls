@@ -7,7 +7,7 @@ use rusqlite::Connection;
 use crate::error::Result;
 
 /// Current schema version.
-pub const SCHEMA_VERSION: i32 = 4;
+pub const SCHEMA_VERSION: i32 = 5;
 
 /// Database schema management.
 pub struct Schema;
@@ -197,6 +197,21 @@ impl Schema {
             "#,
         )?;
 
+        // Applied patches tracking - which daily files have been applied since last weekly
+        conn.execute_batch(
+            r#"
+            CREATE TABLE IF NOT EXISTS applied_patches (
+                radio_service_code TEXT NOT NULL,
+                patch_date TEXT NOT NULL,
+                patch_weekday TEXT NOT NULL,
+                applied_at TEXT NOT NULL,
+                etag TEXT,
+                record_count INTEGER,
+                PRIMARY KEY (radio_service_code, patch_date)
+            );
+            "#,
+        )?;
+
         Ok(())
     }
 
@@ -334,6 +349,70 @@ impl Schema {
             Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
             Err(e) => Err(e.into()),
         }
+    }
+
+    /// Migrate the database schema if needed.
+    ///
+    /// This handles upgrades from older schema versions to the current version.
+    pub fn migrate_if_needed(conn: &Connection) -> Result<()> {
+        let current_version = Self::get_version(conn)?;
+
+        match current_version {
+            None => {
+                // Database not initialized, nothing to migrate
+                Ok(())
+            }
+            Some(v) if v >= SCHEMA_VERSION => {
+                // Already at or above current version
+                Ok(())
+            }
+            Some(v) => {
+                // Need to migrate
+                tracing::info!(
+                    "Migrating database from schema v{} to v{}",
+                    v,
+                    SCHEMA_VERSION
+                );
+
+                // Apply migrations in order
+                if v < 5 {
+                    Self::migrate_to_v5(conn)?;
+                }
+
+                // Update schema version
+                conn.execute(
+                    "INSERT OR REPLACE INTO metadata (key, value) VALUES ('schema_version', ?1)",
+                    [&SCHEMA_VERSION.to_string()],
+                )?;
+
+                Ok(())
+            }
+        }
+    }
+
+    /// Migrate from v4 to v5: Add applied_patches table.
+    fn migrate_to_v5(conn: &Connection) -> Result<()> {
+        tracing::info!("Applying migration to v5: adding applied_patches table");
+
+        conn.execute_batch(
+            r#"
+            CREATE TABLE IF NOT EXISTS applied_patches (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                radio_service_code TEXT NOT NULL,
+                patch_date TEXT NOT NULL,
+                patch_weekday TEXT NOT NULL,
+                applied_at TEXT NOT NULL,
+                etag TEXT,
+                record_count INTEGER,
+                UNIQUE(radio_service_code, patch_date)
+            );
+            
+            CREATE INDEX IF NOT EXISTS idx_applied_patches_service 
+                ON applied_patches(radio_service_code);
+            "#,
+        )?;
+
+        Ok(())
     }
 }
 
