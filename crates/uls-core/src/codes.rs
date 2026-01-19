@@ -1555,9 +1555,48 @@ mod tests {
     }
 
     #[test]
+    fn test_radio_service_maritime() {
+        assert!(RadioService::SA.is_maritime());
+        assert!(RadioService::SB.is_maritime());
+        assert!(RadioService::SE.is_maritime());
+        assert!(RadioService::MA.is_maritime());
+        assert!(RadioService::MC.is_maritime());
+        assert!(!RadioService::HA.is_maritime());
+        assert!(!RadioService::AC.is_maritime());
+    }
+
+    #[test]
+    fn test_radio_service_aircraft() {
+        assert!(RadioService::AC.is_aircraft());
+        assert!(RadioService::AF.is_aircraft());
+        assert!(!RadioService::HA.is_aircraft());
+        assert!(!RadioService::SA.is_aircraft());
+    }
+
+    #[test]
+    fn test_radio_service_description() {
+        assert_eq!(RadioService::HA.description(), "Amateur");
+        assert_eq!(RadioService::HV.description(), "Vanity (Amateur)");
+        assert_eq!(
+            RadioService::ZA.description(),
+            "General Mobile Radio (GMRS)"
+        );
+        assert_eq!(RadioService::AC.description(), "Aircraft");
+    }
+
+    #[test]
     fn test_radio_service_invalid() {
         let result: Result<RadioService> = "XX".parse();
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_radio_service_case_insensitive() {
+        let upper: RadioService = "HA".parse().unwrap();
+        let lower: RadioService = "ha".parse().unwrap();
+        let mixed: RadioService = "Ha".parse().unwrap();
+        assert_eq!(upper, lower);
+        assert_eq!(lower, mixed);
     }
 
     #[test]
@@ -1565,20 +1604,187 @@ mod tests {
         for code in ["A", "E", "G", "N", "P", "T"] {
             let class: OperatorClass = code.parse().unwrap();
             assert_eq!(class.as_str(), code);
+            assert_eq!(class.to_string(), code);
         }
     }
 
     #[test]
-    fn test_license_status() {
+    fn test_operator_class_description() {
+        assert_eq!(OperatorClass::Extra.description(), "Amateur Extra");
+        assert_eq!(OperatorClass::Advanced.description(), "Advanced");
+        assert_eq!(OperatorClass::General.description(), "General");
+        assert_eq!(OperatorClass::Technician.description(), "Technician");
+        assert_eq!(
+            OperatorClass::TechnicianPlus.description(),
+            "Technician Plus"
+        );
+        assert_eq!(OperatorClass::Novice.description(), "Novice");
+    }
+
+    #[test]
+    fn test_operator_class_invalid() {
+        let result: Result<OperatorClass> = "X".parse();
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_operator_class_case_insensitive() {
+        let upper: OperatorClass = "E".parse().unwrap();
+        let lower: OperatorClass = "e".parse().unwrap();
+        assert_eq!(upper, lower);
+    }
+
+    #[test]
+    fn test_license_status_roundtrip() {
+        for code in ["A", "C", "E", "L", "P", "T", "X"] {
+            let status: LicenseStatus = code.parse().unwrap();
+            assert_eq!(status.as_str(), code);
+            assert_eq!(status.to_string(), code);
+        }
+    }
+
+    #[test]
+    fn test_license_status_is_active() {
         assert!(LicenseStatus::Active.is_active());
         assert!(!LicenseStatus::Expired.is_active());
         assert!(!LicenseStatus::Cancelled.is_active());
+        assert!(!LicenseStatus::Terminated.is_active());
+        assert!(!LicenseStatus::PendingLegalStatus.is_active());
+        assert!(!LicenseStatus::ParentStationCancelled.is_active());
+        assert!(!LicenseStatus::TermPending.is_active());
+    }
+
+    #[test]
+    fn test_license_status_invalid() {
+        let result: Result<LicenseStatus> = "Z".parse();
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_license_status_case_insensitive() {
+        let upper: LicenseStatus = "A".parse().unwrap();
+        let lower: LicenseStatus = "a".parse().unwrap();
+        assert_eq!(upper, lower);
+    }
+
+    #[test]
+    fn test_application_purpose_roundtrip() {
+        let codes = [
+            "AA", "AM", "AR", "AU", "CA", "CB", "DC", "DU", "EX", "HA", "LC", "LE", "LM", "LN",
+            "LT", "LU", "MD", "NE", "NT", "RE", "RL", "RM", "RO", "TC", "WD",
+        ];
+        for code in codes {
+            let purpose: ApplicationPurpose = code
+                .parse()
+                .unwrap_or_else(|_| panic!("Failed to parse ApplicationPurpose {}", code));
+            assert_eq!(purpose.as_str(), code);
+            assert_eq!(purpose.to_string(), code);
+        }
+    }
+
+    #[test]
+    fn test_application_purpose_specific_values() {
+        assert_eq!(ApplicationPurpose::AssignmentOfAuthorization.as_str(), "AA");
+        assert_eq!(ApplicationPurpose::New.as_str(), "NE");
+        assert_eq!(ApplicationPurpose::RenewalOnly.as_str(), "RO");
+        assert_eq!(ApplicationPurpose::Modification.as_str(), "MD");
+        assert_eq!(ApplicationPurpose::Withdrawal.as_str(), "WD");
+    }
+
+    #[test]
+    fn test_application_purpose_invalid() {
+        let result: Result<ApplicationPurpose> = "XX".parse();
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_application_purpose_case_insensitive() {
+        let upper: ApplicationPurpose = "NE".parse().unwrap();
+        let lower: ApplicationPurpose = "ne".parse().unwrap();
+        let mixed: ApplicationPurpose = "Ne".parse().unwrap();
+        assert_eq!(upper, lower);
+        assert_eq!(lower, mixed);
+    }
+
+    #[test]
+    fn test_application_status_roundtrip() {
+        let codes = [
+            "1", "2", "A", "C", "D", "E", "G", "H", "I", "J", "K", "M", "N", "P", "Q", "R", "S",
+            "T", "U", "W", "X", "Y",
+        ];
+        for code in codes {
+            let status: ApplicationStatus = code
+                .parse()
+                .unwrap_or_else(|_| panic!("Failed to parse ApplicationStatus {}", code));
+            assert_eq!(status.as_str(), code);
+            assert_eq!(status.to_string(), code);
+        }
+    }
+
+    #[test]
+    fn test_application_status_specific_values() {
+        assert_eq!(ApplicationStatus::Submitted.as_str(), "1");
+        assert_eq!(ApplicationStatus::Pending.as_str(), "2");
+        assert_eq!(ApplicationStatus::Granted.as_str(), "G");
+        assert_eq!(ApplicationStatus::Withdrawn.as_str(), "W");
+        assert_eq!(ApplicationStatus::Terminated.as_str(), "T");
+        assert_eq!(ApplicationStatus::HasProblems.as_str(), "Y");
+    }
+
+    #[test]
+    fn test_application_status_invalid() {
+        let result: Result<ApplicationStatus> = "Z".parse();
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_application_status_case_insensitive() {
+        let upper: ApplicationStatus = "G".parse().unwrap();
+        let lower: ApplicationStatus = "g".parse().unwrap();
+        assert_eq!(upper, lower);
+    }
+
+    #[test]
+    fn test_entity_type_roundtrip() {
+        let codes = ["CE", "CL", "CR", "CS", "E", "L", "O", "R", "S"];
+        for code in codes {
+            let entity: EntityType = code
+                .parse()
+                .unwrap_or_else(|_| panic!("Failed to parse EntityType {}", code));
+            assert_eq!(entity.as_str(), code);
+            assert_eq!(entity.to_string(), code);
+        }
+    }
+
+    #[test]
+    fn test_entity_type_specific_values() {
+        assert_eq!(EntityType::Licensee.as_str(), "L");
+        assert_eq!(EntityType::LicenseeContact.as_str(), "CL");
+        assert_eq!(EntityType::Transferee.as_str(), "E");
+        assert_eq!(EntityType::TransfereeContact.as_str(), "CE");
+        assert_eq!(EntityType::Owner.as_str(), "O");
+        assert_eq!(EntityType::Assignor.as_str(), "R");
+        assert_eq!(EntityType::Lessee.as_str(), "S");
+    }
+
+    #[test]
+    fn test_entity_type_invalid() {
+        let result: Result<EntityType> = "XX".parse();
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_entity_type_case_insensitive() {
+        let upper: EntityType = "L".parse().unwrap();
+        let lower: EntityType = "l".parse().unwrap();
+        assert_eq!(upper, lower);
     }
 
     #[test]
     fn test_record_type_dat_filename() {
         assert_eq!(RecordType::HD.dat_filename(), "HD.dat");
         assert_eq!(RecordType::AM.dat_filename(), "AM.dat");
+        assert_eq!(RecordType::EN.dat_filename(), "EN.dat");
     }
 
     #[test]
@@ -1598,6 +1804,22 @@ mod tests {
                 .parse()
                 .unwrap_or_else(|_| panic!("Failed to parse {}", code));
             assert_eq!(rt.as_str(), code);
+            assert_eq!(rt.to_string(), code);
         }
+    }
+
+    #[test]
+    fn test_record_type_invalid() {
+        let result: Result<RecordType> = "XX".parse();
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_record_type_case_insensitive() {
+        let upper: RecordType = "HD".parse().unwrap();
+        let lower: RecordType = "hd".parse().unwrap();
+        let mixed: RecordType = "Hd".parse().unwrap();
+        assert_eq!(upper, lower);
+        assert_eq!(lower, mixed);
     }
 }
