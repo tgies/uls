@@ -1,5 +1,7 @@
 /target
 /data
+.agent/
+temp_*.md
 *.db
 *.db-journal
 *.db-wal
@@ -7,3 +9,4 @@
 *.zip
 *.etag
 tarpaulin-report.html
+coverage.json
