@@ -203,14 +203,14 @@ fn test_lookup_json_output() {
     let (_temp_dir, db_path) = setup_test_db(&["l_amat"]);
     let callsign = get_first_callsign("l_amat");
 
-    // Lookup now returns array for consistency with multi-callsign support
+    // Single callsign lookup returns single object (detailed format)
     Command::cargo_bin("uls")
         .unwrap()
         .env("ULS_DB_PATH", &db_path)
         .args(["lookup", &callsign, "--format", "json"])
         .assert()
         .success()
-        .stdout(predicate::str::starts_with("["))
+        .stdout(predicate::str::starts_with("{"))
         .stdout(predicate::str::contains("call_sign"));
 }
 

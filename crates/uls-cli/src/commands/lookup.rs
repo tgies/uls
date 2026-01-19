@@ -71,7 +71,13 @@ pub async fn execute(
 
     // If not requesting cross-service lookup, output what we have
     if !all_services {
-        println!("{}", results.format(output_format));
+        // For single callsign lookup, use detailed single-license format
+        // For multiple callsigns, use collection format
+        if callsigns.len() == 1 && results.len() == 1 {
+            println!("{}", results[0].format(output_format));
+        } else {
+            println!("{}", results.format(output_format));
+        }
         return Ok(());
     }
 
@@ -116,7 +122,19 @@ pub async fn execute(
         b_requested.cmp(&a_requested) // requested ones sort first
     });
 
-    println!("{}", all_licenses.format(output_format));
+    // For single-callsign --all, use detailed format for each license
+    // For multi-callsign, use collection format
+    if callsigns.len() == 1 {
+        for (i, license) in all_licenses.iter().enumerate() {
+            if i > 0 {
+                println!("\n---\n");
+            }
+            print!("{}", license.format(output_format));
+        }
+        println!(); // Final newline
+    } else {
+        println!("{}", all_licenses.format(output_format));
+    }
 
     Ok(())
 }
