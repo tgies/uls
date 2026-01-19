@@ -318,11 +318,34 @@ async fn apply_weekly(
     let weekly_date = extract_canonical_date(&zip_path)?.unwrap_or_else(|| Utc::now().date_naive());
 
     println!("\nImporting weekly data...");
+
+    // Count total records for progress bar
+    let mut extractor = ZipExtractor::open(&zip_path)?;
+    let counts = extractor.count_all_records()?;
+    let total_records: usize = counts.values().sum();
+
+    let import_pb = ProgressBar::new(total_records as u64);
+    import_pb.set_style(
+        ProgressStyle::default_bar()
+            .template("{spinner:.green} [{bar:40.cyan/blue}] {pos}/{len} records")?
+            .progress_chars("#>-"),
+    );
+
+    let import_progress: Option<Box<dyn Fn(&uls_db::ImportProgress) + Send + Sync>> =
+        Some(Box::new(move |p| {
+            import_pb.set_position(p.records as u64);
+        }));
+
     let importer = Importer::new(db);
-    let stats = importer.import_for_service(&zip_path, service_code, import_mode.clone(), None)?;
+    let stats = importer.import_for_service(
+        &zip_path,
+        service_code,
+        import_mode.clone(),
+        import_progress,
+    )?;
 
     println!(
-        "Imported {} records in {:.1}s",
+        "\nImported {} records in {:.1}s",
         stats.records, stats.duration_secs
     );
 
