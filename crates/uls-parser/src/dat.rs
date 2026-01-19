@@ -4,29 +4,27 @@ use std::fs::File;
 use std::io::{BufRead, BufReader, Read};
 use std::path::Path;
 
+use phf::phf_set;
 use uls_core::codes::RecordType;
 use uls_core::records::*;
 
 use crate::{ParseError, Result};
 
 /// Known valid record type codes (2 uppercase letters).
-/// Used to detect continuation lines.
-const VALID_RECORD_TYPES: &[&str] = &[
+/// Uses compile-time perfect hash for O(1) lookup.
+static VALID_RECORD_TYPES: phf::Set<&'static str> = phf_set! {
     "A2", "A3", "AC", "AD", "AM", "AN", "AS", "AT", "BC", "BD", "BF", "BL", "BO", "CF", "CG", "CH",
     "CL", "CO", "CP", "CS", "CW", "EM", "EN", "F2", "FA", "FC", "FF", "FH", "FR", "FT", "HD", "HS",
     "IR", "L2", "L3", "L4", "LA", "LF", "LH", "LM", "LO", "LS", "MC", "MF", "MH", "MI", "MK", "ML",
     "MP", "MW", "O2", "OP", "PA", "PC", "PF", "PH", "PI", "PL", "RA", "RC", "RE", "RG", "RI", "RS",
     "SA", "SC", "SE", "SF", "SG", "SH", "SL", "SR", "SS", "SV", "TA", "TP", "UA", "UC", "UF", "UL",
     "UM", "VC",
-];
+};
 
-/// Check if a string looks like a valid record type prefix.
+/// Check if a string is a valid record type prefix.
+#[inline]
 fn is_valid_record_type(s: &str) -> bool {
-    // Must be exactly 2 uppercase letters
-    if s.len() != 2 {
-        return false;
-    }
-    VALID_RECORD_TYPES.contains(&s)
+    s.len() == 2 && VALID_RECORD_TYPES.contains(s)
 }
 
 /// A parsed line from a DAT file.
@@ -94,33 +92,53 @@ impl ParsedLine {
     }
 
     /// Convert to a typed ULS record.
+    /// Uses stack-allocated array to avoid heap allocation for field references.
     pub fn to_record(&self) -> Result<UlsRecord> {
-        let refs = self.field_refs();
+        // Build field references slice - reuse existing from_fields methods
+        // Use a stack-allocated array for small records, heap for large
+        const STACK_LIMIT: usize = 64;
 
+        if self.fields.len() <= STACK_LIMIT {
+            // Stack-allocated path for most records
+            let mut refs_arr: [&str; STACK_LIMIT] = [""; STACK_LIMIT];
+            for (i, s) in self.fields.iter().take(STACK_LIMIT).enumerate() {
+                refs_arr[i] = s.as_str();
+            }
+            let refs = &refs_arr[..self.fields.len()];
+            self.to_record_from_refs(refs)
+        } else {
+            // Heap fallback for unusually large records
+            let refs = self.field_refs();
+            self.to_record_from_refs(&refs)
+        }
+    }
+
+    /// Internal helper to convert to record from field references.
+    fn to_record_from_refs(&self, refs: &[&str]) -> Result<UlsRecord> {
         match self.record_type.as_str() {
-            "HD" => Ok(UlsRecord::Header(HeaderRecord::from_fields(&refs))),
-            "EN" => Ok(UlsRecord::Entity(EntityRecord::from_fields(&refs))),
-            "AM" => Ok(UlsRecord::Amateur(AmateurRecord::from_fields(&refs))),
+            "HD" => Ok(UlsRecord::Header(HeaderRecord::from_fields(refs))),
+            "EN" => Ok(UlsRecord::Entity(EntityRecord::from_fields(refs))),
+            "AM" => Ok(UlsRecord::Amateur(AmateurRecord::from_fields(refs))),
             "AD" => Ok(UlsRecord::ApplicationDetail(
-                ApplicationDetailRecord::from_fields(&refs),
+                ApplicationDetailRecord::from_fields(refs),
             )),
-            "HS" => Ok(UlsRecord::History(HistoryRecord::from_fields(&refs))),
-            "CO" => Ok(UlsRecord::Comment(CommentRecord::from_fields(&refs))),
-            "LO" => Ok(UlsRecord::Location(LocationRecord::from_fields(&refs))),
-            "FR" => Ok(UlsRecord::Frequency(FrequencyRecord::from_fields(&refs))),
-            "AN" => Ok(UlsRecord::Antenna(AntennaRecord::from_fields(&refs))),
-            "EM" => Ok(UlsRecord::Emission(EmissionRecord::from_fields(&refs))),
+            "HS" => Ok(UlsRecord::History(HistoryRecord::from_fields(refs))),
+            "CO" => Ok(UlsRecord::Comment(CommentRecord::from_fields(refs))),
+            "LO" => Ok(UlsRecord::Location(LocationRecord::from_fields(refs))),
+            "FR" => Ok(UlsRecord::Frequency(FrequencyRecord::from_fields(refs))),
+            "AN" => Ok(UlsRecord::Antenna(AntennaRecord::from_fields(refs))),
+            "EM" => Ok(UlsRecord::Emission(EmissionRecord::from_fields(refs))),
             "SC" => Ok(UlsRecord::SpecialCondition(
-                SpecialConditionRecord::from_fields(&refs),
+                SpecialConditionRecord::from_fields(refs),
             )),
             "SF" => Ok(UlsRecord::FreeformCondition(
-                FreeformConditionRecord::from_fields(&refs),
+                FreeformConditionRecord::from_fields(refs),
             )),
             "VC" => Ok(UlsRecord::VanityCallSign(
-                VanityCallSignRecord::from_fields(&refs),
+                VanityCallSignRecord::from_fields(refs),
             )),
-            "AC" => Ok(UlsRecord::Aircraft(AircraftRecord::from_fields(&refs))),
-            "SH" => Ok(UlsRecord::Ship(ShipRecord::from_fields(&refs))),
+            "AC" => Ok(UlsRecord::Aircraft(AircraftRecord::from_fields(refs))),
+            "SH" => Ok(UlsRecord::Ship(ShipRecord::from_fields(refs))),
             // For record types not yet fully implemented, return raw
             _ => {
                 if let Ok(rt) = self.record_type.parse::<RecordType>() {
