@@ -1,6 +1,5 @@
 /target
 /data
-.agent/
 temp_*.md
 *.db
 *.db-journal
