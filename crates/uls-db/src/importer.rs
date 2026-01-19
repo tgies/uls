@@ -6,10 +6,11 @@
 use std::path::Path;
 use std::time::Instant;
 
-use tracing::{info, warn};
+use tracing::{debug, info, warn};
 use uls_parser::archive::ZipExtractor;
 
 use crate::bulk_inserter::BulkInserter;
+use crate::schema::Schema;
 use crate::{Database, Result};
 
 /// Statistics from an import operation.
@@ -185,6 +186,10 @@ impl<'a> Importer<'a> {
              PRAGMA cache_size = -64000;",
         )?;
 
+        // Drop indexes for faster bulk insert (will be recreated after import)
+        debug!("Dropping indexes for bulk import performance");
+        Schema::drop_indexes(&conn)?;
+
         // Begin transaction
         conn.execute("BEGIN TRANSACTION", [])?;
 
@@ -276,6 +281,16 @@ impl<'a> Importer<'a> {
         // Commit transaction
         conn.execute("COMMIT", [])?;
 
+        // Rebuild indexes (this is much faster than maintaining them during insert)
+        let index_start = Instant::now();
+        debug!("Rebuilding indexes after bulk import");
+        Schema::create_indexes(&conn)?;
+        let index_duration = index_start.elapsed();
+        debug!(
+            "Index rebuild completed in {:.2}s",
+            index_duration.as_secs_f64()
+        );
+
         // Reset SQLite settings
         conn.execute_batch(
             "PRAGMA synchronous = NORMAL;
@@ -285,10 +300,11 @@ impl<'a> Importer<'a> {
         stats.duration_secs = start.elapsed().as_secs_f64();
 
         info!(
-            "Import complete: {} records in {:.1}s ({:.0}/sec)",
+            "Import complete: {} records in {:.1}s ({:.0}/sec), index rebuild: {:.2}s",
             stats.records,
             stats.duration_secs,
-            stats.rate()
+            stats.rate(),
+            index_duration.as_secs_f64()
         );
 
         Ok(stats)

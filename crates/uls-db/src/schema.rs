@@ -242,6 +242,49 @@ impl Schema {
         Ok(())
     }
 
+    /// Drop all non-primary indexes (for bulk import performance).
+    /// After import completes, call `create_indexes` to rebuild them.
+    pub fn drop_indexes(conn: &Connection) -> Result<()> {
+        conn.execute_batch(
+            r#"
+            -- License indexes
+            DROP INDEX IF EXISTS idx_licenses_call_sign;
+            DROP INDEX IF EXISTS idx_licenses_status;
+            DROP INDEX IF EXISTS idx_licenses_service;
+            DROP INDEX IF EXISTS idx_licenses_frn;
+            DROP INDEX IF EXISTS idx_licenses_name;
+            DROP INDEX IF EXISTS idx_licenses_grant_date;
+            DROP INDEX IF EXISTS idx_licenses_expired_date;
+            
+            -- Entity indexes
+            DROP INDEX IF EXISTS idx_entities_usi;
+            DROP INDEX IF EXISTS idx_entities_call_sign;
+            DROP INDEX IF EXISTS idx_entities_frn;
+            DROP INDEX IF EXISTS idx_entities_city_state;
+            DROP INDEX IF EXISTS idx_entities_name;
+            DROP INDEX IF EXISTS idx_entities_last_name;
+            
+            -- Amateur operator indexes
+            DROP INDEX IF EXISTS idx_amateur_usi;
+            DROP INDEX IF EXISTS idx_amateur_call_sign;
+            DROP INDEX IF EXISTS idx_amateur_class;
+            
+            -- History indexes
+            DROP INDEX IF EXISTS idx_history_usi;
+            DROP INDEX IF EXISTS idx_history_callsign;
+            
+            -- Comments indexes
+            DROP INDEX IF EXISTS idx_comments_usi;
+            DROP INDEX IF EXISTS idx_comments_callsign;
+            
+            -- Special conditions indexes
+            DROP INDEX IF EXISTS idx_special_cond_usi;
+            "#,
+        )?;
+
+        Ok(())
+    }
+
     /// Initialize a new database with schema and indexes.
     pub fn initialize(conn: &Connection) -> Result<()> {
         Self::create_tables(conn)?;
@@ -362,5 +405,50 @@ mod tests {
             "INSERT INTO entities (unique_system_identifier, entity_type, entity_name) VALUES (1, 'C', 'Contact')",
             [],
         ).unwrap();
+    }
+
+    #[test]
+    fn test_drop_and_recreate_indexes() {
+        let conn = Connection::open_in_memory().unwrap();
+        Schema::initialize(&conn).unwrap();
+
+        // Count indexes before drop
+        let count_before: i32 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM sqlite_master WHERE type='index' AND name LIKE 'idx_%'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert!(count_before > 0, "Should have indexes after initialize");
+
+        // Drop indexes
+        Schema::drop_indexes(&conn).unwrap();
+
+        // Count indexes after drop
+        let count_after_drop: i32 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM sqlite_master WHERE type='index' AND name LIKE 'idx_%'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(count_after_drop, 0, "All indexes should be dropped");
+
+        // Recreate indexes
+        Schema::create_indexes(&conn).unwrap();
+
+        // Count indexes after recreate
+        let count_after_recreate: i32 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM sqlite_master WHERE type='index' AND name LIKE 'idx_%'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(
+            count_before, count_after_recreate,
+            "All indexes should be recreated"
+        );
     }
 }
