@@ -42,7 +42,13 @@ pub async fn execute_with_options(
         ImportMode::Full
     };
 
-    println!("Updating {} database...", service);
+    let service_name = match service_code {
+        "HA" => "amateur",
+        "ZA" => "gmrs",
+        _ => service_code,
+    };
+
+    println!("Updating {} database...", service_name);
     println!("Database: {}", db_path.display());
 
     let config = DatabaseConfig::with_path(&db_path);
