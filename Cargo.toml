@@ -71,6 +71,10 @@ wiremock = "0.6"
 proptest = "1.5"
 rstest = "0.23"
 
+# Benchmarking
+criterion = { version = "0.5", features = ["html_reports"] }
+gungraun = "0.17"
+
 # Workspace crates
 uls-core = { path = "crates/uls-core" }
 uls-parser = { path = "crates/uls-parser" }
@@ -88,3 +92,6 @@ strip = true
 # Faster compilation for development
 opt-level = 0
 debug = true
+
+[profile.bench]
+debug = true  # Required for flamegraph symbols

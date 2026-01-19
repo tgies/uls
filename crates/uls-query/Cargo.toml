@@ -21,3 +21,8 @@ rusqlite.workspace = true
 [dev-dependencies]
 tempfile.workspace = true
 rstest.workspace = true
+criterion.workspace = true
+
+[[bench]]
+name = "query_bench"
+harness = false

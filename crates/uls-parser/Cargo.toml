@@ -19,3 +19,13 @@ zip.workspace = true
 tempfile.workspace = true
 proptest.workspace = true
 rstest.workspace = true
+criterion.workspace = true
+gungraun.workspace = true
+
+[[bench]]
+name = "parser_bench"
+harness = false
+
+[[bench]]
+name = "parser_gungraun"
+harness = false

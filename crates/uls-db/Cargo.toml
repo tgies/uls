@@ -25,3 +25,8 @@ dirs = "5.0"
 tempfile.workspace = true
 rstest.workspace = true
 zip.workspace = true
+criterion.workspace = true
+
+[[bench]]
+name = "db_bench"
+harness = false
