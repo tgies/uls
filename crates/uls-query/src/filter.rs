@@ -1,6 +1,7 @@
 //! Search filters for license queries.
 
 use serde::{Deserialize, Serialize};
+use uls_core::codes::{LicenseStatus, OperatorClass, RadioService};
 
 /// Result of analyzing a search pattern for wildcards.
 #[derive(Debug, Clone, PartialEq)]
@@ -246,16 +247,23 @@ impl SearchFilter {
             params.extend(p);
         }
 
+        // Convert status char to integer code for comparison
         if let Some(status) = self.status {
-            conditions.push("l.license_status = ?".to_string());
-            params.push(status.to_string());
+            if let Ok(status_enum) = status.to_string().parse::<LicenseStatus>() {
+                conditions.push("l.license_status = ?".to_string());
+                params.push(status_enum.to_u8().to_string());
+            }
         } else if self.active_only {
-            conditions.push("l.license_status = 'A'".to_string());
+            let active_code = LicenseStatus::Active.to_u8();
+            conditions.push(format!("l.license_status = {}", active_code));
         }
 
+        // Convert operator_class char to integer code for comparison
         if let Some(class) = self.operator_class {
-            conditions.push("a.operator_class = ?".to_string());
-            params.push(class.to_string());
+            if let Ok(class_enum) = class.to_string().parse::<OperatorClass>() {
+                conditions.push("a.operator_class = ?".to_string());
+                params.push(class_enum.to_u8().to_string());
+            }
         }
 
         if let Some(ref frn) = self.frn {
@@ -263,14 +271,23 @@ impl SearchFilter {
             params.push(frn.clone());
         }
 
+        // Convert radio_service strings to integer codes for comparison
         if let Some(ref services) = self.radio_service {
-            if !services.is_empty() {
-                let placeholders: Vec<String> = services.iter().map(|_| "?".to_string()).collect();
+            let codes: Vec<String> = services
+                .iter()
+                .filter_map(|s| {
+                    s.parse::<RadioService>()
+                        .ok()
+                        .map(|r| r.to_u8().to_string())
+                })
+                .collect();
+            if !codes.is_empty() {
+                let placeholders: Vec<String> = codes.iter().map(|_| "?".to_string()).collect();
                 conditions.push(format!(
                     "l.radio_service_code IN ({})",
                     placeholders.join(", ")
                 ));
-                params.extend(services.iter().cloned());
+                params.extend(codes);
             }
         }
 
@@ -415,7 +432,8 @@ mod tests {
         assert!(clause.contains("operator_class"));
         assert!(clause.contains("license_status"));
         assert!(params.contains(&"CT".to_string()));
-        assert!(params.contains(&"E".to_string()));
+        // operator_class 'E' = OperatorClass::Extra = code 3
+        assert!(params.contains(&OperatorClass::Extra.to_u8().to_string()));
     }
 
     #[test]
@@ -472,8 +490,9 @@ mod tests {
         filter.radio_service = Some(vec!["HA".to_string(), "HV".to_string()]);
         let (clause, params) = filter.to_where_clause();
         assert!(clause.contains("radio_service_code IN"));
-        assert!(params.contains(&"HA".to_string()));
-        assert!(params.contains(&"HV".to_string()));
+        // HA = RadioService::HA, HV = RadioService::HV - check for integer codes
+        assert!(params.contains(&RadioService::HA.to_u8().to_string()));
+        assert!(params.contains(&RadioService::HV.to_u8().to_string()));
     }
 
     #[test]

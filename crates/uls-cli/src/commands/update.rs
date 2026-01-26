@@ -14,6 +14,9 @@ use uls_parser::archive::ZipExtractor;
 
 use crate::config::{default_cache_path, default_db_path};
 
+/// Type alias for import progress callback to reduce type complexity.
+type ImportProgressCallback = Option<Box<dyn Fn(&uls_db::ImportProgress) + Send + Sync>>;
+
 #[allow(dead_code)]
 pub async fn execute(service: &str, force: bool, minimal: bool) -> Result<()> {
     execute_with_options(service, force, minimal, false, false).await
@@ -118,18 +121,9 @@ async fn run_update(
         .collect();
 
     // If no weekly in DB yet, we must import one
-    if db_weekly_date.is_none() || force {
-        if !daily_only {
-            return apply_weekly_then_dailies(
-                db,
-                client,
-                service_code,
-                import_mode,
-                today,
-                check_only,
-            )
+    if (db_weekly_date.is_none() || force) && !daily_only {
+        return apply_weekly_then_dailies(db, client, service_code, import_mode, today, check_only)
             .await;
-        }
     }
 
     let weekly_date = db_weekly_date.unwrap_or(today);
@@ -337,10 +331,9 @@ async fn apply_weekly(
             .progress_chars("#>-"),
     );
 
-    let import_progress: Option<Box<dyn Fn(&uls_db::ImportProgress) + Send + Sync>> =
-        Some(Box::new(move |p| {
-            import_pb.set_position(p.records as u64);
-        }));
+    let import_progress: ImportProgressCallback = Some(Box::new(move |p| {
+        import_pb.set_position(p.records as u64);
+    }));
 
     let importer = Importer::new(db);
     let stats = importer.import_for_service(

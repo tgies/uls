@@ -5,6 +5,7 @@ use std::path::Path;
 use rusqlite::params_from_iter;
 use tracing::debug;
 
+use uls_db::enum_adapters::{read_license_status, read_operator_class, read_radio_service};
 use uls_db::{Database, DatabaseConfig};
 
 use crate::filter::SearchFilter;
@@ -92,6 +93,11 @@ impl QueryEngine {
 
         let mut stmt = conn.prepare(&query)?;
         let iter = stmt.query_map(params_from_iter(params), |row| {
+            // Use centralized enum adapter helpers from uls-db
+            let status = read_license_status(row, 6)?;
+            let radio_service = read_radio_service(row, 7)?;
+            let operator_class = read_operator_class(row, 17)?;
+
             Ok(License {
                 unique_system_identifier: row.get(0)?,
                 call_sign: row.get::<_, Option<String>>(1)?.unwrap_or_default(),
@@ -99,11 +105,8 @@ impl QueryEngine {
                 first_name: row.get(3)?,
                 middle_initial: row.get(4)?,
                 last_name: row.get(5)?,
-                status: row
-                    .get::<_, Option<String>>(6)?
-                    .and_then(|s| s.chars().next())
-                    .unwrap_or('?'),
-                radio_service: row.get::<_, Option<String>>(7)?.unwrap_or_default(),
+                status,
+                radio_service,
                 grant_date: row
                     .get::<_, Option<String>>(8)?
                     .and_then(|s| chrono::NaiveDate::parse_from_str(&s, "%Y-%m-%d").ok()),
@@ -119,9 +122,7 @@ impl QueryEngine {
                 city: row.get(14)?,
                 state: row.get(15)?,
                 zip_code: row.get(16)?,
-                operator_class: row
-                    .get::<_, Option<String>>(17)?
-                    .and_then(|s| s.chars().next()),
+                operator_class,
             })
         })?;
 

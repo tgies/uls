@@ -9,12 +9,14 @@ use r2d2_sqlite::SqliteConnectionManager;
 use rusqlite::{params, Connection};
 use tracing::{debug, info};
 
+use uls_core::codes::{EntityType, LicenseStatus, OperatorClass, RadioService};
 use uls_core::records::{
     AmateurRecord, CommentRecord, EntityRecord, HeaderRecord, HistoryRecord,
     SpecialConditionRecord, UlsRecord,
 };
 
 use crate::config::DatabaseConfig;
+use crate::enum_adapters::{read_license_status, read_operator_class, read_radio_service};
 use crate::error::Result;
 use crate::models::{License, LicenseStats};
 use crate::schema::Schema;
@@ -146,6 +148,19 @@ impl Database {
 
     /// Insert a header record.
     fn insert_header(conn: &Connection, hd: &HeaderRecord) -> Result<()> {
+        // Convert license_status char to integer code
+        let license_status_code: Option<u8> = hd.license_status.and_then(|c| {
+            c.to_string()
+                .parse::<LicenseStatus>()
+                .ok()
+                .map(|s| s.to_u8())
+        });
+        // Convert radio_service_code string to integer code
+        let radio_service_code: Option<u8> = hd
+            .radio_service_code
+            .as_ref()
+            .and_then(|s| s.parse::<RadioService>().ok().map(|r| r.to_u8()));
+
         let mut stmt = conn.prepare_cached(
             r#"INSERT OR REPLACE INTO licenses (
                 unique_system_identifier, uls_file_number, ebf_number, call_sign,
@@ -158,8 +173,8 @@ impl Database {
             hd.uls_file_number,
             hd.ebf_number,
             hd.call_sign,
-            hd.license_status.map(|c| c.to_string()),
-            hd.radio_service_code,
+            license_status_code,
+            radio_service_code,
             hd.grant_date.map(|d| d.to_string()),
             hd.expired_date.map(|d| d.to_string()),
             hd.cancellation_date.map(|d| d.to_string()),
@@ -171,6 +186,12 @@ impl Database {
 
     /// Insert an entity record.
     fn insert_entity(conn: &Connection, en: &EntityRecord) -> Result<()> {
+        // Convert entity_type string to integer code
+        let entity_type_code: Option<u8> = en
+            .entity_type
+            .as_ref()
+            .and_then(|s| s.parse::<EntityType>().ok().map(|e| e.to_u8()));
+
         let mut stmt = conn.prepare_cached(
             r#"INSERT OR REPLACE INTO entities (
                 unique_system_identifier, uls_file_number, ebf_number, call_sign,
@@ -185,7 +206,7 @@ impl Database {
             en.uls_file_number,
             en.ebf_number,
             en.call_sign,
-            en.entity_type,
+            entity_type_code,
             en.licensee_id,
             en.entity_name,
             en.first_name,
@@ -212,6 +233,20 @@ impl Database {
 
     /// Insert an amateur record.
     fn insert_amateur(conn: &Connection, am: &AmateurRecord) -> Result<()> {
+        // Convert operator_class char to integer code
+        let operator_class_code: Option<u8> = am.operator_class.and_then(|c| {
+            c.to_string()
+                .parse::<OperatorClass>()
+                .ok()
+                .map(|o| o.to_u8())
+        });
+        let prev_operator_class_code: Option<u8> = am.previous_operator_class.and_then(|c| {
+            c.to_string()
+                .parse::<OperatorClass>()
+                .ok()
+                .map(|o| o.to_u8())
+        });
+
         let mut stmt = conn.prepare_cached(
             r#"INSERT OR REPLACE INTO amateur_operators (
                 unique_system_identifier, uls_file_number, ebf_number, call_sign,
@@ -227,7 +262,7 @@ impl Database {
             am.uls_file_num,
             am.ebf_number,
             am.callsign,
-            am.operator_class.map(|c| c.to_string()),
+            operator_class_code,
             am.group_code.map(|c| c.to_string()),
             am.region_code,
             am.trustee_callsign,
@@ -238,7 +273,7 @@ impl Database {
             am.vanity_callsign_change.map(|c| c.to_string()),
             am.vanity_relationship,
             am.previous_callsign,
-            am.previous_operator_class.map(|c| c.to_string()),
+            prev_operator_class_code,
             am.trustee_name,
         ])?;
         Ok(())
@@ -325,6 +360,11 @@ impl Database {
             "#,
             [&callsign],
             |row| {
+                // Use centralized enum adapter helpers
+                let status = read_license_status(row, 6)?;
+                let radio_service = read_radio_service(row, 7)?;
+                let operator_class = read_operator_class(row, 17)?;
+
                 Ok(License {
                     unique_system_identifier: row.get(0)?,
                     call_sign: row.get::<_, Option<String>>(1)?.unwrap_or_default(),
@@ -332,11 +372,8 @@ impl Database {
                     first_name: row.get(3)?,
                     middle_initial: row.get(4)?,
                     last_name: row.get(5)?,
-                    status: row
-                        .get::<_, Option<String>>(6)?
-                        .and_then(|s| s.chars().next())
-                        .unwrap_or('?'),
-                    radio_service: row.get::<_, Option<String>>(7)?.unwrap_or_default(),
+                    status,
+                    radio_service,
                     grant_date: row
                         .get::<_, Option<String>>(8)?
                         .and_then(|s| chrono::NaiveDate::parse_from_str(&s, "%Y-%m-%d").ok()),
@@ -352,9 +389,7 @@ impl Database {
                     city: row.get(14)?,
                     state: row.get(15)?,
                     zip_code: row.get(16)?,
-                    operator_class: row
-                        .get::<_, Option<String>>(17)?
-                        .and_then(|s| s.chars().next()),
+                    operator_class,
                 })
             },
         );
@@ -392,6 +427,11 @@ impl Database {
         )?;
 
         let licenses = stmt.query_map([frn], |row| {
+            // Use centralized enum adapter helpers
+            let status = read_license_status(row, 6)?;
+            let radio_service = read_radio_service(row, 7)?;
+            let operator_class = read_operator_class(row, 17)?;
+
             Ok(License {
                 unique_system_identifier: row.get(0)?,
                 call_sign: row.get::<_, Option<String>>(1)?.unwrap_or_default(),
@@ -399,11 +439,8 @@ impl Database {
                 first_name: row.get(3)?,
                 middle_initial: row.get(4)?,
                 last_name: row.get(5)?,
-                status: row
-                    .get::<_, Option<String>>(6)?
-                    .and_then(|s| s.chars().next())
-                    .unwrap_or('?'),
-                radio_service: row.get::<_, Option<String>>(7)?.unwrap_or_default(),
+                status,
+                radio_service,
                 grant_date: row
                     .get::<_, Option<String>>(8)?
                     .and_then(|s| chrono::NaiveDate::parse_from_str(&s, "%Y-%m-%d").ok()),
@@ -419,9 +456,7 @@ impl Database {
                 city: row.get(14)?,
                 state: row.get(15)?,
                 zip_code: row.get(16)?,
-                operator_class: row
-                    .get::<_, Option<String>>(17)?
-                    .and_then(|s| s.chars().next()),
+                operator_class,
             })
         })?;
 
@@ -439,21 +474,26 @@ impl Database {
         let total_licenses: u64 =
             conn.query_row("SELECT COUNT(*) FROM licenses", [], |row| row.get(0))?;
 
+        // Use integer codes for status comparisons
+        let active_code = LicenseStatus::Active.to_u8();
+        let expired_code = LicenseStatus::Expired.to_u8();
+        let cancelled_code = LicenseStatus::Cancelled.to_u8();
+
         let active_licenses: u64 = conn.query_row(
-            "SELECT COUNT(*) FROM licenses WHERE license_status = 'A'",
-            [],
+            "SELECT COUNT(*) FROM licenses WHERE license_status = ?1",
+            [active_code],
             |row| row.get(0),
         )?;
 
         let expired_licenses: u64 = conn.query_row(
-            "SELECT COUNT(*) FROM licenses WHERE license_status = 'E'",
-            [],
+            "SELECT COUNT(*) FROM licenses WHERE license_status = ?1",
+            [expired_code],
             |row| row.get(0),
         )?;
 
         let cancelled_licenses: u64 = conn.query_row(
-            "SELECT COUNT(*) FROM licenses WHERE license_status = 'C'",
-            [],
+            "SELECT COUNT(*) FROM licenses WHERE license_status = ?1",
+            [cancelled_code],
             |row| row.get(0),
         )?;
 
@@ -479,22 +519,27 @@ impl Database {
             return Ok(0);
         }
 
-        let conn = self.conn()?;
-        let placeholders: String = service_codes
+        // Convert string service codes to integer codes
+        let int_codes: Vec<u8> = service_codes
             .iter()
-            .map(|_| "?")
-            .collect::<Vec<_>>()
-            .join(",");
+            .filter_map(|s| s.parse::<RadioService>().ok().map(|r| r.to_u8()))
+            .collect();
+
+        if int_codes.is_empty() {
+            return Ok(0);
+        }
+
+        let conn = self.conn()?;
+        let placeholders: String = int_codes.iter().map(|_| "?").collect::<Vec<_>>().join(",");
         let sql = format!(
             "SELECT COUNT(*) FROM licenses WHERE radio_service_code IN ({})",
             placeholders
         );
 
         let mut stmt = conn.prepare(&sql)?;
-        let count: u64 = stmt
-            .query_row(rusqlite::params_from_iter(service_codes.iter()), |row| {
-                row.get(0)
-            })?;
+        let count: u64 = stmt.query_row(rusqlite::params_from_iter(int_codes.iter()), |row| {
+            row.get(0)
+        })?;
 
         Ok(count)
     }

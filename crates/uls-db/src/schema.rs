@@ -7,7 +7,7 @@ use rusqlite::Connection;
 use crate::error::Result;
 
 /// Current schema version.
-pub const SCHEMA_VERSION: i32 = 5;
+pub const SCHEMA_VERSION: i32 = 6;
 
 /// Database schema management.
 pub struct Schema;
@@ -15,13 +15,18 @@ pub struct Schema;
 impl Schema {
     /// Create all tables in the database.
     pub fn create_tables(conn: &Connection) -> Result<()> {
+        // Set optimal page size for text-heavy data (must be before first table creation)
+        // Smaller pages = less wasted space when storing many short strings
+        conn.execute_batch("PRAGMA page_size = 1024;")?;
+
         // Metadata table for tracking schema version and update times
+        // WITHOUT ROWID: Small table with TEXT PRIMARY KEY
         conn.execute_batch(
             r#"
             CREATE TABLE IF NOT EXISTS metadata (
                 key TEXT PRIMARY KEY,
                 value TEXT NOT NULL
-            );
+            ) WITHOUT ROWID;
             "#,
         )?;
 
@@ -32,7 +37,8 @@ impl Schema {
         )?;
 
         // Header record (HD) - main license table
-        // Primary key: unique_system_identifier
+        // WITHOUT ROWID: Largest table, integer PK, saves ~8 bytes per row
+        // license_status and radio_service_code stored as INTEGER for compactness
         conn.execute_batch(
             r#"
             CREATE TABLE IF NOT EXISTS licenses (
@@ -40,8 +46,8 @@ impl Schema {
                 uls_file_number TEXT,
                 ebf_number TEXT,
                 call_sign TEXT COLLATE NOCASE,
-                license_status TEXT COLLATE NOCASE,
-                radio_service_code TEXT COLLATE NOCASE,
+                license_status INTEGER,
+                radio_service_code INTEGER,
                 grant_date TEXT,
                 expired_date TEXT,
                 cancellation_date TEXT,
@@ -58,13 +64,14 @@ impl Schema {
                 previous_call_sign TEXT COLLATE NOCASE,
                 trustee_call_sign TEXT COLLATE NOCASE,
                 trustee_name TEXT COLLATE NOCASE
-            );
+            ) WITHOUT ROWID;
             "#,
         )?;
 
         // Entity record (EN)
         // Composite unique key: (unique_system_identifier, entity_type)
         // A license can have multiple entities (Licensee, Contact, etc.)
+        // entity_type stored as INTEGER for compactness
         conn.execute_batch(
             r#"
             CREATE TABLE IF NOT EXISTS entities (
@@ -73,7 +80,7 @@ impl Schema {
                 uls_file_number TEXT,
                 ebf_number TEXT,
                 call_sign TEXT COLLATE NOCASE,
-                entity_type TEXT COLLATE NOCASE,
+                entity_type INTEGER,
                 licensee_id TEXT,
                 entity_name TEXT COLLATE NOCASE,
                 first_name TEXT COLLATE NOCASE,
@@ -102,6 +109,7 @@ impl Schema {
 
         // Amateur record (AM)
         // Unique key: unique_system_identifier (one per license)
+        // operator_class and previous_operator_class stored as INTEGER
         conn.execute_batch(
             r#"
             CREATE TABLE IF NOT EXISTS amateur_operators (
@@ -110,7 +118,7 @@ impl Schema {
                 uls_file_number TEXT,
                 ebf_number TEXT,
                 call_sign TEXT COLLATE NOCASE,
-                operator_class TEXT COLLATE NOCASE,
+                operator_class INTEGER,
                 group_code TEXT,
                 region_code INTEGER,
                 trustee_call_sign TEXT COLLATE NOCASE,
@@ -121,7 +129,7 @@ impl Schema {
                 vanity_call_sign_change TEXT,
                 vanity_relationship TEXT,
                 previous_call_sign TEXT COLLATE NOCASE,
-                previous_operator_class TEXT COLLATE NOCASE,
+                previous_operator_class INTEGER,
                 trustee_name TEXT COLLATE NOCASE,
                 FOREIGN KEY (unique_system_identifier) REFERENCES licenses(unique_system_identifier)
             );
@@ -185,6 +193,7 @@ impl Schema {
         )?;
 
         // Import status tracking - which record types have been imported per service
+        // WITHOUT ROWID: Small table with composite TEXT PRIMARY KEY
         conn.execute_batch(
             r#"
             CREATE TABLE IF NOT EXISTS import_status (
@@ -193,7 +202,7 @@ impl Schema {
                 imported_at TEXT,
                 record_count INTEGER,
                 PRIMARY KEY (radio_service_code, record_type)
-            );
+            ) WITHOUT ROWID;
             "#,
         )?;
 

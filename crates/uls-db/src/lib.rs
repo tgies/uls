@@ -23,6 +23,7 @@
 
 pub mod bulk_inserter;
 pub mod config;
+pub mod enum_adapters;
 pub mod error;
 pub mod freshness;
 pub mod importer;

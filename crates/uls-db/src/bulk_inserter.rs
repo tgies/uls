@@ -2,6 +2,7 @@
 
 use rusqlite::{params, Connection, Statement};
 
+use uls_core::codes::{EntityType, LicenseStatus, OperatorClass, RadioService};
 use uls_core::records::{
     AmateurRecord, CommentRecord, EntityRecord, HeaderRecord, HistoryRecord,
     SpecialConditionRecord, UlsRecord,
@@ -87,13 +88,26 @@ impl<'conn> BulkInserter<'conn> {
     }
 
     fn insert_header(&mut self, hd: &HeaderRecord) -> Result<()> {
+        // Convert license_status char to integer code
+        let license_status_code: Option<u8> = hd.license_status.and_then(|c| {
+            c.to_string()
+                .parse::<LicenseStatus>()
+                .ok()
+                .map(|s| s.to_u8())
+        });
+        // Convert radio_service_code string to integer code
+        let radio_service_code: Option<u8> = hd
+            .radio_service_code
+            .as_ref()
+            .and_then(|s| s.parse::<RadioService>().ok().map(|r| r.to_u8()));
+
         self.stmt_header.execute(params![
             hd.unique_system_identifier,
             hd.uls_file_number,
             hd.ebf_number,
             hd.call_sign,
-            hd.license_status.map(|c| c.to_string()),
-            hd.radio_service_code,
+            license_status_code,
+            radio_service_code,
             hd.grant_date.map(|d| d.to_string()),
             hd.expired_date.map(|d| d.to_string()),
             hd.cancellation_date.map(|d| d.to_string()),
@@ -104,12 +118,18 @@ impl<'conn> BulkInserter<'conn> {
     }
 
     fn insert_entity(&mut self, en: &EntityRecord) -> Result<()> {
+        // Convert entity_type string to integer code
+        let entity_type_code: Option<u8> = en
+            .entity_type
+            .as_ref()
+            .and_then(|s| s.parse::<EntityType>().ok().map(|e| e.to_u8()));
+
         self.stmt_entity.execute(params![
             en.unique_system_identifier,
             en.uls_file_number,
             en.ebf_number,
             en.call_sign,
-            en.entity_type,
+            entity_type_code,
             en.licensee_id,
             en.entity_name,
             en.first_name,
@@ -135,12 +155,26 @@ impl<'conn> BulkInserter<'conn> {
     }
 
     fn insert_amateur(&mut self, am: &AmateurRecord) -> Result<()> {
+        // Convert operator_class char to integer code
+        let operator_class_code: Option<u8> = am.operator_class.and_then(|c| {
+            c.to_string()
+                .parse::<OperatorClass>()
+                .ok()
+                .map(|o| o.to_u8())
+        });
+        let prev_operator_class_code: Option<u8> = am.previous_operator_class.and_then(|c| {
+            c.to_string()
+                .parse::<OperatorClass>()
+                .ok()
+                .map(|o| o.to_u8())
+        });
+
         self.stmt_amateur.execute(params![
             am.unique_system_identifier,
             am.uls_file_num,
             am.ebf_number,
             am.callsign,
-            am.operator_class.map(|c| c.to_string()),
+            operator_class_code,
             am.group_code.map(|c| c.to_string()),
             am.region_code,
             am.trustee_callsign,
@@ -151,7 +185,7 @@ impl<'conn> BulkInserter<'conn> {
             am.vanity_callsign_change.map(|c| c.to_string()),
             am.vanity_relationship,
             am.previous_callsign,
-            am.previous_operator_class.map(|c| c.to_string()),
+            prev_operator_class_code,
             am.trustee_name,
         ])?;
         Ok(())
