@@ -2,9 +2,10 @@
 //!
 //! Provides high-level methods for inserting, updating, and querying ULS data.
 
+use std::fmt;
 use std::path::Path;
 
-use r2d2::{Pool, PooledConnection};
+use r2d2::{CustomizeConnection, Pool, PooledConnection};
 use r2d2_sqlite::SqliteConnectionManager;
 use rusqlite::{params, Connection};
 use tracing::{debug, info};
@@ -20,6 +21,48 @@ use crate::enum_adapters::{read_license_status, read_operator_class, read_radio_
 use crate::error::Result;
 use crate::models::{License, LicenseStats};
 use crate::schema::Schema;
+
+/// Connection customizer that applies PRAGMA settings to each new connection.
+///
+/// This ensures every connection from the pool has consistent settings,
+/// not just the first connection checked out.
+#[derive(Clone)]
+struct SqliteConnectionCustomizer {
+    cache_size: i32,
+    foreign_keys: bool,
+}
+
+impl fmt::Debug for SqliteConnectionCustomizer {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("SqliteConnectionCustomizer")
+            .field("cache_size", &self.cache_size)
+            .field("foreign_keys", &self.foreign_keys)
+            .finish()
+    }
+}
+
+impl CustomizeConnection<Connection, rusqlite::Error> for SqliteConnectionCustomizer {
+    fn on_acquire(&self, conn: &mut Connection) -> std::result::Result<(), rusqlite::Error> {
+        // Set cache size
+        conn.execute_batch(&format!("PRAGMA cache_size = {};", self.cache_size))?;
+
+        // Enable foreign keys if configured
+        if self.foreign_keys {
+            conn.execute_batch("PRAGMA foreign_keys = ON;")?;
+        }
+
+        // Other per-connection optimizations
+        conn.execute_batch(
+            r#"
+            PRAGMA synchronous = NORMAL;
+            PRAGMA temp_store = MEMORY;
+            PRAGMA mmap_size = 268435456;
+            "#,
+        )?;
+
+        Ok(())
+    }
+}
 
 /// Database connection pool and operations.
 pub struct Database {
@@ -44,13 +87,26 @@ impl Database {
         }
 
         let manager = SqliteConnectionManager::file(&config.path);
+
+        // Create customizer to apply PRAGMAs on every pooled connection
+        let customizer = SqliteConnectionCustomizer {
+            cache_size: config.cache_size,
+            foreign_keys: config.foreign_keys,
+        };
+
         let pool = Pool::builder()
             .max_size(config.max_connections)
             .connection_timeout(config.connection_timeout)
+            .connection_customizer(Box::new(customizer))
             .build(manager)?;
 
         let db = Self { pool, config };
-        db.configure_connection()?;
+
+        // Set WAL mode once (it's a database-wide setting, not per-connection)
+        if db.config.enable_wal {
+            let conn = db.conn()?;
+            conn.execute_batch("PRAGMA journal_mode = WAL;")?;
+        }
 
         Ok(db)
     }
@@ -58,35 +114,6 @@ impl Database {
     /// Get a connection from the pool.
     pub fn conn(&self) -> Result<PooledConnection<SqliteConnectionManager>> {
         Ok(self.pool.get()?)
-    }
-
-    /// Configure SQLite connection settings.
-    fn configure_connection(&self) -> Result<()> {
-        let conn = self.conn()?;
-
-        // Enable WAL mode for better concurrency
-        if self.config.enable_wal {
-            conn.execute_batch("PRAGMA journal_mode = WAL;")?;
-        }
-
-        // Set cache size
-        conn.execute_batch(&format!("PRAGMA cache_size = {};", self.config.cache_size))?;
-
-        // Enable foreign keys
-        if self.config.foreign_keys {
-            conn.execute_batch("PRAGMA foreign_keys = ON;")?;
-        }
-
-        // Other optimizations
-        conn.execute_batch(
-            r#"
-            PRAGMA synchronous = NORMAL;
-            PRAGMA temp_store = MEMORY;
-            PRAGMA mmap_size = 268435456;
-            "#,
-        )?;
-
-        Ok(())
     }
 
     /// Initialize the database schema.
@@ -1217,5 +1244,48 @@ mod tests {
         // get_imported_types should return empty
         let types = db.get_imported_types("HA").unwrap();
         assert!(types.is_empty());
+    }
+
+    #[test]
+    fn test_pool_pragma_settings_on_all_connections() {
+        // Use a path-based database with multiple connections to test pool behavior
+        let temp_dir = tempfile::tempdir().unwrap();
+        let db_path = temp_dir.path().join("test_pool.db");
+
+        let config = crate::config::DatabaseConfig {
+            path: db_path.clone(),
+            max_connections: 3,
+            foreign_keys: true,
+            enable_wal: true,
+            ..Default::default()
+        };
+
+        let db = Database::with_config(config).unwrap();
+        db.initialize().unwrap();
+
+        // Get multiple connections and verify each has foreign_keys enabled
+        let mut connections = Vec::new();
+        for i in 0..3 {
+            let conn = db.conn().unwrap();
+            let fk_enabled: i32 = conn
+                .query_row("PRAGMA foreign_keys", [], |row| row.get(0))
+                .unwrap();
+            assert_eq!(fk_enabled, 1, "Connection {i} should have foreign_keys ON");
+            connections.push(conn);
+        }
+
+        // Return connections and get new ones to verify they still work
+        drop(connections);
+
+        for i in 0..2 {
+            let conn = db.conn().unwrap();
+            let fk_enabled: i32 = conn
+                .query_row("PRAGMA foreign_keys", [], |row| row.get(0))
+                .unwrap();
+            assert_eq!(
+                fk_enabled, 1,
+                "Re-acquired connection {i} should have foreign_keys ON"
+            );
+        }
     }
 }
