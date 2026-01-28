@@ -6,12 +6,73 @@
 use std::path::Path;
 use std::time::Instant;
 
+use rusqlite::Connection;
 use tracing::{debug, info, warn};
 use uls_parser::archive::ZipExtractor;
 
 use crate::bulk_inserter::BulkInserter;
 use crate::schema::Schema;
 use crate::{Database, Result};
+
+/// RAII guard that restores database state (indexes and PRAGMAs) on drop.
+///
+/// This ensures cleanup happens even if an error causes early return from import.
+struct ImportGuard<'a> {
+    conn: &'a Connection,
+    indexes_dropped: bool,
+    pragmas_modified: bool,
+}
+
+impl<'a> ImportGuard<'a> {
+    fn new(conn: &'a Connection) -> Self {
+        Self {
+            conn,
+            indexes_dropped: false,
+            pragmas_modified: false,
+        }
+    }
+
+    /// Mark that indexes have been dropped and need restoration on cleanup.
+    fn mark_indexes_dropped(&mut self) {
+        self.indexes_dropped = true;
+    }
+
+    /// Mark that PRAGMAs have been modified and need restoration on cleanup.
+    fn mark_pragmas_modified(&mut self) {
+        self.pragmas_modified = true;
+    }
+
+    /// Mark that indexes have been restored successfully.
+    fn mark_indexes_restored(&mut self) {
+        self.indexes_dropped = false;
+    }
+
+    /// Mark that PRAGMAs have been restored successfully.
+    fn mark_pragmas_restored(&mut self) {
+        self.pragmas_modified = false;
+    }
+}
+
+impl Drop for ImportGuard<'_> {
+    fn drop(&mut self) {
+        // Restore indexes if they were dropped and not yet restored
+        if self.indexes_dropped {
+            if let Err(e) = Schema::create_indexes(self.conn) {
+                warn!("Failed to restore indexes during cleanup: {}", e);
+            }
+        }
+
+        // Restore PRAGMAs if they were modified and not yet restored
+        if self.pragmas_modified {
+            if let Err(e) = self.conn.execute_batch(
+                "PRAGMA synchronous = NORMAL;
+                 PRAGMA journal_mode = WAL;",
+            ) {
+                warn!("Failed to restore PRAGMAs during cleanup: {}", e);
+            }
+        }
+    }
+}
 
 /// Statistics from an import operation.
 #[derive(Debug, Clone, Default)]
@@ -179,16 +240,22 @@ impl<'a> Importer<'a> {
 
         // Optimize SQLite for bulk import
         let conn = self.db.conn()?;
+
+        // Create guard to ensure cleanup even on early error return
+        let mut guard = ImportGuard::new(&conn);
+
         conn.execute_batch(
             "PRAGMA synchronous = OFF;
              PRAGMA journal_mode = MEMORY;
              PRAGMA temp_store = MEMORY;
              PRAGMA cache_size = -64000;",
         )?;
+        guard.mark_pragmas_modified();
 
         // Drop indexes for faster bulk insert (will be recreated after import)
         debug!("Dropping indexes for bulk import performance");
         Schema::drop_indexes(&conn)?;
+        guard.mark_indexes_dropped();
 
         // Begin transaction
         conn.execute("BEGIN TRANSACTION", [])?;
@@ -285,6 +352,7 @@ impl<'a> Importer<'a> {
         let index_start = Instant::now();
         debug!("Rebuilding indexes after bulk import");
         Schema::create_indexes(&conn)?;
+        guard.mark_indexes_restored();
         let index_duration = index_start.elapsed();
         debug!(
             "Index rebuild completed in {:.2}s",
@@ -296,6 +364,7 @@ impl<'a> Importer<'a> {
             "PRAGMA synchronous = NORMAL;
              PRAGMA journal_mode = WAL;",
         )?;
+        guard.mark_pragmas_restored();
 
         stats.duration_secs = start.elapsed().as_secs_f64();
 
