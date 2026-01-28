@@ -131,8 +131,13 @@ impl FccClient {
         let dest_path = self.cache_path(file);
 
         // Check for existing cached file and get its ETag
-        let cached_etag = self.get_cached_etag(file);
+        // Only use cached ETag if the data file actually exists
         let cache_exists = dest_path.exists();
+        let cached_etag = if cache_exists {
+            self.get_cached_etag(file)
+        } else {
+            None // Ignore stale ETag if data file is missing
+        };
 
         // If we have a cached file with an ETag, do a HEAD request to check if it's still current
         if cache_exists {
