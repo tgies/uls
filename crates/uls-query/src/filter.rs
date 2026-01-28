@@ -3,6 +3,37 @@
 use serde::{Deserialize, Serialize};
 use uls_core::codes::{LicenseStatus, OperatorClass, RadioService};
 
+/// Convert enum field values from user-friendly strings to database integer codes.
+///
+/// For fields like `status`, `class`, and `service`, the database stores integer
+/// codes, not the string representations. This function handles the conversion.
+fn convert_enum_value(field_name: &str, value: &str) -> Option<String> {
+    match field_name {
+        "status" | "license_status" => {
+            // Try parsing as LicenseStatus char (A, E, C, T, X)
+            value
+                .parse::<LicenseStatus>()
+                .ok()
+                .map(|s| s.to_u8().to_string())
+        }
+        "class" | "operator_class" => {
+            // Try parsing as OperatorClass char (A, E, G, N, P, T)
+            value
+                .parse::<OperatorClass>()
+                .ok()
+                .map(|c| c.to_u8().to_string())
+        }
+        "service" | "radio_service" | "radio_service_code" => {
+            // Try parsing as RadioService code (HA, HV, etc)
+            value
+                .parse::<RadioService>()
+                .ok()
+                .map(|s| s.to_u8().to_string())
+        }
+        _ => None, // Not an enum field, no conversion needed
+    }
+}
+
 /// Result of analyzing a search pattern for wildcards.
 #[derive(Debug, Clone, PartialEq)]
 enum MatchPattern {
@@ -325,8 +356,11 @@ impl SearchFilter {
                         conditions.push(format!("{} LIKE ?", field_def.column));
                         params.push(pattern);
                     } else {
+                        // Convert enum values (status, class, service) to integer codes
+                        let param_value = convert_enum_value(&expr.field, &expr.value)
+                            .unwrap_or_else(|| expr.value.clone());
                         conditions.push(format!("{} {} ?", field_def.column, op.sql()));
-                        params.push(expr.value.clone());
+                        params.push(param_value);
                     }
                 }
             }
@@ -764,5 +798,27 @@ mod tests {
         // Should be empty filter (1=1)
         assert_eq!(clause, "1=1");
         assert!(params.is_empty());
+    }
+
+    #[test]
+    fn test_generic_filter_enum_value_conversion() {
+        // status=A should be converted to integer code (1)
+        let filter = SearchFilter::new().with_filter("status=A");
+        let (clause, params) = filter.to_where_clause();
+
+        assert!(clause.contains("l.license_status"));
+        // LicenseStatus::Active is code 0
+        assert!(params.contains(&"0".to_string()));
+    }
+
+    #[test]
+    fn test_generic_filter_unknown_enum_fallback() {
+        // Unknown status value should fall back to original string
+        let filter = SearchFilter::new().with_filter("status=UNKNOWN");
+        let (clause, params) = filter.to_where_clause();
+
+        assert!(clause.contains("l.license_status"));
+        // Falls back to original string since parse failed
+        assert!(params.contains(&"UNKNOWN".to_string()));
     }
 }
