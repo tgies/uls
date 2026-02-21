@@ -283,6 +283,7 @@ async fn main() -> Result<()> {
                 &args.service,
                 &cli.format,
                 args.fields,
+                &staleness_opts,
             )
             .await
         }
@@ -297,7 +298,7 @@ async fn main() -> Result<()> {
                 .await
         }
         Some(Commands::Frn { frns, service }) => {
-            commands::frn::execute(&frns, &service, &cli.format).await
+            commands::frn::execute(&frns, &service, &cli.format, &staleness_opts).await
         }
         Some(Commands::Stats) => commands::stats::execute(&cli.format).await,
         Some(Commands::Db { command }) => match command {

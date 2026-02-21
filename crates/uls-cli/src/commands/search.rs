@@ -4,6 +4,7 @@ use anyhow::{Context, Result};
 use uls_query::{FormatOutput, License, OutputFormat, QueryEngine, SearchFilter};
 
 use super::auto_update;
+use crate::staleness::{warn_if_stale_after_query, StalenessOptions};
 
 /// Format results with custom field selection.
 fn format_with_fields(licenses: &[License], fields: &[&str], format: OutputFormat) -> String {
@@ -102,6 +103,7 @@ pub async fn execute(
     service_override: &str,
     format: &str,
     fields: Option<String>,
+    staleness_opts: &StalenessOptions,
 ) -> Result<()> {
     // Use service override (defaulting to amateur for searches)
     let service_code = auto_update::service_name_to_code(service_override)
@@ -231,6 +233,8 @@ pub async fn execute(
     } else {
         println!("{}", results.format(output_format));
     }
+
+    let _ = warn_if_stale_after_query(service_code, staleness_opts);
 
     Ok(())
 }

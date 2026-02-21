@@ -6,8 +6,14 @@ use anyhow::{Context, Result};
 use uls_query::{FormatOutput, OutputFormat, QueryEngine};
 
 use super::auto_update;
+use crate::staleness::{warn_if_stale_after_query, StalenessOptions};
 
-pub async fn execute(frns: &[String], service_override: &str, format: &str) -> Result<()> {
+pub async fn execute(
+    frns: &[String],
+    service_override: &str,
+    format: &str,
+    staleness_opts: &StalenessOptions,
+) -> Result<()> {
     if frns.is_empty() {
         anyhow::bail!("At least one FRN is required");
     }
@@ -59,6 +65,8 @@ pub async fn execute(frns: &[String], service_override: &str, format: &str) -> R
 
     // Output all licenses using FormatOutput
     println!("{}", deduped.format(output_format));
+
+    let _ = warn_if_stale_after_query(service_code, staleness_opts);
 
     Ok(())
 }
