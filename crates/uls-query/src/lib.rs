@@ -32,7 +32,7 @@ mod fields;
 mod filter;
 mod output;
 
-pub use engine::QueryEngine;
+pub use engine::{QueryEngine, QueryError};
 pub use fields::{FieldDef, FieldRegistry, FieldType, FilterExpr, FilterOp};
 pub use filter::{SearchFilter, SortOrder};
 pub use output::{FormatOutput, OutputFormat};
