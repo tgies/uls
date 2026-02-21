@@ -54,6 +54,7 @@ impl CustomizeConnection<Connection, rusqlite::Error> for SqliteConnectionCustom
         // Other per-connection optimizations
         conn.execute_batch(
             r#"
+            PRAGMA busy_timeout = 5000;
             PRAGMA synchronous = NORMAL;
             PRAGMA temp_store = MEMORY;
             PRAGMA mmap_size = 268435456;
@@ -96,6 +97,7 @@ impl Database {
 
         let pool = Pool::builder()
             .max_size(config.max_connections)
+            .min_idle(Some(0))
             .connection_timeout(config.connection_timeout)
             .connection_customizer(Box::new(customizer))
             .build(manager)?;
