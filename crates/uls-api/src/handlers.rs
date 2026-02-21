@@ -22,9 +22,9 @@ pub async fn health() -> Json<Value> {
 /// GET /stats
 pub async fn stats(State(engine): State<AppState>) -> Result<Json<Value>, ApiError> {
     let stats = engine.stats()?;
-    Ok(Json(serde_json::to_value(stats).map_err(|e| {
-        ApiError::Internal(e.to_string())
-    })?))
+    Ok(Json(
+        serde_json::to_value(stats).map_err(|e| ApiError::Internal(e.to_string()))?,
+    ))
 }
 
 /// GET /licenses/:callsign
@@ -143,7 +143,12 @@ pub async fn search(
         let codes = match service.to_lowercase().as_str() {
             "amateur" | "ham" | "ha" => vec!["HA".to_string(), "HV".to_string()],
             "gmrs" | "za" => vec!["ZA".to_string()],
-            _ => return Err(ApiError::BadRequest(format!("Unknown service: {}", service))),
+            _ => {
+                return Err(ApiError::BadRequest(format!(
+                    "Unknown service: {}",
+                    service
+                )))
+            }
         };
         filter.radio_service = Some(codes);
     }

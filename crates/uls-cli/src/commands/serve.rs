@@ -6,11 +6,7 @@ use uls_query::QueryEngine;
 
 use crate::config::default_db_path;
 
-pub async fn execute(
-    port: u16,
-    bind: &str,
-    cors_origins: Vec<String>,
-) -> Result<()> {
+pub async fn execute(port: u16, bind: &str, cors_origins: Vec<String>) -> Result<()> {
     let db_path = default_db_path();
 
     let engine = QueryEngine::open(&db_path)
@@ -27,9 +23,7 @@ pub async fn execute(
         config.bind, config.port
     );
 
-    uls_api::run(engine, config)
-        .await
-        .context("Server error")?;
+    uls_api::run(engine, config).await.context("Server error")?;
 
     Ok(())
 }

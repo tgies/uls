@@ -498,9 +498,9 @@ impl Database {
     pub fn get_stats(&self) -> Result<LicenseStats> {
         let conn = self.conn()?;
 
-        let total_licenses: u64 =
-            conn.query_row("SELECT COUNT(*) FROM licenses", [], |row| row.get::<_, i64>(0))?
-                as u64;
+        let total_licenses: u64 = conn.query_row("SELECT COUNT(*) FROM licenses", [], |row| {
+            row.get::<_, i64>(0)
+        })? as u64;
 
         // Use integer codes for status comparisons
         let active_code = LicenseStatus::Active.to_u8();
