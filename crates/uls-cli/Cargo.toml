@@ -7,6 +7,8 @@ license.workspace = true
 repository.workspace = true
 authors.workspace = true
 rust-version.workspace = true
+keywords = ["fcc", "amateur-radio", "ham-radio", "gmrs", "callsign"]
+categories = ["command-line-utilities", "database"]
 
 [[bin]]
 name = "uls"
