@@ -64,6 +64,9 @@ flate2 = "1.0"
 indicatif = "0.17"
 console = "0.15"
 
+# HTTP body utilities (for testing axum)
+http-body-util = "0.1"
+
 # Testing
 tempfile = "3.14"
 mockito = "1.5"

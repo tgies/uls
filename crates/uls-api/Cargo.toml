@@ -23,6 +23,12 @@ serde.workspace = true
 serde_json.workspace = true
 
 [dev-dependencies]
+chrono.workspace = true
+http-body-util.workspace = true
 reqwest.workspace = true
 rstest.workspace = true
+serde_json.workspace = true
 tokio = { workspace = true, features = ["test-util"] }
+uls-core.workspace = true
+uls-db.workspace = true
+uls-query.workspace = true
