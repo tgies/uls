@@ -21,9 +21,6 @@ ignore = [
     # and never ships in release binaries.
     { id = "RUSTSEC-2025-0141", reason = "transitive dev dep via gungraun benchmarks; not in release binary" },
 
-    # indicatif depends on number_prefix 0.4.0, which is unmaintained.
-    # Waiting for indicatif to migrate to unit-prefix.
-    { id = "RUSTSEC-2025-0119", reason = "transitive dep via indicatif; awaiting upstream migration" },
 ]
 
 # --- Licenses ---
@@ -53,9 +50,13 @@ exceptions = [
     # and compatible with our MIT/Apache-2.0 dual license.
     { allow = ["MPL-2.0"], crate = "option-ext" },
 
-    # webpki-roots bundles Mozilla root certificates under CDLA-Permissive-2.0,
-    # a permissive data license.
-    { allow = ["CDLA-Permissive-2.0"], crate = "webpki-roots" },
+    # aws-lc-sys is the AWS cryptographic library used by rustls. Its license
+    # includes the OpenSSL License (a permissive BSD-style license).
+    { allow = ["OpenSSL"], crate = "aws-lc-sys" },
+
+    # libbz2-rs-sys is a safe Rust reimplementation of bzip2, carrying the
+    # original bzip2 license (permissive, BSD-like).
+    { allow = ["bzip2-1.0.6"], crate = "libbz2-rs-sys" },
 ]
 
 [licenses.private]
@@ -69,20 +70,8 @@ multiple-versions = "warn"
 wildcards = "warn"
 highlight = "all"
 
-# These duplicates are caused by transitive deps in the wider Rust ecosystem
-# and are outside our control. Skip them to reduce noise.
-skip = [
-    # getrandom 0.2 (ring, redox_users) vs 0.3 (jobserver/cc)
-    { crate = "getrandom@0.2", reason = "ring hasn't migrated to getrandom 0.3 yet" },
-    # hashbrown 0.14 (rusqlite/hashlink) vs 0.16 (indexmap)
-    { crate = "hashbrown@0.14", reason = "rusqlite's hashlink pins older hashbrown" },
-]
-
-skip-tree = [
-    # The windows-sys/windows-targets crate family has frequent major version
-    # bumps. Multiple versions are unavoidable until the ecosystem converges.
-    { crate = "windows-sys@0.52", reason = "transitive windows crate version churn" },
-]
+skip = []
+skip-tree = []
 
 # --- Sources (supply chain) ---
 
