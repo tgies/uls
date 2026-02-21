@@ -11,6 +11,9 @@ on:
         required: false
         type: string
 
+permissions:
+  contents: write
+
 env:
   CARGO_TERM_COLOR: always
 
@@ -60,8 +63,11 @@ jobs:
         with:
           executable-name: uls
           target: ${{ matrix.platform.target }}
+          changes-file: CHANGELOG.md
           extra-files: |
             README.md
+            LICENSE-MIT
+            LICENSE-APACHE
 
   publish-crates:
     name: Publish to crates.io
@@ -73,6 +79,52 @@ jobs:
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
+
+      # Publish in dependency order with sleeps for index propagation
+      - name: Publish uls-core
+        run: cargo publish -p uls-core --locked
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+
+      - name: Wait for index propagation
+        run: sleep 30
+
+      - name: Publish uls-parser
+        run: cargo publish -p uls-parser --locked
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+
+      - name: Publish uls-download
+        run: cargo publish -p uls-download --locked
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+
+      - name: Wait for index propagation
+        run: sleep 30
+
+      - name: Publish uls-db
+        run: cargo publish -p uls-db --locked
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+
+      - name: Wait for index propagation
+        run: sleep 30
+
+      - name: Publish uls-query
+        run: cargo publish -p uls-query --locked
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+
+      - name: Wait for index propagation
+        run: sleep 30
+
+      - name: Publish uls-api
+        run: cargo publish -p uls-api --locked
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+
+      - name: Wait for index propagation
+        run: sleep 30
 
       - name: Publish uls-cli
         run: cargo publish -p uls-cli --locked

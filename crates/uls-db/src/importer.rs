@@ -299,6 +299,7 @@ impl<'a> Importer<'a> {
 
                 // Send progress update every 10k records
                 if let Some(ref cb) = progress {
+                    #[allow(clippy::manual_is_multiple_of)]
                     if (file_records + file_parse_errors) % 10_000 == 0 {
                         cb(&ImportProgress {
                             current_file: idx + 1,
@@ -513,6 +514,7 @@ impl<'a> Importer<'a> {
 
                 // Send progress update every 1k records (patches are smaller)
                 if let Some(ref cb) = progress {
+                    #[allow(clippy::manual_is_multiple_of)]
                     if (file_records + file_parse_errors) % 1_000 == 0 {
                         cb(&ImportProgress {
                             current_file: idx + 1,

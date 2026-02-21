@@ -16,7 +16,7 @@ edition = "2021"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/tgies/uls"
 authors = ["tgies"]
-rust-version = "1.78"
+rust-version = "1.88"
 
 [workspace.dependencies]
 # Async runtime
@@ -79,12 +79,12 @@ criterion = { version = "0.5", features = ["html_reports"] }
 gungraun = "0.17"
 
 # Workspace crates
-uls-core = { path = "crates/uls-core" }
-uls-parser = { path = "crates/uls-parser" }
-uls-db = { path = "crates/uls-db" }
-uls-download = { path = "crates/uls-download" }
-uls-api = { path = "crates/uls-api" }
-uls-query = { path = "crates/uls-query" }
+uls-core = { path = "crates/uls-core", version = "0.1.0" }
+uls-parser = { path = "crates/uls-parser", version = "0.1.0" }
+uls-db = { path = "crates/uls-db", version = "0.1.0" }
+uls-download = { path = "crates/uls-download", version = "0.1.0" }
+uls-api = { path = "crates/uls-api", version = "0.1.0" }
+uls-query = { path = "crates/uls-query", version = "0.1.0" }
 
 [profile.release]
 lto = true

@@ -7,7 +7,7 @@ A fast, robust command-line tool for querying FCC ULS public data.
 - **Quick callsign lookups** - `uls W1AW`
 - **Automatic data updates** - Downloads and applies FCC weekly/daily updates
 - **Local database** - SQLite for fast offline queries
-- **REST API mode** - Serve ULS data over HTTP (planned)
+- **REST API mode** - Serve ULS data over HTTP
 - **Multiple output formats** - JSON, CSV, YAML, table
 
 ## Quick Start
@@ -65,7 +65,7 @@ cargo build --release
 
 ### Requirements
 
-- Rust 1.78+
+- Rust 1.88+
 
 ## Data Sources
 
