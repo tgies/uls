@@ -110,6 +110,21 @@ enum Commands {
     /// Show database statistics
     Stats,
 
+    /// Start the REST API server
+    Serve {
+        /// Listen port
+        #[arg(short, long, default_value = "3000")]
+        port: u16,
+
+        /// Bind address
+        #[arg(short, long, default_value = "127.0.0.1")]
+        bind: String,
+
+        /// CORS allowed origin (repeatable)
+        #[arg(long = "cors-origin")]
+        cors_origins: Vec<String>,
+    },
+
     /// Manage the database
     Db {
         #[command(subcommand)]
@@ -301,6 +316,11 @@ async fn main() -> Result<()> {
             commands::frn::execute(&frns, &service, &cli.format, &staleness_opts).await
         }
         Some(Commands::Stats) => commands::stats::execute(&cli.format).await,
+        Some(Commands::Serve {
+            port,
+            bind,
+            cors_origins,
+        }) => commands::serve::execute(port, &bind, cors_origins).await,
         Some(Commands::Db { command }) => match command {
             DbCommands::Init { path } => commands::db::init(path).await,
             DbCommands::Info => commands::db::info(&cli.format).await,
