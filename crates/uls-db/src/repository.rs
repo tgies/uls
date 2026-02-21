@@ -499,7 +499,8 @@ impl Database {
         let conn = self.conn()?;
 
         let total_licenses: u64 =
-            conn.query_row("SELECT COUNT(*) FROM licenses", [], |row| row.get(0))?;
+            conn.query_row("SELECT COUNT(*) FROM licenses", [], |row| row.get::<_, i64>(0))?
+                as u64;
 
         // Use integer codes for status comparisons
         let active_code = LicenseStatus::Active.to_u8();
@@ -509,20 +510,20 @@ impl Database {
         let active_licenses: u64 = conn.query_row(
             "SELECT COUNT(*) FROM licenses WHERE license_status = ?1",
             [active_code],
-            |row| row.get(0),
-        )?;
+            |row| row.get::<_, i64>(0),
+        )? as u64;
 
         let expired_licenses: u64 = conn.query_row(
             "SELECT COUNT(*) FROM licenses WHERE license_status = ?1",
             [expired_code],
-            |row| row.get(0),
-        )?;
+            |row| row.get::<_, i64>(0),
+        )? as u64;
 
         let cancelled_licenses: u64 = conn.query_row(
             "SELECT COUNT(*) FROM licenses WHERE license_status = ?1",
             [cancelled_code],
-            |row| row.get(0),
-        )?;
+            |row| row.get::<_, i64>(0),
+        )? as u64;
 
         let schema_version = Schema::get_version(&conn)?.unwrap_or(0);
         let last_updated = Schema::get_metadata(&conn, "last_updated")?;
@@ -565,8 +566,8 @@ impl Database {
 
         let mut stmt = conn.prepare(&sql)?;
         let count: u64 = stmt.query_row(rusqlite::params_from_iter(int_codes.iter()), |row| {
-            row.get(0)
-        })?;
+            row.get::<_, i64>(0)
+        })? as u64;
 
         Ok(count)
     }

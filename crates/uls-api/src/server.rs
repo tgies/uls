@@ -37,9 +37,9 @@ pub fn build_router(engine: QueryEngine, config: &ServerConfig) -> Router {
     let mut app = Router::new()
         .route("/health", axum::routing::get(handlers::health))
         .route("/stats", axum::routing::get(handlers::stats))
-        .route("/licenses/:callsign", axum::routing::get(handlers::lookup))
+        .route("/licenses/{callsign}", axum::routing::get(handlers::lookup))
         .route("/licenses", axum::routing::get(handlers::search))
-        .route("/frn/:frn", axum::routing::get(handlers::frn_lookup))
+        .route("/frn/{frn}", axum::routing::get(handlers::frn_lookup))
         .with_state(state)
         .layer(TraceLayer::new_for_http());
 
@@ -68,5 +68,8 @@ pub async fn run(engine: QueryEngine, config: ServerConfig) -> std::io::Result<(
     tracing::info!("Starting ULS API server on {}", addr);
 
     let listener = tokio::net::TcpListener::bind(&addr).await?;
-    axum::serve(listener, app).await
+    axum::serve(listener, app)
+        .await
+        .expect("server should not fail");
+    Ok(())
 }

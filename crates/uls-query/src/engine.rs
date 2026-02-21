@@ -160,7 +160,8 @@ impl QueryEngine {
         );
 
         let conn = self.db.conn()?;
-        let count: usize = conn.query_row(&query, params_from_iter(params), |row| row.get(0))?;
+        let count: usize =
+            conn.query_row(&query, params_from_iter(params), |row| row.get::<_, i64>(0))? as usize;
         Ok(count)
     }
 
