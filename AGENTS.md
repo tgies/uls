@@ -93,7 +93,7 @@ All 89 record types are defined in `uls-core/src/records/`.
 
 ## Coding Conventions
 
-- Rust 2021 edition, MSRV 1.75
+- Rust 2021 edition, MSRV 1.78
 - `cargo fmt` for formatting (4-space indentation)
 - `snake_case` for modules/functions/files, `CamelCase` for types/traits, `SCREAMING_SNAKE_CASE` for constants
 - Shared record models in `uls-core`, output formatting in `uls-query`

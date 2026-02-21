@@ -65,7 +65,7 @@ cargo build --release
 
 ### Requirements
 
-- Rust 1.75+
+- Rust 1.78+
 
 ## Data Sources
 

@@ -156,7 +156,7 @@ jobs:
       - name: Install Rust toolchain (MSRV)
         uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: "1.75"
+          toolchain: "1.78"
       
       - name: Check MSRV
         run: cargo check --all
