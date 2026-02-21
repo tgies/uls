@@ -1,0 +1,94 @@
+# cargo-deny configuration for ULS
+# https://embarkstudios.github.io/cargo-deny/
+
+[graph]
+# Check all targets we build for in CI
+targets = [
+    "x86_64-unknown-linux-musl",
+    "aarch64-unknown-linux-musl",
+    "x86_64-pc-windows-msvc",
+    "x86_64-apple-darwin",
+    "aarch64-apple-darwin",
+]
+all-features = true
+
+# --- Advisories (known vulnerabilities & unmaintained crates) ---
+
+[advisories]
+ignore = [
+    # gungraun (benchmark crate) depends on bincode 1.3.3, which is
+    # unmaintained. This is a dev-only dependency used for benchmarks
+    # and never ships in release binaries.
+    { id = "RUSTSEC-2025-0141", reason = "transitive dev dep via gungraun benchmarks; not in release binary" },
+
+    # indicatif depends on number_prefix 0.4.0, which is unmaintained.
+    # Waiting for indicatif to migrate to unit-prefix.
+    { id = "RUSTSEC-2025-0119", reason = "transitive dep via indicatif; awaiting upstream migration" },
+]
+
+# --- Licenses ---
+
+[licenses]
+# All dependencies must use one of these licenses.
+# ULS itself is MIT OR Apache-2.0.
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "BSL-1.0",
+    "0BSD",
+    "ISC",
+    "Unlicense",
+    "Zlib",
+    "MIT-0",
+    "CC0-1.0",
+    "Unicode-3.0",
+]
+confidence-threshold = 0.8
+
+exceptions = [
+    # option-ext is used by the dirs crate. MPL-2.0 is weak copyleft
+    # and compatible with our MIT/Apache-2.0 dual license.
+    { allow = ["MPL-2.0"], crate = "option-ext" },
+
+    # webpki-roots bundles Mozilla root certificates under CDLA-Permissive-2.0,
+    # a permissive data license.
+    { allow = ["CDLA-Permissive-2.0"], crate = "webpki-roots" },
+]
+
+[licenses.private]
+# Ignore license checks for unpublished workspace crates
+ignore = true
+
+# --- Bans (duplicate & denied crates) ---
+
+[bans]
+multiple-versions = "warn"
+wildcards = "warn"
+highlight = "all"
+
+# These duplicates are caused by transitive deps in the wider Rust ecosystem
+# and are outside our control. Skip them to reduce noise.
+skip = [
+    # getrandom 0.2 (ring, redox_users) vs 0.3 (jobserver/cc)
+    { crate = "getrandom@0.2", reason = "ring hasn't migrated to getrandom 0.3 yet" },
+    # hashbrown 0.14 (rusqlite/hashlink) vs 0.16 (indexmap)
+    { crate = "hashbrown@0.14", reason = "rusqlite's hashlink pins older hashbrown" },
+]
+
+skip-tree = [
+    # The windows-sys/windows-targets crate family has frequent major version
+    # bumps. Multiple versions are unavoidable until the ecosystem converges.
+    { crate = "windows-sys@0.52", reason = "transitive windows crate version churn" },
+]
+
+# --- Sources (supply chain) ---
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+# Only allow crates from the official registry
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+allow-git = []
