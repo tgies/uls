@@ -1,0 +1,40 @@
+[workspace]
+# Single tag format matching release.yml's v* trigger for binary builds
+git_tag_name = "v{{ version }}"
+# Disable tags/releases/changelogs at workspace level —
+# only uls-cli gets these (see below)
+git_release_enable = false
+git_tag_enable = false
+changelog_update = false
+
+[[package]]
+name = "uls-cli"
+version_group = "uls"
+git_tag_enable = true
+git_release_enable = true
+changelog_update = true
+changelog_path = "./CHANGELOG.md"
+
+[[package]]
+name = "uls-core"
+version_group = "uls"
+
+[[package]]
+name = "uls-parser"
+version_group = "uls"
+
+[[package]]
+name = "uls-db"
+version_group = "uls"
+
+[[package]]
+name = "uls-download"
+version_group = "uls"
+
+[[package]]
+name = "uls-query"
+version_group = "uls"
+
+[[package]]
+name = "uls-api"
+version_group = "uls"
