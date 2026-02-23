@@ -106,18 +106,10 @@ impl FccClient {
     }
 
     /// Download the daily license file for a specific date.
-    pub async fn download_daily_for_date(
-        &self,
-        service: &str,
-        date: NaiveDate,
-    ) -> Result<Option<PathBuf>> {
-        match ServiceCatalog::daily_license_for_date(service, date)? {
-            Some(file) => {
-                let (path, _) = self.download_file(&file, no_progress()).await?;
-                Ok(Some(path))
-            }
-            None => Ok(None), // No file for Sundays
-        }
+    pub async fn download_daily_for_date(&self, service: &str, date: NaiveDate) -> Result<PathBuf> {
+        let file = ServiceCatalog::daily_license_for_date(service, date)?;
+        let (path, _) = self.download_file(&file, no_progress()).await?;
+        Ok(path)
     }
 
     /// Download a specific data file.
