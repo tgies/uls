@@ -175,18 +175,10 @@ async fn build_daily_chain(
     _today: NaiveDate,
 ) -> Result<DailyChainResult> {
     let full_name = ServiceCatalog::full_name(service_code).unwrap_or("amat");
-    let weekdays = [
-        uls_download::catalog::Weekday::Monday,
-        uls_download::catalog::Weekday::Tuesday,
-        uls_download::catalog::Weekday::Wednesday,
-        uls_download::catalog::Weekday::Thursday,
-        uls_download::catalog::Weekday::Friday,
-        uls_download::catalog::Weekday::Saturday,
-    ];
 
     let mut available_dailies: Vec<(NaiveDate, PathBuf)> = vec![];
 
-    for weekday in &weekdays {
+    for weekday in &uls_download::catalog::Weekday::ALL {
         let data_file = uls_download::DataFile::daily_license(full_name, *weekday);
         let progress: ProgressCallback = Arc::new(|_| {});
 
@@ -209,12 +201,16 @@ async fn build_daily_chain(
     // Sort by canonical date
     available_dailies.sort_by_key(|(date, _)| *date);
 
-    // Check if we have a continuous chain from last_update
-    let mut expected = last_update;
+    // Start from the latest applied patch after the weekly, not the weekly itself
+    let mut expected = applied
+        .iter()
+        .copied()
+        .filter(|d| *d > last_update)
+        .max()
+        .unwrap_or(last_update);
     for (date, _) in &available_dailies {
-        // Allow gaps of 1 day (for Sundays)
         let gap = (*date - expected).num_days();
-        if gap > 2 {
+        if gap > 1 {
             return Ok(DailyChainResult::Broken {
                 missing_date: expected.succ_opt().unwrap_or(expected),
             });
