@@ -385,7 +385,7 @@ impl Database {
             LEFT JOIN entities e ON l.unique_system_identifier = e.unique_system_identifier
             LEFT JOIN amateur_operators a ON l.unique_system_identifier = a.unique_system_identifier
             WHERE l.call_sign = ?1
-            ORDER BY l.license_status ASC
+            ORDER BY l.license_status ASC, l.grant_date DESC
             LIMIT 1
             "#,
             [&callsign],
@@ -1127,6 +1127,41 @@ mod tests {
         let license = db.get_license_by_callsign("W9OLD").unwrap();
         assert!(license.is_some(), "Should find cancelled-only license");
         assert_eq!(license.unwrap().status, 'C');
+    }
+
+    #[test]
+    fn test_lookup_prefers_most_recent_inactive_record() {
+        let db = create_test_db();
+
+        // Insert an older expired license (granted 2015)
+        let mut older = HeaderRecord::from_fields(&["HD", "10001"]);
+        older.unique_system_identifier = 10001;
+        older.call_sign = Some("W3OLD".to_string());
+        older.license_status = Some('E');
+        older.radio_service_code = Some("HA".to_string());
+        older.grant_date = Some(chrono::NaiveDate::from_ymd_opt(2015, 3, 1).unwrap());
+        older.expired_date = Some(chrono::NaiveDate::from_ymd_opt(2025, 3, 1).unwrap());
+        db.insert_record(&UlsRecord::Header(older)).unwrap();
+
+        // Insert a newer expired license (granted 2020)
+        let mut newer = HeaderRecord::from_fields(&["HD", "20002"]);
+        newer.unique_system_identifier = 20002;
+        newer.call_sign = Some("W3OLD".to_string());
+        newer.license_status = Some('E');
+        newer.radio_service_code = Some("HA".to_string());
+        newer.grant_date = Some(chrono::NaiveDate::from_ymd_opt(2020, 6, 15).unwrap());
+        newer.expired_date = Some(chrono::NaiveDate::from_ymd_opt(2030, 6, 15).unwrap());
+        db.insert_record(&UlsRecord::Header(newer)).unwrap();
+
+        // Should return the more recently granted record
+        let license = db.get_license_by_callsign("W3OLD").unwrap();
+        assert!(license.is_some(), "Should find expired license for W3OLD");
+        let license = license.unwrap();
+        assert_eq!(
+            license.unique_system_identifier, 20002,
+            "Should return the most recently granted expired record"
+        );
+        assert_eq!(license.status, 'E');
     }
 
     #[test]
