@@ -14,6 +14,7 @@ git_tag_enable = true
 git_release_enable = true
 changelog_update = true
 changelog_path = "./CHANGELOG.md"
+changelog_include = ["uls-core", "uls-parser", "uls-db", "uls-download", "uls-query", "uls-api"]
 
 [[package]]
 name = "uls-core"
