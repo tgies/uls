@@ -9,7 +9,6 @@ changelog_update = false
 
 [[package]]
 name = "uls-cli"
-version_group = "uls"
 git_tag_enable = true
 git_release_enable = true
 changelog_update = true
@@ -18,24 +17,18 @@ changelog_include = ["uls-core", "uls-parser", "uls-db", "uls-download", "uls-qu
 
 [[package]]
 name = "uls-core"
-version_group = "uls"
 
 [[package]]
 name = "uls-parser"
-version_group = "uls"
 
 [[package]]
 name = "uls-db"
-version_group = "uls"
 
 [[package]]
 name = "uls-download"
-version_group = "uls"
 
 [[package]]
 name = "uls-query"
-version_group = "uls"
 
 [[package]]
 name = "uls-api"
-version_group = "uls"
