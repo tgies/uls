@@ -385,6 +385,7 @@ impl Database {
             LEFT JOIN entities e ON l.unique_system_identifier = e.unique_system_identifier
             LEFT JOIN amateur_operators a ON l.unique_system_identifier = a.unique_system_identifier
             WHERE l.call_sign = ?1
+            ORDER BY l.license_status ASC
             LIMIT 1
             "#,
             [&callsign],
@@ -1076,6 +1077,56 @@ mod tests {
 
         let licenses = db.get_licenses_by_frn("9999999999").unwrap();
         assert!(licenses.is_empty());
+    }
+
+    #[test]
+    fn test_lookup_prefers_active_over_cancelled() {
+        let db = create_test_db();
+
+        // Insert a cancelled license first (lower USI = inserted first)
+        let mut cancelled = HeaderRecord::from_fields(&["HD", "10001"]);
+        cancelled.unique_system_identifier = 10001;
+        cancelled.call_sign = Some("K2QA".to_string());
+        cancelled.license_status = Some('C');
+        cancelled.radio_service_code = Some("HA".to_string());
+        db.insert_record(&UlsRecord::Header(cancelled)).unwrap();
+
+        // Insert an active license with the same callsign (higher USI)
+        let mut active = HeaderRecord::from_fields(&["HD", "20002"]);
+        active.unique_system_identifier = 20002;
+        active.call_sign = Some("K2QA".to_string());
+        active.license_status = Some('A');
+        active.radio_service_code = Some("HA".to_string());
+        db.insert_record(&UlsRecord::Header(active)).unwrap();
+
+        // Lookup should return the active record, not the cancelled one
+        let license = db.get_license_by_callsign("K2QA").unwrap();
+        assert!(license.is_some(), "Should find license for K2QA");
+        let license = license.unwrap();
+        assert_eq!(
+            license.status, 'A',
+            "Should return active license, not cancelled (got status='{}')",
+            license.status
+        );
+        assert_eq!(license.unique_system_identifier, 20002);
+    }
+
+    #[test]
+    fn test_lookup_returns_cancelled_when_no_active() {
+        let db = create_test_db();
+
+        // Insert only a cancelled license
+        let mut cancelled = HeaderRecord::from_fields(&["HD", "10001"]);
+        cancelled.unique_system_identifier = 10001;
+        cancelled.call_sign = Some("W9OLD".to_string());
+        cancelled.license_status = Some('C');
+        cancelled.radio_service_code = Some("HA".to_string());
+        db.insert_record(&UlsRecord::Header(cancelled)).unwrap();
+
+        // Should still return the cancelled record when it's the only one
+        let license = db.get_license_by_callsign("W9OLD").unwrap();
+        assert!(license.is_some(), "Should find cancelled-only license");
+        assert_eq!(license.unwrap().status, 'C');
     }
 
     #[test]
