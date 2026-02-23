@@ -81,7 +81,7 @@ gungraun = "0.17"
 uls-core = { path = "crates/uls-core", version = "0.1.1" }
 uls-parser = { path = "crates/uls-parser", version = "0.1.1" }
 uls-db = { path = "crates/uls-db", version = "0.1.1" }
-uls-download = { path = "crates/uls-download", version = "0.1.1" }
+uls-download = { path = "crates/uls-download", version = "0.2.0" }
 uls-api = { path = "crates/uls-api", version = "0.1.1" }
 uls-query = { path = "crates/uls-query", version = "0.1.1" }
 

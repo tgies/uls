@@ -2959,7 +2959,7 @@ dependencies = [
 
 [[package]]
 name = "uls-cli"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "anyhow",
  "assert_cmd",
@@ -3021,7 +3021,7 @@ dependencies = [
 
 [[package]]
 name = "uls-download"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "chrono",
  "dirs",
