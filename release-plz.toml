@@ -1,14 +1,15 @@
 [workspace]
-# Single tag format matching release.yml's v* trigger for binary builds
-git_tag_name = "v{{ version }}"
-# Disable tags/releases/changelogs at workspace level —
-# only uls-cli gets these (see below)
+# Safe default: includes package name so tags can't collide across crates.
+# Only uls-cli actually creates tags (see below), but this prevents
+# release-plz from mismatching other crates against uls-cli's v* tags.
+git_tag_name = "{{ package }}-v{{ version }}"
 git_release_enable = false
 git_tag_enable = false
 changelog_update = false
 
 [[package]]
 name = "uls-cli"
+git_tag_name = "v{{ version }}"
 git_tag_enable = true
 git_release_enable = true
 changelog_update = true
