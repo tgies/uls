@@ -99,7 +99,7 @@ pub fn print_staleness_warning(freshness: &DataFreshness) {
     };
 
     eprintln!(
-        "⚠ Data is {} old. Run 'uls update {}' to refresh.",
+        "⚠ Data is {} old. Run 'uls update --service {}' to refresh.",
         freshness.age_display, service_name
     );
     eprintln!("  (Use --no-stale-warning to suppress, or --auto-update to update automatically)");
