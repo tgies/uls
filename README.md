@@ -2,6 +2,8 @@
 
 A fast, robust command-line tool for querying FCC ULS public data.
 
+**[Try it online](https://wrck692.net/lookup/)** | `cargo install uls-cli`
+
 ## Features
 
 - **Quick callsign lookups** - `uls W1AW`
