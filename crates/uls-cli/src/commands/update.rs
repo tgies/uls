@@ -174,6 +174,25 @@ enum DailyChainResult {
     Broken { missing_date: NaiveDate },
 }
 
+/// Return the weekdays to check for daily files, optionally skipping the
+/// weekday that coincides with a just-applied weekly snapshot.
+fn weekdays_to_check(
+    skip_weekday: Option<uls_download::catalog::Weekday>,
+) -> Vec<uls_download::catalog::Weekday> {
+    uls_download::catalog::Weekday::ALL
+        .iter()
+        .copied()
+        .filter(|w| {
+            if skip_weekday == Some(*w) {
+                tracing::debug!("Skipping {} daily (same day as weekly)", w.abbrev());
+                false
+            } else {
+                true
+            }
+        })
+        .collect()
+}
+
 async fn build_daily_chain(
     client: &FccClient,
     service_code: &str,
@@ -185,14 +204,9 @@ async fn build_daily_chain(
     let full_name = ServiceCatalog::full_name(service_code).unwrap_or("amat");
 
     let mut available_dailies: Vec<(NaiveDate, PathBuf)> = vec![];
+    let weekdays = weekdays_to_check(skip_weekday);
 
-    for weekday in &uls_download::catalog::Weekday::ALL {
-        // Skip the daily that coincides with a just-applied weekly (its data is
-        // already included in the weekly snapshot).
-        if skip_weekday == Some(*weekday) {
-            tracing::debug!("Skipping {} daily (same day as weekly)", weekday.abbrev());
-            continue;
-        }
+    for weekday in &weekdays {
         let data_file = uls_download::DataFile::daily_license(full_name, *weekday);
         let progress: ProgressCallback = Arc::new(|_| {});
 
@@ -453,27 +467,24 @@ mod tests {
     }
 
     #[test]
-    fn test_skip_weekday_filters_correctly() {
-        let skip = Some(Weekday::Sunday);
-        let mut kept = Vec::new();
-        for weekday in &Weekday::ALL {
-            if skip != Some(*weekday) {
-                kept.push(*weekday);
-            }
-        }
+    fn test_weekdays_to_check_skips_sunday() {
+        let kept = weekdays_to_check(Some(Weekday::Sunday));
         assert_eq!(kept.len(), 6);
         assert!(!kept.contains(&Weekday::Sunday));
     }
 
     #[test]
-    fn test_no_skip_keeps_all_weekdays() {
-        let skip: Option<Weekday> = None;
-        let mut kept = Vec::new();
-        for weekday in &Weekday::ALL {
-            if skip != Some(*weekday) {
-                kept.push(*weekday);
-            }
+    fn test_weekdays_to_check_skips_correct_day() {
+        for skip_day in &Weekday::ALL {
+            let kept = weekdays_to_check(Some(*skip_day));
+            assert_eq!(kept.len(), 6);
+            assert!(!kept.contains(skip_day));
         }
+    }
+
+    #[test]
+    fn test_weekdays_to_check_none_keeps_all() {
+        let kept = weekdays_to_check(None);
         assert_eq!(kept.len(), 7);
     }
 }
