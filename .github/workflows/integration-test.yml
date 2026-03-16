@@ -100,8 +100,8 @@ jobs:
       
       - name: Test FRN lookup
         run: |
-          # Look up ARRL's FRN
-          ./target/release/uls frn 0001387578 --format json
+          # Look up ARRL HQ Operators Club's FRN (the W1AW license holder)
+          ./target/release/uls frn 0004511143 --format json
 
   report:
     name: Generate Report

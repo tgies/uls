@@ -11,6 +11,10 @@ on:
         type: boolean
         default: false
 
+permissions:
+  contents: read
+  issues: write
+
 env:
   FCC_PUBLIC_ACCESS_URL: "https://www.fcc.gov/wireless/data/public-access-updates"
   FCC_DATA_BASE_URL: "https://data.fcc.gov/download/pub/uls"
@@ -31,7 +35,7 @@ jobs:
           set -euo pipefail
           
           echo "Fetching FCC Public Access Updates page..."
-          RESPONSE=$(curl -sS --fail --retry 3 --retry-delay 5 \
+          RESPONSE=$(curl -sS --fail --http1.1 --retry 3 --retry-delay 5 \
             -H "User-Agent: ULS-CLI-Monitor/1.0 (https://github.com/tgies/uls)" \
             "$FCC_PUBLIC_ACCESS_URL" || echo "FETCH_FAILED")
           
@@ -79,7 +83,7 @@ jobs:
       - name: Cache content hash
         run: |
           mkdir -p .fcc-monitor-cache
-          curl -sS "$FCC_PUBLIC_ACCESS_URL" | \
+          curl -sS --http1.1 "$FCC_PUBLIC_ACCESS_URL" | \
             grep -i -E '(update|change|notice|announcement)' | \
             md5sum | cut -d' ' -f1 > .fcc-monitor-cache/content-hash.txt
 
