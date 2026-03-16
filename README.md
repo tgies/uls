@@ -50,6 +50,7 @@ Additional FCC radio services are planned for future releases.
 | `uls stats` | Database statistics |
 | `uls serve` | Start REST API server |
 | `uls download` | Download FCC files without building database |
+| `uls completions <SHELL>` | Generate shell completions (bash, zsh, fish, elvish, powershell) |
 
 ## Configuration
 
