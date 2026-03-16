@@ -23,6 +23,8 @@ jobs:
   check-fcc-updates:
     name: Check FCC Public Access Updates
     runs-on: ubuntu-latest
+    # Best-effort: www.fcc.gov is often unreliable; don't fail the workflow over it
+    continue-on-error: true
     outputs:
       has_updates: ${{ steps.check-page.outputs.has_updates }}
       latest_update: ${{ steps.check-page.outputs.latest_update }}
@@ -174,7 +176,7 @@ jobs:
   notify-on-failure:
     name: Notify on Failure
     runs-on: ubuntu-latest
-    needs: [check-fcc-updates, verify-data-availability]
+    needs: [verify-data-availability]
     if: failure()
     steps:
       - name: Create failure issue
