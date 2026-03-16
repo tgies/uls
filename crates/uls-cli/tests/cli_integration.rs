@@ -380,6 +380,70 @@ fn test_multi_frn_partial_failure() {
 }
 
 // =============================================================================
+// Shell completions tests
+// =============================================================================
+
+#[test]
+fn test_completions_bash() {
+    Command::cargo_bin("uls")
+        .unwrap()
+        .args(["completions", "bash"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("complete"));
+}
+
+#[test]
+fn test_completions_zsh() {
+    Command::cargo_bin("uls")
+        .unwrap()
+        .args(["completions", "zsh"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("compdef").or(predicate::str::contains("_uls")));
+}
+
+#[test]
+fn test_completions_fish() {
+    Command::cargo_bin("uls")
+        .unwrap()
+        .args(["completions", "fish"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("complete"));
+}
+
+#[test]
+fn test_completions_elvish() {
+    Command::cargo_bin("uls")
+        .unwrap()
+        .args(["completions", "elvish"])
+        .assert()
+        .success()
+        .stdout(predicate::str::is_empty().not());
+}
+
+#[test]
+fn test_completions_powershell() {
+    Command::cargo_bin("uls")
+        .unwrap()
+        .args(["completions", "powershell"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("uls"));
+}
+
+#[test]
+fn test_completions_help() {
+    Command::cargo_bin("uls")
+        .unwrap()
+        .args(["completions", "--help"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("shell"));
+}
+
+// =============================================================================
 // Database management tests
 // =============================================================================
 

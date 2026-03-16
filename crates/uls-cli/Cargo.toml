@@ -23,6 +23,7 @@ uls-download.workspace = true
 uls-query.workspace = true
 uls-api.workspace = true
 clap.workspace = true
+clap_complete.workspace = true
 tokio.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true

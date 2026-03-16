@@ -11,6 +11,7 @@
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
+use clap_complete::Shell;
 use tracing_subscriber::EnvFilter;
 
 mod commands;
@@ -123,6 +124,13 @@ enum Commands {
         /// CORS allowed origin (repeatable)
         #[arg(long = "cors-origin")]
         cors_origins: Vec<String>,
+    },
+
+    /// Generate shell completions
+    Completions {
+        /// Shell to generate completions for
+        #[arg(value_enum)]
+        shell: Shell,
     },
 
     /// Manage the database
@@ -321,6 +329,10 @@ async fn main() -> Result<()> {
             bind,
             cors_origins,
         }) => commands::serve::execute(port, &bind, cors_origins).await,
+        Some(Commands::Completions { shell }) => {
+            commands::completions::execute(shell);
+            Ok(())
+        }
         Some(Commands::Db { command }) => match command {
             DbCommands::Init { path } => commands::db::init(path).await,
             DbCommands::Info => commands::db::info(&cli.format).await,
