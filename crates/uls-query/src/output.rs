@@ -88,8 +88,18 @@ fn format_license_table(license: &License) -> String {
         output.push_str(&format!("Operator Class: {}\n", class));
     }
 
-    if let Some(ref addr) = license.street_address {
-        output.push_str(&format!("Address:        {}\n", addr));
+    match (&license.street_address, &license.po_box) {
+        (Some(addr), Some(po_box)) => {
+            output.push_str(&format!("Address:        {}\n", addr));
+            output.push_str(&format!("                PO Box {}\n", po_box));
+        }
+        (Some(addr), None) => {
+            output.push_str(&format!("Address:        {}\n", addr));
+        }
+        (None, Some(po_box)) => {
+            output.push_str(&format!("Address:        PO Box {}\n", po_box));
+        }
+        (None, None) => {}
     }
 
     let location = format_location(license);
@@ -312,6 +322,7 @@ mod tests {
             city: Some("NEWINGTON".to_string()),
             state: Some("CT".to_string()),
             zip_code: Some("06111".to_string()),
+            po_box: None,
             operator_class: Some('E'),
             previous_call_sign: None,
         }
@@ -539,6 +550,7 @@ mod tests {
             city: None,
             state: None,
             zip_code: None,
+            po_box: None,
             operator_class: None,
             previous_call_sign: None,
         };
@@ -581,12 +593,42 @@ mod tests {
             city: None,
             state: None,
             zip_code: None,
+            po_box: None,
             operator_class: None,
             previous_call_sign: None,
         };
         let output = license.format(OutputFormat::Table);
         assert!(output.contains("W0MIN"));
         // Should not have Location line since city/state/zip are all None
+    }
+
+    #[test]
+    fn test_table_format_po_box_fallback() {
+        let mut license = test_license();
+        license.street_address = None;
+        license.po_box = Some("608".to_string());
+        let output = license.format(OutputFormat::Table);
+        assert!(output.contains("Address:        PO Box 608"));
+        assert!(!output.contains("123 Main St"));
+    }
+
+    #[test]
+    fn test_table_format_both_address_and_po_box() {
+        let mut license = test_license();
+        license.street_address = Some("2865 Center Road".to_string());
+        license.po_box = Some("1367".to_string());
+        let output = license.format(OutputFormat::Table);
+        assert!(output.contains("Address:        2865 Center Road\n"));
+        assert!(output.contains("                PO Box 1367\n"));
+    }
+
+    #[test]
+    fn test_table_format_no_address_or_po_box() {
+        let mut license = test_license();
+        license.street_address = None;
+        license.po_box = None;
+        let output = license.format(OutputFormat::Table);
+        assert!(!output.contains("Address:"));
     }
 
     #[test]

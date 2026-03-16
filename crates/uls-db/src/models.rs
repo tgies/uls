@@ -41,6 +41,8 @@ pub struct License {
     pub state: Option<String>,
     /// ZIP code.
     pub zip_code: Option<String>,
+    /// PO Box.
+    pub po_box: Option<String>,
     /// Operator class (for amateur).
     pub operator_class: Option<char>,
     /// Previous call sign.
@@ -121,6 +123,7 @@ impl License {
                 }
             }
             "address" | "street_address" => self.street_address.clone(),
+            "po_box" => self.po_box.clone(),
             "frn" => self.frn.clone(),
             "grant_date" | "granted" => self.grant_date.map(|d| d.to_string()),
             "expired_date" | "expires" | "expiration" => self.expired_date.map(|d| d.to_string()),
@@ -148,6 +151,7 @@ impl License {
             "zip",
             "location",
             "address",
+            "po_box",
             "frn",
             "grant_date",
             "expired_date",
@@ -221,6 +225,7 @@ mod tests {
             city: None,
             state: None,
             zip_code: None,
+            po_box: None,
             operator_class: Some('E'),
             previous_call_sign: None,
         };
@@ -250,6 +255,7 @@ mod tests {
             city: None,
             state: None,
             zip_code: None,
+            po_box: None,
             operator_class: Some('E'),
             previous_call_sign: None,
         };
@@ -277,6 +283,7 @@ mod tests {
             city: None,
             state: None,
             zip_code: None,
+            po_box: None,
             operator_class: None,
             previous_call_sign: None,
         };
@@ -324,6 +331,7 @@ mod tests {
             city: None,
             state: None,
             zip_code: None,
+            po_box: None,
             operator_class: Some('T'),
             previous_call_sign: None,
         };
@@ -371,6 +379,7 @@ mod tests {
             city: None,
             state: None,
             zip_code: None,
+            po_box: None,
             operator_class: None,
             previous_call_sign: None,
         };
@@ -397,6 +406,7 @@ mod tests {
             city: Some("Newington".to_string()),
             state: Some("CT".to_string()),
             zip_code: Some("06111".to_string()),
+            po_box: None,
             operator_class: Some('E'),
             previous_call_sign: Some("N1XYZ".to_string()),
         };
@@ -507,6 +517,7 @@ mod tests {
             city: None,
             state: None,
             zip_code: None,
+            po_box: None,
             operator_class: None,
             previous_call_sign: None,
         };
@@ -534,6 +545,7 @@ mod tests {
             city: None,
             state: None,
             zip_code: None,
+            po_box: None,
             operator_class: None,
             previous_call_sign: None,
         };
@@ -574,6 +586,7 @@ mod tests {
             city: None,
             state: None,
             zip_code: None,
+            po_box: None,
             operator_class: None,
             previous_call_sign: None,
         };
@@ -608,6 +621,7 @@ mod tests {
             city: None,
             state: None,
             zip_code: None,
+            po_box: None,
             operator_class: None,
             previous_call_sign: None,
         };
@@ -642,6 +656,7 @@ mod tests {
             city: Some("Boston".to_string()),
             state: None,
             zip_code: None,
+            po_box: None,
             operator_class: None,
             previous_call_sign: None,
         };
@@ -675,6 +690,7 @@ mod tests {
             city: None,
             state: None,
             zip_code: None,
+            po_box: None,
             operator_class: None,
             previous_call_sign: None,
         };
@@ -705,6 +721,7 @@ mod tests {
             city: None,
             state: None,
             zip_code: None,
+            po_box: None,
             operator_class: None,
             previous_call_sign: None,
         };
@@ -736,6 +753,7 @@ mod tests {
             city: None,
             state: None,
             zip_code: None,
+            po_box: None,
             operator_class: None,
             previous_call_sign: None,
         };

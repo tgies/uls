@@ -68,13 +68,13 @@ impl QueryEngine {
 
         let query = format!(
             r#"
-            SELECT 
+            SELECT
                 l.unique_system_identifier, l.call_sign,
                 e.entity_name, e.first_name, e.middle_initial, e.last_name,
                 l.license_status, l.radio_service_code,
                 l.grant_date, l.expired_date, l.cancellation_date,
                 e.frn, NULL as previous_call_sign,
-                e.street_address, e.city, e.state, e.zip_code,
+                e.street_address, e.city, e.state, e.zip_code, e.po_box,
                 a.operator_class
             FROM licenses l
             LEFT JOIN entities e ON l.unique_system_identifier = e.unique_system_identifier
@@ -96,7 +96,7 @@ impl QueryEngine {
             // Use centralized enum adapter helpers from uls-db
             let status = read_license_status(row, 6)?;
             let radio_service = read_radio_service(row, 7)?;
-            let operator_class = read_operator_class(row, 17)?;
+            let operator_class = read_operator_class(row, 18)?;
 
             Ok(License {
                 unique_system_identifier: row.get(0)?,
@@ -122,6 +122,7 @@ impl QueryEngine {
                 city: row.get(14)?,
                 state: row.get(15)?,
                 zip_code: row.get(16)?,
+                po_box: row.get(17)?,
                 operator_class,
             })
         })?;
