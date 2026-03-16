@@ -128,9 +128,16 @@ async fn run_update(
 
     let weekly_date = db_weekly_date.unwrap_or(today);
 
-    // Try to build daily chain
-    let chain_result =
-        build_daily_chain(client, service_code, weekly_date, &applied_patches, today).await?;
+    // Try to build daily chain (no weekday to skip — we didn't just apply a weekly)
+    let chain_result = build_daily_chain(
+        client,
+        service_code,
+        weekly_date,
+        &applied_patches,
+        today,
+        None,
+    )
+    .await?;
 
     match chain_result {
         DailyChainResult::Complete(dailies) => {
@@ -167,18 +174,39 @@ enum DailyChainResult {
     Broken { missing_date: NaiveDate },
 }
 
+/// Return the weekdays to check for daily files, optionally skipping the
+/// weekday that coincides with a just-applied weekly snapshot.
+fn weekdays_to_check(
+    skip_weekday: Option<uls_download::catalog::Weekday>,
+) -> Vec<uls_download::catalog::Weekday> {
+    uls_download::catalog::Weekday::ALL
+        .iter()
+        .copied()
+        .filter(|w| {
+            if skip_weekday == Some(*w) {
+                tracing::debug!("Skipping {} daily (same day as weekly)", w.abbrev());
+                false
+            } else {
+                true
+            }
+        })
+        .collect()
+}
+
 async fn build_daily_chain(
     client: &FccClient,
     service_code: &str,
     last_update: NaiveDate,
     applied: &HashSet<NaiveDate>,
     _today: NaiveDate,
+    skip_weekday: Option<uls_download::catalog::Weekday>,
 ) -> Result<DailyChainResult> {
     let full_name = ServiceCatalog::full_name(service_code).unwrap_or("amat");
 
     let mut available_dailies: Vec<(NaiveDate, PathBuf)> = vec![];
+    let weekdays = weekdays_to_check(skip_weekday);
 
-    for weekday in &uls_download::catalog::Weekday::ALL {
+    for weekday in &weekdays {
         let data_file = uls_download::DataFile::daily_license(full_name, *weekday);
         let progress: ProgressCallback = Arc::new(|_| {});
 
@@ -271,9 +299,11 @@ async fn apply_weekly_then_dailies(
 
     let weekly_date = apply_weekly(db, client, service_code, import_mode).await?;
 
-    // Now try dailies after the fresh weekly
+    // Now try dailies after the fresh weekly, skipping the daily that matches
+    // the weekly's publication day (its data is already in the weekly).
     let applied = HashSet::new();
-    let chain = build_daily_chain(client, service_code, weekly_date, &applied, today).await?;
+    let skip = Some(uls_download::catalog::Weekday::for_date(weekly_date));
+    let chain = build_daily_chain(client, service_code, weekly_date, &applied, today, skip).await?;
 
     let daily_count = if let DailyChainResult::Complete(dailies) = chain {
         apply_dailies(db, service_code, import_mode, &dailies)?
@@ -393,4 +423,68 @@ fn apply_dailies(
     }
 
     Ok(count)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use uls_download::catalog::Weekday;
+
+    #[test]
+    fn test_parse_fcc_date_standard() {
+        let date = parse_fcc_date("Sun Jan 18 12:01:25 EST 2026");
+        assert_eq!(date, NaiveDate::from_ymd_opt(2026, 1, 18));
+    }
+
+    #[test]
+    fn test_parse_fcc_date_various_months() {
+        assert_eq!(
+            parse_fcc_date("Mon Mar 03 08:00:00 EST 2025"),
+            NaiveDate::from_ymd_opt(2025, 3, 3)
+        );
+        assert_eq!(
+            parse_fcc_date("Fri Dec 31 23:59:59 EST 2027"),
+            NaiveDate::from_ymd_opt(2027, 12, 31)
+        );
+    }
+
+    #[test]
+    fn test_parse_fcc_date_invalid() {
+        assert!(parse_fcc_date("not a date").is_none());
+        assert!(parse_fcc_date("").is_none());
+        assert!(parse_fcc_date("Mon Xyz 01 00:00:00 EST 2025").is_none());
+    }
+
+    #[test]
+    fn test_weekly_weekday_skip_matches_date() {
+        // FCC weeklies are published on Sundays; a Sunday date should produce
+        // Weekday::Sunday which would be skipped after a fresh weekly import.
+        let sunday = NaiveDate::from_ymd_opt(2026, 1, 18).unwrap();
+        assert_eq!(Weekday::for_date(sunday), Weekday::Sunday);
+
+        let monday = NaiveDate::from_ymd_opt(2026, 1, 19).unwrap();
+        assert_eq!(Weekday::for_date(monday), Weekday::Monday);
+    }
+
+    #[test]
+    fn test_weekdays_to_check_skips_sunday() {
+        let kept = weekdays_to_check(Some(Weekday::Sunday));
+        assert_eq!(kept.len(), 6);
+        assert!(!kept.contains(&Weekday::Sunday));
+    }
+
+    #[test]
+    fn test_weekdays_to_check_skips_correct_day() {
+        for skip_day in &Weekday::ALL {
+            let kept = weekdays_to_check(Some(*skip_day));
+            assert_eq!(kept.len(), 6);
+            assert!(!kept.contains(skip_day));
+        }
+    }
+
+    #[test]
+    fn test_weekdays_to_check_none_keeps_all() {
+        let kept = weekdays_to_check(None);
+        assert_eq!(kept.len(), 7);
+    }
 }
