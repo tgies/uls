@@ -51,7 +51,7 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - name: Build binary
-        uses: houseabsolute/actions-rust-cross@9a1618ffb70e8374ab5f48fcccea3ebeacf57971 # v1.0.5
+        uses: houseabsolute/actions-rust-cross@a8cc74d61047fa553b4e908b4b10e70029f00ca6 # v1.0.6
         with:
           command: build
           target: ${{ matrix.platform.target }}
@@ -59,7 +59,7 @@ jobs:
           strip: true
 
       - name: Publish artifacts and release
-        uses: houseabsolute/actions-rust-release@48ce35fb40c3dab00791a3d6c485022341354c44 # v0.0.6
+        uses: houseabsolute/actions-rust-release@c44c1813a888b1d070680a3783d0ed0d8cc2b6b6 # v0.0.7
         with:
           executable-name: uls
           archive-name: uls-${{ matrix.platform.target }}
