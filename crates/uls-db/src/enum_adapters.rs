@@ -28,7 +28,7 @@ pub fn read_radio_service(row: &Row, idx: usize) -> rusqlite::Result<String> {
         .unwrap_or_default())
 }
 
-/// Read an operator_class column (stored as INTEGER) and return as `Option<char>.
+/// Read an operator_class column (stored as INTEGER) and return as `Option<char>`.
 ///
 /// Returns None if the value is NULL or unrecognized.
 pub fn read_operator_class(row: &Row, idx: usize) -> rusqlite::Result<Option<char>> {
