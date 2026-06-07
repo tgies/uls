@@ -487,4 +487,402 @@ mod tests {
         let kept = weekdays_to_check(None);
         assert_eq!(kept.len(), 7);
     }
+
+    // =========================================================================
+    // Orchestration tests (run_update / apply_weekly / build_daily_chain /
+    // apply_dailies) driven by a wiremock backend and a real TempDir database.
+    // =========================================================================
+
+    use std::fs;
+    use std::io::Write as _;
+    use std::path::Path;
+    use tempfile::TempDir;
+    use uls_download::DownloadConfig;
+    use wiremock::matchers::{method, path as wm_path};
+    use wiremock::{Mock, MockServer, ResponseTemplate};
+    use zip::write::SimpleFileOptions;
+    use zip::ZipWriter;
+
+    /// Path to the shared FCC sample fixtures.
+    fn fixture_dir(service: &str) -> std::path::PathBuf {
+        std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .unwrap()
+            .parent()
+            .unwrap()
+            .join("tests/fixtures/fcc-sample")
+            .join(service)
+    }
+
+    /// Build a ULS ZIP from the fixture DAT files plus a `counts` file carrying
+    /// the given FCC creation date string. The creation date is what
+    /// `extract_canonical_date` reads to order/gate weekly and daily files.
+    fn build_fixture_zip(service: &str, creation_date: &str) -> Vec<u8> {
+        let mut buf = Vec::new();
+        {
+            let cursor = std::io::Cursor::new(&mut buf);
+            let mut zip = ZipWriter::new(cursor);
+            let opts =
+                SimpleFileOptions::default().compression_method(zip::CompressionMethod::Stored);
+
+            zip.start_file("counts", opts).unwrap();
+            writeln!(zip, "File Creation Date: {}", creation_date).unwrap();
+
+            for entry in fs::read_dir(fixture_dir(service)).unwrap() {
+                let p = entry.unwrap().path();
+                if p.extension().is_some_and(|e| e == "dat") {
+                    let name = p.file_name().unwrap().to_str().unwrap().to_string();
+                    let contents = fs::read(&p).unwrap();
+                    zip.start_file(name, opts).unwrap();
+                    zip.write_all(&contents).unwrap();
+                }
+            }
+            zip.finish().unwrap();
+        }
+        buf
+    }
+
+    /// Mount a ZIP body at the given URL path on the mock server.
+    async fn mount_zip(server: &MockServer, url_path: &str, body: Vec<u8>) {
+        Mock::given(method("GET"))
+            .and(wm_path(url_path.to_string()))
+            .respond_with(
+                ResponseTemplate::new(200)
+                    .set_body_bytes(body.clone())
+                    .insert_header("Content-Length", body.len().to_string())
+                    .insert_header("ETag", "\"fixture-etag\""),
+            )
+            .mount(server)
+            .await;
+    }
+
+    /// Open a fresh initialized database in a temp directory.
+    fn fresh_db(dir: &Path) -> Database {
+        let config = DatabaseConfig::with_path(dir.join("test.db"));
+        let db = Database::with_config(config).unwrap();
+        db.initialize().unwrap();
+        db
+    }
+
+    fn test_client(server: &MockServer, cache: &Path) -> FccClient {
+        let config = DownloadConfig::with_cache_dir(cache.to_path_buf())
+            .with_base_url(server.uri())
+            .with_timeout(std::time::Duration::from_secs(10));
+        FccClient::new(config).unwrap()
+    }
+
+    #[tokio::test]
+    async fn test_run_update_fresh_db_applies_weekly_and_dailies() {
+        let server = MockServer::start().await;
+        let tmp = TempDir::new().unwrap();
+        let db = fresh_db(tmp.path());
+        let client = test_client(&server, tmp.path());
+
+        // Weekly published Sunday 2026-01-18; one Monday daily one day later.
+        mount_zip(
+            &server,
+            "/complete/l_amat.zip",
+            build_fixture_zip("l_amat", "Sun Jan 18 12:01:25 EST 2026"),
+        )
+        .await;
+        mount_zip(
+            &server,
+            "/daily/l_am_mon.zip",
+            build_fixture_zip("l_amat", "Mon Jan 19 12:01:25 EST 2026"),
+        )
+        .await;
+
+        let result = run_update(
+            &db,
+            &client,
+            "HA",
+            &ImportMode::Minimal,
+            false,
+            false,
+            false,
+        )
+        .await
+        .unwrap();
+
+        match result {
+            UpdateResult::Updated { dailies, weekly } => {
+                assert!(weekly, "weekly should be applied on a fresh DB");
+                assert_eq!(dailies, 1, "exactly the Monday daily should apply");
+            }
+            other => panic!("expected Updated, got {:?}", DebugResult(&other)),
+        }
+
+        // Metadata reflects the weekly snapshot and the single applied patch.
+        assert_eq!(
+            db.get_last_weekly_date("HA").unwrap(),
+            NaiveDate::from_ymd_opt(2026, 1, 18)
+        );
+        let patches = db.get_applied_patches("HA").unwrap();
+        assert_eq!(patches.len(), 1);
+        assert_eq!(
+            patches[0].patch_date,
+            NaiveDate::from_ymd_opt(2026, 1, 19).unwrap()
+        );
+    }
+
+    #[tokio::test]
+    async fn test_run_update_up_to_date_returns_uptodate() {
+        let server = MockServer::start().await;
+        let tmp = TempDir::new().unwrap();
+        let db = fresh_db(tmp.path());
+        let client = test_client(&server, tmp.path());
+
+        // Record an existing weekly far in the future so no daily is newer.
+        let weekly = NaiveDate::from_ymd_opt(2030, 6, 7).unwrap(); // a Friday
+        db.set_last_weekly_date("HA", weekly).unwrap();
+
+        // Serve dailies whose canonical dates predate the weekly, so the chain
+        // builder gates them all out.
+        mount_zip(
+            &server,
+            "/daily/l_am_mon.zip",
+            build_fixture_zip("l_amat", "Mon Jan 19 12:01:25 EST 2026"),
+        )
+        .await;
+
+        let result = run_update(
+            &db,
+            &client,
+            "HA",
+            &ImportMode::Minimal,
+            false,
+            false,
+            false,
+        )
+        .await
+        .unwrap();
+
+        assert!(matches!(result, UpdateResult::UpToDate));
+    }
+
+    #[tokio::test]
+    async fn test_run_update_check_only_reports_available_count() {
+        let server = MockServer::start().await;
+        let tmp = TempDir::new().unwrap();
+        let db = fresh_db(tmp.path());
+        let client = test_client(&server, tmp.path());
+
+        // Existing weekly on Sunday; a newer Monday daily is available.
+        let weekly = NaiveDate::from_ymd_opt(2026, 1, 18).unwrap();
+        db.set_last_weekly_date("HA", weekly).unwrap();
+        mount_zip(
+            &server,
+            "/daily/l_am_mon.zip",
+            build_fixture_zip("l_amat", "Mon Jan 19 12:01:25 EST 2026"),
+        )
+        .await;
+
+        let result = run_update(
+            &db,
+            &client,
+            "HA",
+            &ImportMode::Minimal,
+            false,
+            false,
+            true, // check_only
+        )
+        .await
+        .unwrap();
+
+        match result {
+            UpdateResult::CheckOnly { available } => assert_eq!(available, 1),
+            other => panic!("expected CheckOnly, got {:?}", DebugResult(&other)),
+        }
+
+        // Check mode must not mutate patch state.
+        assert!(db.get_applied_patches("HA").unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_run_update_check_only_fresh_db_reports_weekly() {
+        let server = MockServer::start().await;
+        let tmp = TempDir::new().unwrap();
+        let db = fresh_db(tmp.path());
+        let client = test_client(&server, tmp.path());
+
+        // No weekly recorded and check_only: a weekly import is "available".
+        let result = run_update(&db, &client, "HA", &ImportMode::Minimal, false, false, true)
+            .await
+            .unwrap();
+
+        match result {
+            UpdateResult::CheckOnly { available } => assert_eq!(available, 1),
+            other => panic!("expected CheckOnly, got {:?}", DebugResult(&other)),
+        }
+        // Nothing imported.
+        assert!(db.get_last_weekly_date("HA").unwrap().is_none());
+    }
+
+    #[tokio::test]
+    async fn test_run_update_daily_only_no_newer_dailies_is_uptodate() {
+        let server = MockServer::start().await;
+        let tmp = TempDir::new().unwrap();
+        let db = fresh_db(tmp.path());
+        let client = test_client(&server, tmp.path());
+
+        // daily_only with no weekly in DB: weekly_date defaults to today, and no
+        // served daily is newer than today, so the chain is empty.
+        mount_zip(
+            &server,
+            "/daily/l_am_mon.zip",
+            build_fixture_zip("l_amat", "Mon Jan 19 12:01:25 EST 2026"),
+        )
+        .await;
+
+        let result = run_update(
+            &db,
+            &client,
+            "HA",
+            &ImportMode::Minimal,
+            false,
+            true, // daily_only
+            false,
+        )
+        .await
+        .unwrap();
+
+        assert!(matches!(result, UpdateResult::UpToDate));
+        // daily_only must not perform a weekly import.
+        assert!(db.get_last_weekly_date("HA").unwrap().is_none());
+    }
+
+    #[tokio::test]
+    async fn test_run_update_broken_daily_chain_falls_back_to_weekly() {
+        let server = MockServer::start().await;
+        let tmp = TempDir::new().unwrap();
+        let db = fresh_db(tmp.path());
+        let client = test_client(&server, tmp.path());
+
+        // Existing weekly on Sunday 2026-01-18. The only available daily is for
+        // Thursday 2026-01-22, leaving a multi-day gap (Mon/Tue/Wed missing),
+        // which the chain builder reports as broken and falls back to weekly.
+        let weekly = NaiveDate::from_ymd_opt(2026, 1, 18).unwrap();
+        db.set_last_weekly_date("HA", weekly).unwrap();
+
+        mount_zip(
+            &server,
+            "/daily/l_am_thu.zip",
+            build_fixture_zip("l_amat", "Thu Jan 22 12:01:25 EST 2026"),
+        )
+        .await;
+        // Fresh weekly served for the fallback import.
+        mount_zip(
+            &server,
+            "/complete/l_amat.zip",
+            build_fixture_zip("l_amat", "Sun Jan 25 12:01:25 EST 2026"),
+        )
+        .await;
+
+        let result = run_update(
+            &db,
+            &client,
+            "HA",
+            &ImportMode::Minimal,
+            false,
+            false,
+            false,
+        )
+        .await
+        .unwrap();
+
+        match result {
+            UpdateResult::Updated { weekly, .. } => {
+                assert!(weekly, "fallback should perform a weekly import");
+            }
+            other => panic!("expected Updated, got {:?}", DebugResult(&other)),
+        }
+
+        // The fresh weekly date replaced the old one, and patches were cleared.
+        assert_eq!(
+            db.get_last_weekly_date("HA").unwrap(),
+            NaiveDate::from_ymd_opt(2026, 1, 25)
+        );
+    }
+
+    #[tokio::test]
+    async fn test_run_update_broken_chain_check_only_reports_one() {
+        let server = MockServer::start().await;
+        let tmp = TempDir::new().unwrap();
+        let db = fresh_db(tmp.path());
+        let client = test_client(&server, tmp.path());
+
+        let weekly = NaiveDate::from_ymd_opt(2026, 1, 18).unwrap();
+        db.set_last_weekly_date("HA", weekly).unwrap();
+        mount_zip(
+            &server,
+            "/daily/l_am_thu.zip",
+            build_fixture_zip("l_amat", "Thu Jan 22 12:01:25 EST 2026"),
+        )
+        .await;
+
+        let result = run_update(
+            &db,
+            &client,
+            "HA",
+            &ImportMode::Minimal,
+            false,
+            false,
+            true, // check_only
+        )
+        .await
+        .unwrap();
+
+        match result {
+            UpdateResult::CheckOnly { available } => assert_eq!(available, 1),
+            other => panic!("expected CheckOnly, got {:?}", DebugResult(&other)),
+        }
+        // Old weekly untouched in check mode.
+        assert_eq!(db.get_last_weekly_date("HA").unwrap(), Some(weekly));
+    }
+
+    #[tokio::test]
+    async fn test_extract_canonical_date_round_trip() {
+        let tmp = TempDir::new().unwrap();
+        let zip_path = tmp.path().join("l_amat.zip");
+        let body = build_fixture_zip("l_amat", "Sun Jan 18 12:01:25 EST 2026");
+        fs::write(&zip_path, body).unwrap();
+
+        let date = extract_canonical_date(&zip_path).unwrap();
+        assert_eq!(date, NaiveDate::from_ymd_opt(2026, 1, 18));
+    }
+
+    #[tokio::test]
+    async fn test_extract_canonical_date_missing_counts_is_none() {
+        let tmp = TempDir::new().unwrap();
+        let zip_path = tmp.path().join("no_counts.zip");
+        let mut buf = Vec::new();
+        {
+            let cursor = std::io::Cursor::new(&mut buf);
+            let mut zip = ZipWriter::new(cursor);
+            let opts =
+                SimpleFileOptions::default().compression_method(zip::CompressionMethod::Stored);
+            zip.start_file("HD.dat", opts).unwrap();
+            zip.write_all(b"HD|1|||TEST|A|HA|\n").unwrap();
+            zip.finish().unwrap();
+        }
+        fs::write(&zip_path, buf).unwrap();
+
+        assert_eq!(extract_canonical_date(&zip_path).unwrap(), None);
+    }
+
+    /// Wrapper that makes the private `UpdateResult` printable in panic messages.
+    struct DebugResult<'a>(&'a UpdateResult);
+    impl std::fmt::Debug for DebugResult<'_> {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            match self.0 {
+                UpdateResult::UpToDate => write!(f, "UpToDate"),
+                UpdateResult::Updated { dailies, weekly } => {
+                    write!(f, "Updated {{ dailies: {}, weekly: {} }}", dailies, weekly)
+                }
+                UpdateResult::CheckOnly { available } => {
+                    write!(f, "CheckOnly {{ available: {} }}", available)
+                }
+            }
+        }
+    }
 }
