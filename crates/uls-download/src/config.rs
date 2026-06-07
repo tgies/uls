@@ -3,6 +3,15 @@
 use std::path::PathBuf;
 use std::time::Duration;
 
+/// Default User-Agent sent with FCC download requests, carrying the crate
+/// version. Also used as the fallback when a configured User-Agent cannot be
+/// parsed into a header value.
+pub const DEFAULT_USER_AGENT: &str = concat!(
+    "uls-cli/",
+    env!("CARGO_PKG_VERSION"),
+    " (https://github.com/tgies/uls)"
+);
+
 /// Configuration for the FCC download client.
 #[derive(Debug, Clone)]
 pub struct DownloadConfig {
@@ -37,10 +46,7 @@ impl Default for DownloadConfig {
             cache_dir: default_cache_dir(),
             base_url: "https://data.fcc.gov/download/pub/uls".to_string(),
             timeout: Duration::from_secs(300), // 5 minutes
-            user_agent: format!(
-                "uls-cli/{} (https://github.com/tgies/uls)",
-                env!("CARGO_PKG_VERSION")
-            ),
+            user_agent: DEFAULT_USER_AGENT.to_string(),
             verify_ssl: true,
             max_retries: 3,
             retry_delay: Duration::from_secs(5),

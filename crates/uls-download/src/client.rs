@@ -36,7 +36,7 @@ impl FccClient {
             config
                 .user_agent
                 .parse()
-                .unwrap_or_else(|_| "uls-cli/0.1.0".parse().unwrap()),
+                .unwrap_or_else(|_| crate::config::DEFAULT_USER_AGENT.parse().unwrap()),
         );
 
         let http = reqwest::Client::builder()
