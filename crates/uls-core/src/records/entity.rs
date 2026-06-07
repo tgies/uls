@@ -174,4 +174,60 @@ mod tests {
         record.entity_name = Some("ACME Corp".to_string());
         assert_eq!(record.full_name(), "ACME Corp");
     }
+
+    #[test]
+    fn test_full_name_with_mi_and_suffix() {
+        let mut record = EntityRecord::from_fields(&["EN", "123"]);
+        record.first_name = Some("Hiram".to_string());
+        record.mi = Some('P');
+        record.last_name = Some("Maxim".to_string());
+        record.suffix = Some("Jr".to_string());
+        assert_eq!(record.full_name(), "Hiram P Maxim Jr");
+    }
+
+    #[test]
+    fn test_full_name_ignores_empty_entity_name() {
+        let mut record = EntityRecord::from_fields(&["EN", "123"]);
+        record.entity_name = Some(String::new());
+        record.first_name = Some("Jane".to_string());
+        record.last_name = Some("Roe".to_string());
+        assert_eq!(record.full_name(), "Jane Roe");
+    }
+
+    #[test]
+    fn test_full_name_empty_when_no_parts() {
+        let record = EntityRecord::from_fields(&["EN", "123"]);
+        assert_eq!(record.full_name(), "");
+    }
+
+    #[test]
+    fn test_full_address_street_city_state_zip() {
+        let mut record = EntityRecord::from_fields(&["EN", "123"]);
+        record.street_address = Some("225 Main St".to_string());
+        record.city = Some("Newington".to_string());
+        record.state = Some("CT".to_string());
+        record.zip_code = Some("06111".to_string());
+        assert_eq!(record.full_address(), "225 Main St, Newington, CT 06111");
+    }
+
+    #[test]
+    fn test_full_address_street_only() {
+        let mut record = EntityRecord::from_fields(&["EN", "123"]);
+        record.street_address = Some("1 Radio Way".to_string());
+        assert_eq!(record.full_address(), "1 Radio Way");
+    }
+
+    #[test]
+    fn test_full_address_city_without_state_or_zip_is_trimmed() {
+        let mut record = EntityRecord::from_fields(&["EN", "123"]);
+        record.city = Some("Newington".to_string());
+        // No state or zip: the trailing separators are trimmed off.
+        assert_eq!(record.full_address(), "Newington,");
+    }
+
+    #[test]
+    fn test_full_address_empty_when_no_parts() {
+        let record = EntityRecord::from_fields(&["EN", "123"]);
+        assert_eq!(record.full_address(), "");
+    }
 }

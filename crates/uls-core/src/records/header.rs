@@ -230,4 +230,26 @@ mod tests {
         assert_eq!(record.call_sign, None);
         assert!(!record.is_active());
     }
+
+    #[test]
+    fn test_header_is_expired() {
+        let mut record = HeaderRecord::from_fields(&["HD", "1"]);
+        record.license_status = Some('E');
+        assert!(record.is_expired());
+        assert!(!record.is_active());
+    }
+
+    #[test]
+    fn test_header_is_expired_false_for_active() {
+        let mut record = HeaderRecord::from_fields(&["HD", "1"]);
+        record.license_status = Some('A');
+        assert!(!record.is_expired());
+        assert!(record.is_active());
+    }
+
+    #[test]
+    fn test_header_is_expired_false_when_status_missing() {
+        let record = HeaderRecord::from_fields(&["HD", "1"]);
+        assert!(!record.is_expired());
+    }
 }

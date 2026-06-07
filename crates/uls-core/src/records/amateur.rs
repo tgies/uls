@@ -110,4 +110,38 @@ mod tests {
         record.trustee_callsign = Some("N1MM".to_string());
         assert!(record.is_club());
     }
+
+    #[test]
+    fn test_is_club_trustee_callsign_only() {
+        let mut record = AmateurRecord::from_fields(&["AM", "123"]);
+        record.trustee_callsign = Some("N1MM".to_string());
+        assert!(record.is_club());
+    }
+
+    #[test]
+    fn test_is_club_false_when_no_trustee() {
+        let record = AmateurRecord::from_fields(&["AM", "123"]);
+        assert!(!record.is_club());
+    }
+
+    #[rstest::rstest]
+    #[case('A', "Advanced")]
+    #[case('E', "Amateur Extra")]
+    #[case('G', "General")]
+    #[case('N', "Novice")]
+    #[case('P', "Technician Plus")]
+    #[case('T', "Technician")]
+    fn test_operator_class_description_all(#[case] code: char, #[case] expected: &str) {
+        let mut record = AmateurRecord::from_fields(&["AM", "123"]);
+        record.operator_class = Some(code);
+        assert_eq!(record.operator_class_description(), Some(expected));
+    }
+
+    #[test]
+    fn test_operator_class_description_unknown_and_missing() {
+        let mut record = AmateurRecord::from_fields(&["AM", "123"]);
+        assert_eq!(record.operator_class_description(), None);
+        record.operator_class = Some('Z');
+        assert_eq!(record.operator_class_description(), None);
+    }
 }
