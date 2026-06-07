@@ -22,12 +22,17 @@ env:
   CARGO_TERM_COLOR: always
   FCC_DATA_BASE_URL: "https://data.fcc.gov/download/pub/uls"
 
+permissions:
+  contents: read
+
 jobs:
   integration-test:
     name: Integration Test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
       
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -55,6 +60,8 @@ jobs:
     if: github.event.inputs.test_type == 'full' || github.event_name == 'schedule'
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
       
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -83,12 +90,14 @@ jobs:
       
       - name: Download and import amateur data
         run: |
-          if [[ "${{ github.event.inputs.force_download }}" == "true" ]]; then
+          if [[ "${GITHUB_EVENT_INPUTS_FORCE_DOWNLOAD}" == "true" ]]; then
             echo "Force download requested, clearing cache..."
             rm -rf ~/.cache/uls
           fi
           
           ./target/release/uls update --service amateur
+        env:
+          GITHUB_EVENT_INPUTS_FORCE_DOWNLOAD: ${{ github.event.inputs.force_download }}
       
       - name: Verify database stats
         run: |
