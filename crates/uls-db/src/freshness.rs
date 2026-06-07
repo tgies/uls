@@ -318,6 +318,102 @@ mod tests {
     }
 
     #[test]
+    fn test_freshness_unknown_constructor() {
+        let freshness = DataFreshness::unknown("ZA");
+        assert_eq!(freshness.service, "ZA");
+        assert!(freshness.is_stale);
+        assert!(freshness.last_updated.is_none());
+        assert!(freshness.age.is_none());
+        assert_eq!(freshness.age_display, "unknown");
+        assert!(freshness.last_weekly_date.is_none());
+        assert!(freshness.applied_patch_dates.is_empty());
+        assert!(freshness.missing_patch_dates.is_empty());
+    }
+
+    #[test]
+    fn test_age_days_none_when_unknown() {
+        let freshness = DataFreshness::unknown("HA");
+        assert_eq!(freshness.age_days(), None);
+    }
+
+    #[test]
+    fn test_needs_weekly_update_tracks_last_weekly_date() {
+        let mut freshness = DataFreshness::unknown("HA");
+        assert!(freshness.needs_weekly_update());
+
+        freshness.last_weekly_date = NaiveDate::from_ymd_opt(2026, 1, 5);
+        assert!(!freshness.needs_weekly_update());
+    }
+
+    #[test]
+    fn test_has_missing_patches() {
+        let mut freshness = DataFreshness::unknown("HA");
+        assert!(!freshness.has_missing_patches());
+
+        freshness.missing_patch_dates = vec![NaiveDate::from_ymd_opt(2026, 1, 6).unwrap()];
+        assert!(freshness.has_missing_patches());
+    }
+
+    #[test]
+    fn test_age_display_minutes_for_very_recent() {
+        let recent = Utc::now() - Duration::minutes(30);
+        let timestamp = recent.format("%Y-%m-%d %H:%M:%S UTC").to_string();
+        let freshness = DataFreshness::from_timestamp("HA", Some(&timestamp), 3);
+        assert!(freshness.age_display.ends_with('m'));
+        assert!(!freshness.age_display.contains('h'));
+        assert!(!freshness.is_stale);
+    }
+
+    #[test]
+    fn test_from_timestamp_rfc3339() {
+        let recent = Utc::now() - Duration::hours(2);
+        let timestamp = recent.to_rfc3339();
+        let freshness = DataFreshness::from_timestamp("HA", Some(&timestamp), 3);
+        assert!(freshness.last_updated.is_some());
+        assert!(!freshness.is_stale);
+    }
+
+    #[test]
+    fn test_from_timestamp_unparseable_is_stale() {
+        let freshness = DataFreshness::from_timestamp("HA", Some("not a date at all"), 3);
+        assert!(freshness.last_updated.is_none());
+        assert!(freshness.is_stale);
+        assert_eq!(freshness.age_display, "unknown");
+    }
+
+    #[test]
+    fn test_staleness_config_no_warnings() {
+        let config = StalenessConfig::no_warnings();
+        assert!(!config.warn_enabled);
+        assert!(!config.auto_update);
+        assert_eq!(config.threshold_days, DEFAULT_STALE_THRESHOLD_DAYS);
+    }
+
+    #[test]
+    fn test_staleness_config_with_auto_update() {
+        let config = StalenessConfig::with_auto_update();
+        assert!(config.auto_update);
+        assert!(config.warn_enabled);
+        assert_eq!(config.threshold_days, DEFAULT_STALE_THRESHOLD_DAYS);
+    }
+
+    #[test]
+    fn test_staleness_config_with_threshold() {
+        let config = StalenessConfig::with_threshold(10);
+        assert_eq!(config.threshold_days, 10);
+        assert!(config.warn_enabled);
+        assert!(!config.auto_update);
+    }
+
+    #[test]
+    fn test_parse_fcc_datetime_bad_time_component() {
+        // Day and month parse but the time field lacks three colon-separated parts.
+        assert!(parse_fcc_datetime("Tue Jan 13 0831 EST 2026").is_none());
+        // Out-of-range month abbreviation.
+        assert!(parse_fcc_datetime("Tue Foo 13 08:31:48 EST 2026").is_none());
+    }
+
+    #[test]
     fn test_freshness_from_fcc_format() {
         // FCC format: "Tue Jan 13 08:31:48 EST 2026"
         // This is older than 3 days from today (Jan 19), so should be stale

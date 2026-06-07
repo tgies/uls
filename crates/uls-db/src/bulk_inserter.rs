@@ -616,6 +616,133 @@ mod tests {
     }
 
     #[test]
+    fn test_insert_amateur_stores_optional_fields() {
+        let conn = setup_db();
+        let mut inserter = BulkInserter::new(&conn).unwrap();
+        insert_parent_header(&mut inserter);
+
+        inserter
+            .insert(&UlsRecord::Amateur(create_amateur()))
+            .unwrap();
+
+        // region_code is parsed as an integer; group_code as text; the amateur
+        // fixture uses class E, group D, region 6.
+        let (region, group): (Option<i64>, Option<String>) = conn
+            .query_row(
+                "SELECT region_code, group_code FROM amateur_operators WHERE call_sign = ?",
+                [TEST_CALLSIGN],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )
+            .unwrap();
+        assert_eq!(region, Some(6));
+        assert_eq!(group, Some("D".to_string()));
+
+        // operator_class is encoded as an integer code, not the raw char 'E';
+        // the code decodes back to the Extra class the fixture used.
+        let class_code: Option<i64> = conn
+            .query_row(
+                "SELECT operator_class FROM amateur_operators WHERE call_sign = ?",
+                [TEST_CALLSIGN],
+                |r| r.get(0),
+            )
+            .unwrap();
+        let class =
+            OperatorClass::from_u8(class_code.expect("operator_class should be encoded") as u8);
+        assert_eq!(class, Some(OperatorClass::Extra));
+    }
+
+    #[test]
+    fn test_insert_entity_stores_address_and_frn() {
+        let conn = setup_db();
+        let mut inserter = BulkInserter::new(&conn).unwrap();
+        insert_parent_header(&mut inserter);
+
+        inserter
+            .insert(&UlsRecord::Entity(create_entity()))
+            .unwrap();
+
+        let field = |column: &str| -> Option<String> {
+            conn.query_row(
+                &format!("SELECT {column} FROM entities WHERE call_sign = ?"),
+                [TEST_CALLSIGN],
+                |r| r.get(0),
+            )
+            .unwrap()
+        };
+        assert_eq!(field("city"), Some("ANYTOWN".to_string()));
+        assert_eq!(field("state"), Some("CA".to_string()));
+        assert_eq!(field("zip_code"), Some("90210".to_string()));
+        assert_eq!(field("frn"), Some("0001234567".to_string()));
+        assert_eq!(field("email"), Some("test@example.com".to_string()));
+    }
+
+    #[test]
+    fn test_insert_header_encodes_status_and_service() {
+        let conn = setup_db();
+        let mut inserter = BulkInserter::new(&conn).unwrap();
+
+        inserter
+            .insert(&UlsRecord::Header(create_header()))
+            .unwrap();
+
+        // Status 'A' and service "HA" are stored as integer codes that decode
+        // back to the Active status and HA radio service the fixture used.
+        let (status, service): (Option<i64>, Option<i64>) = conn
+            .query_row(
+                "SELECT license_status, radio_service_code FROM licenses WHERE call_sign = ?",
+                [TEST_CALLSIGN],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )
+            .unwrap();
+        let status =
+            LicenseStatus::from_u8(status.expect("license_status should be encoded") as u8);
+        assert_eq!(status, Some(LicenseStatus::Active));
+        let service =
+            RadioService::from_u8(service.expect("radio_service_code should be encoded") as u8);
+        assert_eq!(service, Some(RadioService::HA));
+
+        // Dates are normalized to YYYY-MM-DD strings on the way in.
+        let grant: Option<String> = conn
+            .query_row(
+                "SELECT grant_date FROM licenses WHERE call_sign = ?",
+                [TEST_CALLSIGN],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(grant, Some("2020-01-15".to_string()));
+    }
+
+    #[test]
+    fn test_insert_entity_replace_updates_in_place() {
+        let conn = setup_db();
+        let mut inserter = BulkInserter::new(&conn).unwrap();
+        insert_parent_header(&mut inserter);
+
+        inserter
+            .insert(&UlsRecord::Entity(create_entity()))
+            .unwrap();
+
+        // A second entity with the same (usi, entity_type) replaces the first.
+        let mut updated = create_entity();
+        updated.city = Some("NEWCITY".to_string());
+        inserter.insert(&UlsRecord::Entity(updated)).unwrap();
+
+        let count: i64 = conn
+            .query_row("SELECT COUNT(*) FROM entities", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(count, 1);
+
+        let city: Option<String> = conn
+            .query_row(
+                "SELECT city FROM entities WHERE call_sign = ?",
+                [TEST_CALLSIGN],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(city, Some("NEWCITY".to_string()));
+    }
+
+    #[test]
     fn test_insert_replace_behavior() {
         let conn = setup_db();
         let mut inserter = BulkInserter::new(&conn).unwrap();
