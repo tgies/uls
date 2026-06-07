@@ -503,6 +503,144 @@ mod tests {
     }
 
     #[test]
+    fn test_datafile_display_uses_filename() {
+        let complete = DataFile::complete_license("amat");
+        assert_eq!(complete.to_string(), "l_amat.zip");
+
+        let daily = DataFile::daily_license("gmrs", Weekday::Wednesday);
+        assert_eq!(daily.to_string(), "l_gm_wed.zip");
+
+        let application = DataFile::complete_application("amat");
+        assert_eq!(application.to_string(), "a_amat.zip");
+    }
+
+    #[test]
+    fn test_complete_application_via_catalog_known_and_unknown() {
+        let file = ServiceCatalog::complete_application("amat").unwrap();
+        assert_eq!(file.filename(), "a_amat.zip");
+        assert_eq!(file.url_path(), "complete/a_amat.zip");
+
+        // Radio service code resolves to the full name as well.
+        let by_code = ServiceCatalog::complete_application("HA").unwrap();
+        assert_eq!(by_code.filename(), "a_amat.zip");
+
+        let err = ServiceCatalog::complete_application("nope").unwrap_err();
+        assert!(matches!(err, DownloadError::UnknownService(s) if s == "nope"));
+    }
+
+    #[test]
+    fn test_full_name_unknown_returns_none() {
+        assert_eq!(ServiceCatalog::full_name("amat"), Some("amat"));
+        assert_eq!(ServiceCatalog::full_name("gm"), Some("gmrs"));
+        assert_eq!(ServiceCatalog::full_name("ZA"), Some("gmrs"));
+        assert_eq!(ServiceCatalog::full_name("not-a-service"), None);
+    }
+
+    #[test]
+    fn test_daily_abbreviation_unknown_returns_placeholder() {
+        assert_eq!(ServiceCatalog::daily_abbreviation("ship"), "sh");
+        assert_eq!(ServiceCatalog::daily_abbreviation("does-not-exist"), "xx");
+    }
+
+    #[test]
+    fn test_unknown_service_daily_filename_uses_placeholder() {
+        // An unknown service still produces a (placeholder) daily filename.
+        let file = DataFile::daily_license("mystery", Weekday::Tuesday);
+        assert_eq!(file.filename(), "l_xx_tue.zip");
+    }
+
+    #[test]
+    fn test_all_services_metadata() {
+        let services = ServiceCatalog::all_services();
+        assert_eq!(services.len(), 9);
+
+        let amat = services.iter().find(|s| s.name == "amat").unwrap();
+        assert_eq!(amat.daily_abbrev, "am");
+        assert_eq!(amat.description, "Amateur Radio");
+        assert_eq!(amat.radio_service_codes, vec!["HA", "HV"]);
+
+        let market = services.iter().find(|s| s.name == "market").unwrap();
+        assert!(market.radio_service_codes.is_empty());
+    }
+
+    #[test]
+    fn test_daily_licenses_lists_all_seven_days() {
+        let files = ServiceCatalog::daily_licenses("amat").unwrap();
+        let names: Vec<String> = files.iter().map(|f| f.filename()).collect();
+        assert_eq!(
+            names,
+            vec![
+                "l_am_sun.zip",
+                "l_am_mon.zip",
+                "l_am_tue.zip",
+                "l_am_wed.zip",
+                "l_am_thu.zip",
+                "l_am_fri.zip",
+                "l_am_sat.zip",
+            ]
+        );
+
+        assert!(ServiceCatalog::daily_licenses("nope").is_err());
+    }
+
+    #[test]
+    fn test_weekday_all_ordering_and_abbrevs() {
+        assert_eq!(Weekday::ALL.len(), 7);
+        let abbrevs: Vec<&str> = Weekday::ALL.iter().map(|d| d.abbrev()).collect();
+        assert_eq!(
+            abbrevs,
+            vec!["sun", "mon", "tue", "wed", "thu", "fri", "sat"]
+        );
+    }
+
+    #[rstest::rstest]
+    #[case(chrono::Weekday::Sun, Weekday::Sunday, "sun")]
+    #[case(chrono::Weekday::Mon, Weekday::Monday, "mon")]
+    #[case(chrono::Weekday::Tue, Weekday::Tuesday, "tue")]
+    #[case(chrono::Weekday::Wed, Weekday::Wednesday, "wed")]
+    #[case(chrono::Weekday::Thu, Weekday::Thursday, "thu")]
+    #[case(chrono::Weekday::Fri, Weekday::Friday, "fri")]
+    #[case(chrono::Weekday::Sat, Weekday::Saturday, "sat")]
+    fn test_weekday_from_chrono_and_abbrev(
+        #[case] chrono_day: chrono::Weekday,
+        #[case] expected: Weekday,
+        #[case] abbrev: &str,
+    ) {
+        assert_eq!(Weekday::from_chrono(chrono_day), expected);
+        assert_eq!(expected.abbrev(), abbrev);
+    }
+
+    #[rstest::rstest]
+    // 2026-01-11 is a Sunday; each subsequent date advances one weekday.
+    #[case(11, Weekday::Sunday)]
+    #[case(12, Weekday::Monday)]
+    #[case(13, Weekday::Tuesday)]
+    #[case(14, Weekday::Wednesday)]
+    #[case(15, Weekday::Thursday)]
+    #[case(16, Weekday::Friday)]
+    #[case(17, Weekday::Saturday)]
+    fn test_weekday_for_date(#[case] day_of_month: u32, #[case] expected: Weekday) {
+        let date = NaiveDate::from_ymd_opt(2026, 1, day_of_month).unwrap();
+        assert_eq!(Weekday::for_date(date), expected);
+    }
+
+    #[test]
+    fn test_get_missing_daily_files_unknown_service_errors() {
+        let weekly = NaiveDate::from_ymd_opt(2026, 1, 11).unwrap();
+        let today = NaiveDate::from_ymd_opt(2026, 1, 15).unwrap();
+        assert!(ServiceCatalog::get_missing_daily_files("nope", weekly, &[], today).is_err());
+    }
+
+    #[test]
+    fn test_get_missing_daily_files_none_when_caught_up() {
+        // Weekly imported today, nothing newer to apply.
+        let weekly = NaiveDate::from_ymd_opt(2026, 1, 15).unwrap();
+        let today = NaiveDate::from_ymd_opt(2026, 1, 15).unwrap();
+        let missing = ServiceCatalog::get_missing_daily_files("amat", weekly, &[], today).unwrap();
+        assert!(missing.is_empty());
+    }
+
+    #[test]
     fn test_get_missing_daily_files_second_week_with_first_week_applied() {
         // Weekly on Sun Jan 11, all of week 1 (Mon-Sun) applied, now it's Thu Jan 22
         let weekly = NaiveDate::from_ymd_opt(2026, 1, 11).unwrap();

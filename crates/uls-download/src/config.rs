@@ -119,4 +119,29 @@ mod tests {
         assert_eq!(config.timeout, Duration::from_secs(60));
         assert_eq!(config.bandwidth_limit, 1_000_000);
     }
+
+    #[test]
+    fn test_with_cache_dir_keeps_other_defaults() {
+        let config = DownloadConfig::with_cache_dir(PathBuf::from("/tmp/uls-cache"));
+        assert_eq!(config.cache_dir, PathBuf::from("/tmp/uls-cache"));
+        // Remaining fields fall back to the defaults.
+        assert_eq!(config.max_retries, 3);
+        assert!(config.verify_ssl);
+        assert_eq!(config.timeout, Duration::from_secs(300));
+    }
+
+    #[test]
+    fn test_full_builder_chain() {
+        let config = DownloadConfig::with_cache_dir(PathBuf::from("/var/cache/uls"))
+            .with_base_url("https://example.test")
+            .with_timeout(Duration::from_secs(10))
+            .with_user_agent("agent")
+            .with_bandwidth_limit(2_048);
+
+        assert_eq!(config.cache_dir, PathBuf::from("/var/cache/uls"));
+        assert_eq!(config.base_url, "https://example.test");
+        assert_eq!(config.timeout, Duration::from_secs(10));
+        assert_eq!(config.user_agent, "agent");
+        assert_eq!(config.bandwidth_limit, 2_048);
+    }
 }

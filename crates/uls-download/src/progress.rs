@@ -132,4 +132,54 @@ mod tests {
 
         assert_eq!(progress.size_string(), "512.0 KB / 1.00 MB");
     }
+
+    #[test]
+    fn test_size_string_unknown_total() {
+        let mut progress = DownloadProgress::new("test.zip", None);
+        progress.downloaded_bytes = 2048;
+        assert_eq!(progress.size_string(), "2.0 KB");
+    }
+
+    #[test]
+    fn test_fraction_zero_total_is_complete() {
+        // A zero-length file is treated as fully downloaded.
+        let progress = DownloadProgress::new("empty.zip", Some(0));
+        assert_eq!(progress.fraction(), Some(1.0));
+        assert_eq!(progress.percent(), Some(100));
+    }
+
+    #[test]
+    fn test_percent_clamped_to_100() {
+        // Overshooting the reported total still caps at 100 percent.
+        let mut progress = DownloadProgress::new("test.zip", Some(1000));
+        progress.downloaded_bytes = 1500;
+        assert_eq!(progress.percent(), Some(100));
+    }
+
+    #[test]
+    fn test_speed_string() {
+        let mut progress = DownloadProgress::new("test.zip", None);
+        progress.speed_bps = 1024 * 1024;
+        assert_eq!(progress.speed_string(), "1.00 MB/s");
+
+        progress.speed_bps = 500;
+        assert_eq!(progress.speed_string(), "500 B/s");
+    }
+
+    #[test]
+    fn test_format_bytes_per_second() {
+        assert_eq!(format_bytes_per_second(0), "0 B/s");
+        assert_eq!(format_bytes_per_second(1024), "1.0 KB/s");
+        assert_eq!(format_bytes_per_second(1024 * 1024 * 1024), "1.00 GB/s");
+    }
+
+    #[test]
+    fn test_new_initializes_fields() {
+        let progress = DownloadProgress::new("file.zip", Some(99));
+        assert_eq!(progress.filename, "file.zip");
+        assert_eq!(progress.total_bytes, Some(99));
+        assert_eq!(progress.downloaded_bytes, 0);
+        assert_eq!(progress.speed_bps, 0);
+        assert_eq!(progress.eta_seconds, None);
+    }
 }
