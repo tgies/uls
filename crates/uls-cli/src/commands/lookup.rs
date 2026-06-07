@@ -112,7 +112,7 @@ pub async fn execute(
     }
 
     // Deduplicate by unique_system_identifier
-    all_licenses.sort_by(|a, b| a.unique_system_identifier.cmp(&b.unique_system_identifier));
+    all_licenses.sort_by_key(|a| a.unique_system_identifier);
     all_licenses.dedup_by(|a, b| a.unique_system_identifier == b.unique_system_identifier);
 
     // Sort so originally-requested callsigns appear first
