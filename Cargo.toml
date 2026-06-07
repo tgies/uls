@@ -76,7 +76,7 @@ rstest = "0.26"
 
 # Benchmarking
 criterion = { version = "0.5", features = ["html_reports"] }
-gungraun = "0.17"
+gungraun = "0.19"
 
 # Workspace crates
 uls-core = { path = "crates/uls-core", version = "0.1.2" }
