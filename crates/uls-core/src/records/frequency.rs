@@ -126,4 +126,20 @@ mod tests {
         assert_eq!(record.unique_system_identifier, 123456789);
         assert!((record.frequency_assigned.unwrap() - 146.94).abs() < 0.001);
     }
+
+    #[test]
+    fn test_frequency_mhz_and_khz() {
+        let mut record = FrequencyRecord::from_fields(&["FR", "1"]);
+        record.frequency_assigned = Some(146.94);
+        assert_eq!(record.frequency_mhz(), Some(146.94));
+        assert!((record.frequency_khz().unwrap() - 146_940.0).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_frequency_mhz_and_khz_none_when_unassigned() {
+        let record = FrequencyRecord::from_fields(&["FR", "1"]);
+        assert_eq!(record.frequency_assigned, None);
+        assert_eq!(record.frequency_mhz(), None);
+        assert_eq!(record.frequency_khz(), None);
+    }
 }

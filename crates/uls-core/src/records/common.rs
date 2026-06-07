@@ -213,4 +213,81 @@ mod tests {
         assert_eq!(parse_opt_f64("-0.5"), Some(-0.5));
         assert_eq!(parse_opt_f64(""), None);
     }
+
+    #[test]
+    fn test_coordinates_decimal_southern_hemisphere() {
+        // 'S' latitude and 'E' longitude: latitude negates, longitude stays positive.
+        let coords = Coordinates {
+            lat_degrees: Some(33),
+            lat_minutes: Some(52),
+            lat_seconds: Some(0.0),
+            lat_direction: Some('S'),
+            long_degrees: Some(151),
+            long_minutes: Some(12),
+            long_seconds: Some(0.0),
+            long_direction: Some('E'),
+        };
+        let (lat, long) = coords.to_decimal().unwrap();
+        assert!((lat - (-33.866_67)).abs() < 0.001);
+        assert!((long - 151.2).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_coordinates_decimal_default_directions() {
+        // Missing minutes/seconds/directions default to 0 and N/W respectively.
+        let coords = Coordinates {
+            lat_degrees: Some(40),
+            lat_minutes: None,
+            lat_seconds: None,
+            lat_direction: None,
+            long_degrees: Some(74),
+            long_minutes: None,
+            long_seconds: None,
+            long_direction: None,
+        };
+        let (lat, long) = coords.to_decimal().unwrap();
+        assert!((lat - 40.0).abs() < 0.001);
+        assert!((long - (-74.0)).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_coordinates_decimal_none_without_longitude_degrees() {
+        // Latitude present but longitude degrees missing yields None.
+        let coords = Coordinates {
+            lat_degrees: Some(40),
+            long_degrees: None,
+            ..Coordinates::empty()
+        };
+        assert_eq!(coords.to_decimal(), None);
+    }
+
+    #[test]
+    fn test_coordinates_default_equals_empty() {
+        assert_eq!(Coordinates::default(), Coordinates::empty());
+    }
+
+    #[test]
+    fn test_parse_opt_char() {
+        assert_eq!(parse_opt_char("A"), Some('A'));
+        assert_eq!(parse_opt_char("  Y  "), Some('Y'));
+        // Only the first character is taken.
+        assert_eq!(parse_opt_char("XYZ"), Some('X'));
+        assert_eq!(parse_opt_char(""), None);
+        assert_eq!(parse_opt_char("   "), None);
+    }
+
+    #[test]
+    fn test_parse_opt_i64() {
+        assert_eq!(parse_opt_i64("9000000000"), Some(9_000_000_000));
+        assert_eq!(parse_opt_i64("-42"), Some(-42));
+        assert_eq!(parse_opt_i64(""), None);
+        assert_eq!(parse_opt_i64("abc"), None);
+    }
+
+    #[test]
+    fn test_parse_i64_or_default() {
+        assert_eq!(parse_i64_or_default("123456"), 123456);
+        assert_eq!(parse_i64_or_default(""), 0);
+        assert_eq!(parse_i64_or_default("not-a-number"), 0);
+    }
 }

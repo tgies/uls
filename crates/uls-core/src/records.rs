@@ -266,4 +266,98 @@ mod tests {
         assert_eq!(special_condition_record().call_sign(), Some("W8TEST"));
         assert_eq!(raw_record().call_sign(), None);
     }
+
+    fn application_detail_record() -> UlsRecord {
+        UlsRecord::ApplicationDetail(ApplicationDetailRecord::from_fields(&[
+            "AD", "100009", "", "", "NE",
+        ]))
+    }
+
+    fn antenna_record() -> UlsRecord {
+        UlsRecord::Antenna(AntennaRecord::from_fields(&[
+            "AN", "100010", "", "", "WANT01",
+        ]))
+    }
+
+    fn emission_record() -> UlsRecord {
+        UlsRecord::Emission(EmissionRecord::from_fields(&[
+            "EM", "100011", "", "", "WEMI01",
+        ]))
+    }
+
+    fn freeform_condition_record() -> UlsRecord {
+        UlsRecord::FreeformCondition(FreeformConditionRecord::from_fields(&[
+            "SF", "100012", "", "", "WSFC01",
+        ]))
+    }
+
+    fn vanity_callsign_record() -> UlsRecord {
+        UlsRecord::VanityCallSign(VanityCallSignRecord::from_fields(&[
+            "VC", "100013", "", "", "1", "W1AW",
+        ]))
+    }
+
+    fn aircraft_record() -> UlsRecord {
+        UlsRecord::Aircraft(AircraftRecord::from_fields(&[
+            "AC", "100014", "", "", "WACR01",
+        ]))
+    }
+
+    fn ship_record() -> UlsRecord {
+        UlsRecord::Ship(ShipRecord::from_fields(&["SH", "100015", "", "", "WSHP01"]))
+    }
+
+    #[test]
+    fn test_record_type_dispatch_remaining_variants() {
+        assert_eq!(application_detail_record().record_type(), RecordType::AD);
+        assert_eq!(antenna_record().record_type(), RecordType::AN);
+        assert_eq!(emission_record().record_type(), RecordType::EM);
+        assert_eq!(freeform_condition_record().record_type(), RecordType::SF);
+        assert_eq!(vanity_callsign_record().record_type(), RecordType::VC);
+        assert_eq!(aircraft_record().record_type(), RecordType::AC);
+        assert_eq!(ship_record().record_type(), RecordType::SH);
+    }
+
+    #[test]
+    fn test_unique_system_identifier_dispatch_remaining_variants() {
+        assert_eq!(
+            application_detail_record().unique_system_identifier(),
+            Some(100009)
+        );
+        assert_eq!(antenna_record().unique_system_identifier(), Some(100010));
+        assert_eq!(emission_record().unique_system_identifier(), Some(100011));
+        // FreeformCondition stores an Option<i64> and forwards it directly.
+        assert_eq!(
+            freeform_condition_record().unique_system_identifier(),
+            Some(100012)
+        );
+        assert_eq!(
+            vanity_callsign_record().unique_system_identifier(),
+            Some(100013)
+        );
+        assert_eq!(aircraft_record().unique_system_identifier(), Some(100014));
+        // Ship stores an Option<i64> and forwards it directly.
+        assert_eq!(ship_record().unique_system_identifier(), Some(100015));
+    }
+
+    #[test]
+    fn test_option_usi_variants_return_none_when_missing() {
+        // FreeformCondition and Ship carry Option<i64>; a missing id forwards None.
+        let sf = UlsRecord::FreeformCondition(FreeformConditionRecord::from_fields(&["SF"]));
+        assert_eq!(sf.unique_system_identifier(), None);
+        let sh = UlsRecord::Ship(ShipRecord::from_fields(&["SH"]));
+        assert_eq!(sh.unique_system_identifier(), None);
+    }
+
+    #[test]
+    fn test_call_sign_dispatch_remaining_variants() {
+        assert_eq!(antenna_record().call_sign(), Some("WANT01"));
+        assert_eq!(emission_record().call_sign(), Some("WEMI01"));
+        assert_eq!(freeform_condition_record().call_sign(), Some("WSFC01"));
+        assert_eq!(aircraft_record().call_sign(), Some("WACR01"));
+        assert_eq!(ship_record().call_sign(), Some("WSHP01"));
+        // ApplicationDetail and VanityCallSign expose no call sign.
+        assert_eq!(application_detail_record().call_sign(), None);
+        assert_eq!(vanity_callsign_record().call_sign(), None);
+    }
 }

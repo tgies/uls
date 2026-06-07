@@ -2375,4 +2375,131 @@ mod tests {
         assert_eq!(upper, lower);
         assert_eq!(lower, mixed);
     }
+
+    #[test]
+    fn test_radio_service_u8_roundtrip_all() {
+        // Every value that decodes to a variant must re-encode to the same byte,
+        // and that variant's string form must FromStr back to the same variant.
+        let mut decoded = 0u8;
+        for v in 0u8..=255 {
+            match RadioService::from_u8(v) {
+                Some(service) => {
+                    decoded += 1;
+                    assert_eq!(service.to_u8(), v, "to_u8/from_u8 mismatch for {v}");
+                    assert!(!service.as_str().is_empty());
+                    assert!(!service.description().is_empty());
+                    let parsed: RadioService = service.as_str().parse().unwrap();
+                    assert_eq!(parsed, service);
+                }
+                None => assert!(v > 141, "value {v} should decode to a RadioService"),
+            }
+        }
+        // All 142 variants (0..=141) decode; nothing above does.
+        assert_eq!(decoded, 142);
+    }
+
+    #[test]
+    fn test_radio_service_u8_endpoints() {
+        assert_eq!(RadioService::from_u8(0), Some(RadioService::AA));
+        assert_eq!(RadioService::from_u8(141), Some(RadioService::ZV));
+        assert_eq!(RadioService::AA.to_u8(), 0);
+        assert_eq!(RadioService::ZV.to_u8(), 141);
+        assert_eq!(RadioService::from_u8(142), None);
+        assert_eq!(RadioService::from_u8(255), None);
+    }
+
+    #[test]
+    fn test_license_status_u8_roundtrip_all() {
+        let mut decoded = 0u8;
+        for v in 0u8..=255 {
+            match LicenseStatus::from_u8(v) {
+                Some(status) => {
+                    decoded += 1;
+                    assert_eq!(status.to_u8(), v, "to_u8/from_u8 mismatch for {v}");
+                    assert!(!status.as_str().is_empty());
+                    let parsed: LicenseStatus = status.as_str().parse().unwrap();
+                    assert_eq!(parsed, status);
+                }
+                None => assert!(v > 6, "value {v} should decode to a LicenseStatus"),
+            }
+        }
+        assert_eq!(decoded, 7);
+        assert_eq!(LicenseStatus::from_u8(7), None);
+        assert_eq!(LicenseStatus::from_u8(255), None);
+    }
+
+    #[test]
+    fn test_license_status_u8_specific() {
+        assert_eq!(LicenseStatus::Active.to_u8(), 0);
+        assert_eq!(LicenseStatus::Cancelled.to_u8(), 1);
+        assert_eq!(LicenseStatus::Expired.to_u8(), 2);
+        assert_eq!(LicenseStatus::PendingLegalStatus.to_u8(), 3);
+        assert_eq!(LicenseStatus::ParentStationCancelled.to_u8(), 4);
+        assert_eq!(LicenseStatus::Terminated.to_u8(), 5);
+        assert_eq!(LicenseStatus::TermPending.to_u8(), 6);
+    }
+
+    #[test]
+    fn test_operator_class_u8_roundtrip_all() {
+        let mut decoded = 0u8;
+        for v in 0u8..=255 {
+            match OperatorClass::from_u8(v) {
+                Some(class) => {
+                    decoded += 1;
+                    assert_eq!(class.to_u8(), v, "to_u8/from_u8 mismatch for {v}");
+                    assert!(!class.as_str().is_empty());
+                    assert!(!class.description().is_empty());
+                    let parsed: OperatorClass = class.as_str().parse().unwrap();
+                    assert_eq!(parsed, class);
+                }
+                None => assert!(v > 5, "value {v} should decode to an OperatorClass"),
+            }
+        }
+        assert_eq!(decoded, 6);
+        assert_eq!(OperatorClass::from_u8(6), None);
+        assert_eq!(OperatorClass::from_u8(255), None);
+    }
+
+    #[test]
+    fn test_operator_class_u8_specific() {
+        assert_eq!(OperatorClass::Advanced.to_u8(), 0);
+        assert_eq!(OperatorClass::Extra.to_u8(), 1);
+        assert_eq!(OperatorClass::General.to_u8(), 2);
+        assert_eq!(OperatorClass::Novice.to_u8(), 3);
+        assert_eq!(OperatorClass::TechnicianPlus.to_u8(), 4);
+        assert_eq!(OperatorClass::Technician.to_u8(), 5);
+    }
+
+    #[test]
+    fn test_entity_type_u8_roundtrip_all() {
+        let mut decoded = 0u8;
+        for v in 0u8..=255 {
+            match EntityType::from_u8(v) {
+                Some(entity) => {
+                    decoded += 1;
+                    assert_eq!(entity.to_u8(), v, "to_u8/from_u8 mismatch for {v}");
+                    assert!(!entity.as_str().is_empty());
+                    let parsed: EntityType = entity.as_str().parse().unwrap();
+                    assert_eq!(parsed, entity);
+                }
+                None => assert!(v > 8, "value {v} should decode to an EntityType"),
+            }
+        }
+        assert_eq!(decoded, 9);
+        assert_eq!(EntityType::from_u8(9), None);
+        assert_eq!(EntityType::from_u8(255), None);
+    }
+
+    #[test]
+    fn test_entity_type_u8_specific() {
+        assert_eq!(EntityType::TransfereeContact.to_u8(), 0);
+        assert_eq!(EntityType::LicenseeContact.to_u8(), 1);
+        assert_eq!(EntityType::AssignorContact.to_u8(), 2);
+        assert_eq!(EntityType::LesseeContact.to_u8(), 3);
+        assert_eq!(EntityType::Transferee.to_u8(), 4);
+        assert_eq!(EntityType::Licensee.to_u8(), 5);
+        assert_eq!(EntityType::Owner.to_u8(), 6);
+        assert_eq!(EntityType::Assignor.to_u8(), 7);
+        assert_eq!(EntityType::Lessee.to_u8(), 8);
+    }
 }
