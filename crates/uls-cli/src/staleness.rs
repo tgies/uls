@@ -134,3 +134,37 @@ pub fn warn_if_stale_after_query(service_code: &str, options: &StalenessOptions)
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_from_cli_maps_flags() {
+        let opts = StalenessOptions::from_cli(7, false, false);
+        assert_eq!(opts.threshold_days, 7);
+        assert!(opts.warn_enabled);
+        assert!(!opts.auto_update);
+    }
+
+    #[test]
+    fn test_from_cli_no_warning_inverts_flag() {
+        let opts = StalenessOptions::from_cli(3, true, false);
+        assert!(!opts.warn_enabled);
+    }
+
+    #[test]
+    fn test_from_cli_auto_update() {
+        let opts = StalenessOptions::from_cli(1, false, true);
+        assert_eq!(opts.threshold_days, 1);
+        assert!(opts.auto_update);
+    }
+
+    #[test]
+    fn test_default_options() {
+        let opts = StalenessOptions::default_options();
+        assert_eq!(opts.threshold_days, DEFAULT_STALE_THRESHOLD_DAYS);
+        assert!(opts.warn_enabled);
+        assert!(!opts.auto_update);
+    }
+}

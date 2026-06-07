@@ -96,6 +96,47 @@ fn get_first_callsign(service: &str) -> String {
     panic!("No callsign found in fixture");
 }
 
+/// Get the first non-empty FRN from fixture EN.dat (column 23, 1-indexed).
+fn get_first_frn(service: &str) -> String {
+    use std::io::{BufRead, BufReader};
+
+    let en_path = fixture_path().join(service).join("EN.dat");
+    let file = File::open(&en_path).expect("EN.dat should exist");
+    let reader = BufReader::new(file);
+
+    for line in reader.lines().map_while(Result::ok) {
+        let fields: Vec<&str> = line.split('|').collect();
+        if fields.len() > 22
+            && fields[22].len() == 10
+            && fields[22].chars().all(|c| c.is_ascii_digit())
+        {
+            return fields[22].to_string();
+        }
+    }
+    panic!("No FRN found in fixture");
+}
+
+/// Get the call sign (column 5) from the same EN.dat row that `get_first_frn`
+/// selects, so an FRN lookup can be checked against its expected call sign.
+fn get_callsign_for_first_frn(service: &str) -> String {
+    use std::io::{BufRead, BufReader};
+
+    let en_path = fixture_path().join(service).join("EN.dat");
+    let file = File::open(&en_path).expect("EN.dat should exist");
+    let reader = BufReader::new(file);
+
+    for line in reader.lines().map_while(Result::ok) {
+        let fields: Vec<&str> = line.split('|').collect();
+        if fields.len() > 22
+            && fields[22].len() == 10
+            && fields[22].chars().all(|c| c.is_ascii_digit())
+        {
+            return fields[4].to_string();
+        }
+    }
+    panic!("No FRN found in fixture");
+}
+
 // =============================================================================
 // Help and version tests (no database needed)
 // =============================================================================
@@ -512,4 +553,277 @@ fn test_db_help() {
         .stdout(predicate::str::contains("init"))
         .stdout(predicate::str::contains("info"))
         .stdout(predicate::str::contains("vacuum"));
+}
+
+// =============================================================================
+// Output format branches (search / lookup)
+// =============================================================================
+
+#[test]
+fn test_search_yaml_output() {
+    let (_temp_dir, db_path) = setup_test_db(&["l_amat"]);
+
+    // YAML output lists results as a sequence with field keys.
+    Command::cargo_bin("uls")
+        .unwrap()
+        .env("ULS_DB_PATH", &db_path)
+        .args(["search", "--name", "*", "--limit", "2", "--format", "yaml"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("call_sign:"));
+}
+
+#[test]
+fn test_search_custom_fields_csv() {
+    let (_temp_dir, db_path) = setup_test_db(&["l_amat"]);
+
+    // --fields with csv format emits exactly the selected header columns.
+    Command::cargo_bin("uls")
+        .unwrap()
+        .env("ULS_DB_PATH", &db_path)
+        .args([
+            "search",
+            "--name",
+            "*",
+            "--limit",
+            "3",
+            "--format",
+            "csv",
+            "--fields",
+            "call_sign,state",
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::starts_with("call_sign,state"));
+}
+
+#[test]
+fn test_search_custom_fields_table() {
+    let (_temp_dir, db_path) = setup_test_db(&["l_amat"]);
+
+    // --fields with the default table format renders a header row plus a
+    // result count footer.
+    Command::cargo_bin("uls")
+        .unwrap()
+        .env("ULS_DB_PATH", &db_path)
+        .args([
+            "search",
+            "--name",
+            "*",
+            "--limit",
+            "3",
+            "--fields",
+            "call_sign,city,state",
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("call_sign"))
+        .stdout(predicate::str::contains("result(s)"));
+}
+
+#[test]
+fn test_search_no_filter_errors() {
+    let (_temp_dir, db_path) = setup_test_db(&["l_amat"]);
+
+    // A bare search with no filters exits non-zero with usage guidance.
+    Command::cargo_bin("uls")
+        .unwrap()
+        .env("ULS_DB_PATH", &db_path)
+        .args(["search"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains(
+            "At least one search filter is required",
+        ));
+}
+
+#[test]
+fn test_search_state_filter() {
+    let (_temp_dir, db_path) = setup_test_db(&["l_amat"]);
+
+    // A state not present in the fixtures yields no results and a non-zero exit.
+    Command::cargo_bin("uls")
+        .unwrap()
+        .env("ULS_DB_PATH", &db_path)
+        .args(["search", "--state", "ZZ"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("No results"));
+}
+
+#[test]
+fn test_lookup_yaml_output() {
+    let (_temp_dir, db_path) = setup_test_db(&["l_amat"]);
+    let callsign = get_first_callsign("l_amat");
+
+    Command::cargo_bin("uls")
+        .unwrap()
+        .env("ULS_DB_PATH", &db_path)
+        .args(["lookup", &callsign, "--format", "yaml"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("call_sign:"))
+        .stdout(predicate::str::contains(&callsign));
+}
+
+#[test]
+fn test_lookup_all_services_flag() {
+    use uls_db::{Database, DatabaseConfig};
+
+    let (_temp_dir, db_path) = setup_test_db(&["l_amat", "l_gmrs"]);
+    let ha_call = get_first_callsign("l_amat");
+    let za_call = get_first_callsign("l_gmrs");
+
+    // Give an amateur and a GMRS license the same FRN so the --all cross-service
+    // FRN expansion links them.
+    {
+        let db = Database::with_config(DatabaseConfig::with_path(&db_path)).unwrap();
+        let conn = db.conn().unwrap();
+        for call in [&ha_call, &za_call] {
+            conn.execute(
+                "UPDATE entities SET frn = ?1 WHERE call_sign = ?2",
+                ("0000099999", call.as_str()),
+            )
+            .unwrap();
+        }
+    }
+
+    // Plain lookup returns only the requested amateur callsign.
+    Command::cargo_bin("uls")
+        .unwrap()
+        .env("ULS_DB_PATH", &db_path)
+        .args(["lookup", &ha_call])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(&ha_call))
+        .stdout(predicate::str::contains(&za_call).not());
+
+    // --all expands by the shared FRN and surfaces the GMRS callsign too.
+    Command::cargo_bin("uls")
+        .unwrap()
+        .env("ULS_DB_PATH", &db_path)
+        .args(["lookup", &ha_call, "--all"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(&ha_call))
+        .stdout(predicate::str::contains(&za_call));
+}
+
+// =============================================================================
+// FRN lookup success path
+// =============================================================================
+
+#[test]
+fn test_frn_lookup_success() {
+    let (_temp_dir, db_path) = setup_test_db(&["l_amat"]);
+    let frn = get_first_frn("l_amat");
+    let callsign = get_callsign_for_first_frn("l_amat");
+
+    // The FRN is not a table column, so the lookup is confirmed by the call sign
+    // of the resolved license appearing in the rendered table.
+    Command::cargo_bin("uls")
+        .unwrap()
+        .env("ULS_DB_PATH", &db_path)
+        .args(["frn", &frn])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(&callsign))
+        .stdout(predicate::str::contains("result(s)"));
+}
+
+#[test]
+fn test_frn_lookup_json_output() {
+    let (_temp_dir, db_path) = setup_test_db(&["l_amat"]);
+    let frn = get_first_frn("l_amat");
+
+    Command::cargo_bin("uls")
+        .unwrap()
+        .env("ULS_DB_PATH", &db_path)
+        .args(["frn", &frn, "--format", "json"])
+        .assert()
+        .success()
+        .stdout(predicate::str::starts_with("["));
+}
+
+// =============================================================================
+// Stats and db info format branches
+// =============================================================================
+
+#[test]
+fn test_stats_json_output() {
+    let (_temp_dir, db_path) = setup_test_db(&["l_amat"]);
+
+    Command::cargo_bin("uls")
+        .unwrap()
+        .env("ULS_DB_PATH", &db_path)
+        .args(["stats", "--format", "json"])
+        .assert()
+        .success()
+        .stdout(predicate::str::starts_with("{"))
+        .stdout(predicate::str::contains("total_licenses"));
+}
+
+#[test]
+fn test_stats_default_text_output() {
+    let (_temp_dir, db_path) = setup_test_db(&["l_amat"]);
+
+    Command::cargo_bin("uls")
+        .unwrap()
+        .env("ULS_DB_PATH", &db_path)
+        .args(["stats"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Database Statistics"))
+        .stdout(predicate::str::contains("Active licenses"))
+        .stdout(predicate::str::contains("Schema version"));
+}
+
+#[test]
+fn test_db_info_default_text_fields() {
+    let (_temp_dir, db_path) = setup_test_db(&["l_amat"]);
+
+    Command::cargo_bin("uls")
+        .unwrap()
+        .env("ULS_DB_PATH", &db_path)
+        .args(["db", "info"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Schema version"))
+        .stdout(predicate::str::contains("Total licenses"));
+}
+
+// =============================================================================
+// Staleness warning behavior
+// =============================================================================
+
+#[test]
+fn test_staleness_warning_emitted() {
+    let (_temp_dir, db_path) = setup_test_db(&["l_amat"]);
+    let callsign = get_first_callsign("l_amat");
+
+    // Fixture imports leave last_updated unset, so data reads as stale and a
+    // warning is printed to stderr after the query result. The HA service maps
+    // to the "amateur" label in the suggested command.
+    Command::cargo_bin("uls")
+        .unwrap()
+        .env("ULS_DB_PATH", &db_path)
+        .args(["lookup", &callsign])
+        .assert()
+        .success()
+        .stderr(predicate::str::contains("uls update --service amateur"));
+}
+
+#[test]
+fn test_staleness_warning_suppressed() {
+    let (_temp_dir, db_path) = setup_test_db(&["l_amat"]);
+    let callsign = get_first_callsign("l_amat");
+
+    // --no-stale-warning suppresses the freshness notice on stderr.
+    Command::cargo_bin("uls")
+        .unwrap()
+        .env("ULS_DB_PATH", &db_path)
+        .args(["--no-stale-warning", "lookup", &callsign])
+        .assert()
+        .success()
+        .stderr(predicate::str::contains("uls update").not());
 }
