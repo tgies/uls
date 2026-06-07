@@ -2,7 +2,8 @@
 //!
 //! Benchmarks the critical query operations used during lookups and searches.
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use criterion::{criterion_group, criterion_main, Criterion};
+use std::hint::black_box;
 use uls_query::{SearchFilter, SortOrder};
 
 /// Benchmark SearchFilter construction
