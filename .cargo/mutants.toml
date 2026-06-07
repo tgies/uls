@@ -1,0 +1,13 @@
+# Configuration for cargo-mutants: https://mutants.rs/config-file.html
+
+# Exclude specific files/directories from mutation
+exclude_globs = [
+    "**/build.rs",
+]
+
+# Exclude patterns (formatters, derives, and other low-value targets)
+exclude_re = [
+    "impl Debug",
+    "impl Display",
+    "<impl Clone for .*>::clone",
+]
