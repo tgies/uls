@@ -5,6 +5,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.5](https://github.com/tgies/uls/compare/v0.1.4...v0.1.5) - 2026-06-07
+
+### Added
+
+- *(cli)* add shell completion generation
+
+### Fixed
+
+- *(update)* skip redundant daily download that coincides with weekly
+- *(cli)* use sort_by_key for license dedup sort
+- *(db)* close code span in operator_class doc comment
+- *(db)* scope weekly metadata query connection to avoid pool deadlock
+- *(download)* send versioned default User-Agent on invalid-config fallback
+
+### Other
+
+- *(cli)* add tests for cli commands, staleness warning, and update orchestration
+- *(update)* extract weekdays_to_check for direct test coverage
+- *(core)* add unit tests for record models and codes
+- *(deps)* bump criterion 0.5 -> 0.8
+- *(parser)* add dat parsing and zip archive integration tests
+- *(db)* add tests for bulk inserter, schema, importer, and queries
+- *(download)* add client behavior, catalog, and config tests
+- *(query)* add tests for engine, search filters, and output formatting
+- *(api)* add tests for error responses and routing endpoints
+
 ## [0.1.4](https://github.com/tgies/uls/compare/v0.1.3...v0.1.4) - 2026-03-16
 
 ### Added
