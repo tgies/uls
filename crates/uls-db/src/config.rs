@@ -126,4 +126,22 @@ mod tests {
         // 256MB * 1000 = 256000 pages, stored as negative
         assert_eq!(config.cache_size, -256000);
     }
+
+    #[test]
+    fn test_default_db_path_ends_with_uls_db() {
+        let path = default_db_path();
+        assert_eq!(path.file_name().and_then(|n| n.to_str()), Some("uls.db"));
+        assert_eq!(
+            path.parent()
+                .and_then(|p| p.file_name())
+                .and_then(|n| n.to_str()),
+            Some("uls")
+        );
+    }
+
+    #[test]
+    fn test_default_config_path_is_uls_db() {
+        let path = DatabaseConfig::default().path;
+        assert_eq!(path.file_name().and_then(|n| n.to_str()), Some("uls.db"));
+    }
 }

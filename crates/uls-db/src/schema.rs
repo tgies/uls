@@ -496,6 +496,101 @@ mod tests {
     }
 
     #[test]
+    fn test_get_version_uninitialized() {
+        // A bare connection with no tables reports no schema version.
+        let conn = Connection::open_in_memory().unwrap();
+        assert_eq!(Schema::get_version(&conn).unwrap(), None);
+    }
+
+    #[test]
+    fn test_get_version_after_create_tables() {
+        let conn = Connection::open_in_memory().unwrap();
+        Schema::create_tables(&conn).unwrap();
+        assert_eq!(Schema::get_version(&conn).unwrap(), Some(SCHEMA_VERSION));
+    }
+
+    #[test]
+    fn test_migrate_uninitialized_is_noop() {
+        // Migration on an empty database leaves it uninitialized.
+        let conn = Connection::open_in_memory().unwrap();
+        Schema::migrate_if_needed(&conn).unwrap();
+        assert_eq!(Schema::get_version(&conn).unwrap(), None);
+    }
+
+    #[test]
+    fn test_migrate_current_version_is_noop() {
+        let conn = Connection::open_in_memory().unwrap();
+        Schema::initialize(&conn).unwrap();
+        Schema::migrate_if_needed(&conn).unwrap();
+        assert_eq!(Schema::get_version(&conn).unwrap(), Some(SCHEMA_VERSION));
+    }
+
+    #[test]
+    fn test_migrate_from_v4_adds_applied_patches_and_bumps_version() {
+        let conn = Connection::open_in_memory().unwrap();
+        Schema::create_tables(&conn).unwrap();
+
+        // Drop applied_patches and pin the recorded version to v4 to simulate
+        // an old database that predates the patch-tracking table.
+        conn.execute_batch("DROP TABLE applied_patches;").unwrap();
+        Schema::set_metadata(&conn, "schema_version", "4").unwrap();
+        assert_eq!(Schema::get_version(&conn).unwrap(), Some(4));
+
+        Schema::migrate_if_needed(&conn).unwrap();
+
+        // Version advances to current and the table is created by migrate_to_v5.
+        assert_eq!(Schema::get_version(&conn).unwrap(), Some(SCHEMA_VERSION));
+        let table_count: i32 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='applied_patches'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(table_count, 1);
+    }
+
+    #[test]
+    fn test_create_tables_makes_all_expected_tables() {
+        let conn = Connection::open_in_memory().unwrap();
+        Schema::create_tables(&conn).unwrap();
+
+        for table in [
+            "metadata",
+            "licenses",
+            "entities",
+            "amateur_operators",
+            "history",
+            "comments",
+            "special_conditions",
+            "import_status",
+            "applied_patches",
+        ] {
+            let count: i32 = conn
+                .query_row(
+                    "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name=?1",
+                    [table],
+                    |row| row.get(0),
+                )
+                .unwrap();
+            assert_eq!(count, 1, "table {table} should exist");
+        }
+    }
+
+    #[test]
+    fn test_set_metadata_overwrites_existing() {
+        let conn = Connection::open_in_memory().unwrap();
+        Schema::initialize(&conn).unwrap();
+
+        Schema::set_metadata(&conn, "k", "first").unwrap();
+        Schema::set_metadata(&conn, "k", "second").unwrap();
+        assert_eq!(
+            Schema::get_metadata(&conn, "k").unwrap(),
+            Some("second".to_string())
+        );
+    }
+
+    #[test]
     fn test_drop_and_recreate_indexes() {
         let conn = Connection::open_in_memory().unwrap();
         Schema::initialize(&conn).unwrap();
