@@ -1,0 +1,53 @@
+name: Mutants (Full)
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+on:
+  schedule:
+    - cron: "0 6 * * 1"   # Mondays 06:00 UTC
+  workflow_dispatch:
+
+jobs:
+  full-mutants:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+      - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+      - uses: taiki-e/install-action@e0eafa9a0d485c37f97c0f7beb930a58a2facbac # v2.79.4
+        with:
+          tool: cargo-mutants,nextest
+      - name: Run cargo-mutants full sweep
+        continue-on-error: true
+        run: cargo mutants --workspace -vV --test-tool nextest
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: mutants.out
+          path: mutants.out
+      - name: Compute and print mutation score
+        if: always()
+        run: |
+          python3 - <<'EOF'
+          import json
+          try:
+              d = json.load(open("mutants.out/outcomes.json"))
+              caught  = d.get("caught",  0)
+              missed  = d.get("missed",  0)
+              timeout = d.get("timeout", 0)
+              denom = caught + missed + timeout
+              if denom:
+                  score = (caught + timeout) / denom * 100
+                  print(f"Mutation Score: {score:.1f}% ({caught + timeout} caught / {denom} viable)")
+              else:
+                  print("No viable mutants found.")
+          except Exception as e:
+              print(f"Failed to compute score: {e}")
+          EOF

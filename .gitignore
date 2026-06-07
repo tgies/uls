@@ -9,3 +9,4 @@ temp_*.md
 *.etag
 tarpaulin-report.html
 coverage.json
+/mutants.out
