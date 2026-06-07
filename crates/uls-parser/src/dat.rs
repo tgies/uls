@@ -349,4 +349,260 @@ mod tests {
         assert!(!is_valid_record_type("License"));
         assert!(!is_valid_record_type(""));
     }
+
+    #[test]
+    fn test_from_line_empty_string_is_single_empty_field() {
+        // splitting "" on '|' yields one empty field, never an empty Vec,
+        // so from_line succeeds with an empty record type.
+        let parsed = ParsedLine::from_line("", 7).unwrap();
+        assert_eq!(parsed.line_number, 7);
+        assert_eq!(parsed.record_type, "");
+        assert_eq!(parsed.fields, vec![String::new()]);
+    }
+
+    #[test]
+    fn test_from_line_trailing_pipe_yields_trailing_empty_field() {
+        let parsed = ParsedLine::from_line("HD|123|W1AW|", 1).unwrap();
+        assert_eq!(
+            parsed.fields,
+            vec![
+                "HD".to_string(),
+                "123".to_string(),
+                "W1AW".to_string(),
+                String::new(),
+            ]
+        );
+        assert_eq!(parsed.field(3), "");
+    }
+
+    #[test]
+    fn test_from_line_embedded_empty_fields() {
+        let parsed = ParsedLine::from_line("EN|1||W1AW||John", 1).unwrap();
+        assert_eq!(parsed.fields.len(), 6);
+        assert_eq!(parsed.field(0), "EN");
+        assert_eq!(parsed.field(1), "1");
+        assert_eq!(parsed.field(2), "");
+        assert_eq!(parsed.field(3), "W1AW");
+        assert_eq!(parsed.field(4), "");
+        assert_eq!(parsed.field(5), "John");
+    }
+
+    #[test]
+    fn test_field_out_of_bounds_returns_empty() {
+        let parsed = ParsedLine::from_line("AM|1|W1AW", 1).unwrap();
+        assert_eq!(parsed.field(2), "W1AW");
+        assert_eq!(parsed.field(3), "");
+        assert_eq!(parsed.field(999), "");
+    }
+
+    #[test]
+    fn test_field_refs_mirrors_fields() {
+        let parsed = ParsedLine::from_line("HD|1||W1AW", 1).unwrap();
+        assert_eq!(parsed.field_refs(), vec!["HD", "1", "", "W1AW"]);
+    }
+
+    #[test]
+    fn test_parse_line_matches_from_line() {
+        let parsed = parse_line("CO|42|note", 99).unwrap();
+        assert_eq!(parsed.line_number, 99);
+        assert_eq!(parsed.record_type, "CO");
+        assert_eq!(parsed.field(2), "note");
+    }
+
+    #[test]
+    fn test_to_record_known_type_header() {
+        let parsed = ParsedLine::from_line("HD|123456789|||W1AW|A|HA", 1).unwrap();
+        let record = parsed.to_record().unwrap();
+        match record {
+            UlsRecord::Header(h) => {
+                assert_eq!(h.unique_system_identifier, 123456789);
+                assert_eq!(h.call_sign, Some("W1AW".to_string()));
+            }
+            other => panic!("expected Header, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_to_record_amateur_type() {
+        let parsed = ParsedLine::from_line("AM|254305|||KK9HIU|E|A|8", 1).unwrap();
+        let record = parsed.to_record().unwrap();
+        match record {
+            UlsRecord::Amateur(a) => {
+                assert_eq!(a.unique_system_identifier, 254305);
+                assert_eq!(a.callsign, Some("KK9HIU".to_string()));
+                assert_eq!(a.operator_class, Some('E'));
+                assert_eq!(a.region_code, Some(8));
+            }
+            other => panic!("expected Amateur, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_to_record_valid_recordtype_but_unmapped_is_raw() {
+        // LA parses as a RecordType but has no explicit arm in to_record_from_refs,
+        // so it falls through to the Raw branch carrying every field.
+        let parsed = ParsedLine::from_line("LA|780866|W1AW|L|Pleading", 1).unwrap();
+        let record = parsed.to_record().unwrap();
+        match record {
+            UlsRecord::Raw {
+                record_type,
+                fields,
+            } => {
+                assert_eq!(record_type, RecordType::LA);
+                assert_eq!(fields, vec!["LA", "780866", "W1AW", "L", "Pleading"]);
+            }
+            other => panic!("expected Raw, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_to_record_unknown_type_errors() {
+        // ZZ is two uppercase letters but is not a known RecordType,
+        // so to_record returns UnknownRecordType.
+        let parsed = ParsedLine::from_line("ZZ|1|2", 1).unwrap();
+        let err = parsed.to_record().unwrap_err();
+        match err {
+            ParseError::UnknownRecordType(rt) => assert_eq!(rt, "ZZ"),
+            other => panic!("expected UnknownRecordType, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_to_record_large_record_heap_path() {
+        // More than STACK_LIMIT (64) fields forces the heap fallback in to_record.
+        let mut parts = vec!["HD".to_string(), "999".to_string()];
+        parts.resize(80, "x".to_string());
+        let line = parts.join("|");
+        let parsed = ParsedLine::from_line(&line, 1).unwrap();
+        assert_eq!(parsed.fields.len(), 80);
+        let record = parsed.to_record().unwrap();
+        match record {
+            UlsRecord::Header(h) => assert_eq!(h.unique_system_identifier, 999),
+            other => panic!("expected Header, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_append_continuation_to_last_nonempty_field() {
+        let mut parsed = ParsedLine::from_line("CO|1||W1AW|First line||", 1).unwrap();
+        parsed.append_continuation("second line");
+        assert_eq!(parsed.field(4), "First line second line");
+    }
+
+    #[test]
+    fn test_append_continuation_strips_pipes_and_trims() {
+        let mut parsed = ParsedLine::from_line("CO|1||W1AW|First", 1).unwrap();
+        parsed.append_continuation("|  more text  |");
+        assert_eq!(parsed.field(4), "First more text");
+    }
+
+    #[test]
+    fn test_append_continuation_no_separator_when_target_empty() {
+        // Trailing empty fields are skipped; with no non-empty content the
+        // continuation lands on field 0 without a leading separator space.
+        let mut parsed = ParsedLine::from_line("||", 1).unwrap();
+        parsed.append_continuation("orphan");
+        assert_eq!(parsed.field(0), "orphan");
+    }
+
+    #[test]
+    fn test_reader_skips_blank_lines_between_records() {
+        let data = "HD|1||W1AW|A|HA\n\nHD|2||W2AW|A|HA\n";
+        let reader = DatReader::new(data.as_bytes());
+        let records: Vec<_> = reader.map(|r| r.unwrap()).collect();
+        assert_eq!(records.len(), 2);
+        assert_eq!(records[0].field(3), "W1AW");
+        assert_eq!(records[1].field(3), "W2AW");
+    }
+
+    #[test]
+    fn test_reader_handles_crlf_line_endings() {
+        let data = "HD|1||W1AW|A|HA\r\nHD|2||W2AW|A|HA\r\n";
+        let reader = DatReader::new(data.as_bytes());
+        let records: Vec<_> = reader.map(|r| r.unwrap()).collect();
+        assert_eq!(records.len(), 2);
+        // The trailing carriage return is stripped from the final field.
+        assert_eq!(records[0].record_type, "HD");
+        assert_eq!(records[1].field(3), "W2AW");
+        assert_eq!(records[1].field(5), "HA");
+    }
+
+    #[test]
+    fn test_reader_orphan_continuation_at_start_is_skipped() {
+        // A continuation line with no preceding record is dropped.
+        let data = "orphan continuation\nHD|1||W1AW|A|HA\n";
+        let reader = DatReader::new(data.as_bytes());
+        let records: Vec<_> = reader.map(|r| r.unwrap()).collect();
+        assert_eq!(records.len(), 1);
+        assert_eq!(records[0].record_type, "HD");
+    }
+
+    #[test]
+    fn test_reader_returns_final_pending_record_at_eof() {
+        // A single record with no trailing newline is still yielded.
+        let data = "HD|1||W1AW|A|HA";
+        let reader = DatReader::new(data.as_bytes());
+        let records: Vec<_> = reader.map(|r| r.unwrap()).collect();
+        assert_eq!(records.len(), 1);
+        assert_eq!(records[0].field(3), "W1AW");
+    }
+
+    #[test]
+    fn test_reader_line_number_tracks_raw_lines() {
+        let data = "HD|1||W1AW|desc\ncontinuation\nHD|2||W2AW|desc2\n";
+        let mut reader = DatReader::new(data.as_bytes());
+        assert_eq!(reader.line_number(), 0);
+        let first = reader.next_line().unwrap().unwrap();
+        // First record is emitted only once the second HD is read on line 3,
+        // with the line-2 continuation merged into its last description field.
+        assert_eq!(first.field(3), "W1AW");
+        assert_eq!(first.field(4), "desc continuation");
+        assert_eq!(reader.line_number(), 3);
+        let second = reader.next_line().unwrap().unwrap();
+        assert_eq!(second.field(3), "W2AW");
+        assert!(reader.next_line().unwrap().is_none());
+    }
+
+    #[test]
+    fn test_open_nonexistent_file_errors() {
+        match DatReader::<File>::open("/no/such/path/missing.dat") {
+            Err(ParseError::Io(_)) => {}
+            Err(other) => panic!("expected Io error, got {other:?}"),
+            Ok(_) => panic!("expected error opening missing path"),
+        }
+    }
+
+    #[test]
+    fn test_parse_file_round_trip_from_temp() {
+        use std::io::Write;
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("HD.dat");
+        let mut f = File::create(&path).unwrap();
+        f.write_all(b"HD|111||W1AW|A|HA\nHD|222||W2AW|A|HA\n")
+            .unwrap();
+        drop(f);
+
+        let records = parse_file(&path).unwrap();
+        assert_eq!(records.len(), 2);
+        match &records[0] {
+            UlsRecord::Header(h) => assert_eq!(h.unique_system_identifier, 111),
+            other => panic!("expected Header, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_parse_file_propagates_unknown_record_error() {
+        use std::io::Write;
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("bad.dat");
+        let mut f = File::create(&path).unwrap();
+        // CH is in VALID_RECORD_TYPES, so the reader treats it as a record start
+        // rather than a continuation, yet it fails RecordType parsing, so
+        // parse_file surfaces UnknownRecordType.
+        f.write_all(b"CH|1|2\n").unwrap();
+        drop(f);
+
+        let err = parse_file(&path).unwrap_err();
+        assert!(matches!(err, ParseError::UnknownRecordType(rt) if rt == "CH"));
+    }
 }
