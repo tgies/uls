@@ -408,4 +408,165 @@ mod tests {
         assert!(missing.contains(&"EN".to_string()));
         assert!(missing.contains(&"AM".to_string()));
     }
+
+    #[test]
+    fn test_open_uninitialized_db_returns_not_initialized() {
+        // A file-backed database that has never had its schema applied reports
+        // NotInitialized when opened through the query engine.
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("empty.db");
+
+        // Touch the file via with_config so it exists but lacks schema.
+        let db = Database::with_config(DatabaseConfig::with_path(&path)).unwrap();
+        assert!(!db.is_initialized().unwrap());
+        drop(db);
+
+        match QueryEngine::open(&path) {
+            Err(QueryError::NotInitialized) => {}
+            Err(other) => panic!("expected NotInitialized, got {other}"),
+            Ok(_) => panic!("expected NotInitialized error, got an engine"),
+        }
+
+        // The error renders the operator-facing guidance.
+        let err = QueryError::NotInitialized;
+        assert_eq!(
+            err.to_string(),
+            "database not initialized - run 'uls update' first"
+        );
+    }
+
+    #[test]
+    fn test_open_initialized_db_succeeds() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("ready.db");
+
+        // Initialize the schema, then drop the handle.
+        let db = Database::with_config(DatabaseConfig::with_path(&path)).unwrap();
+        db.initialize().unwrap();
+        drop(db);
+
+        // Opening the same path yields a ready engine.
+        let engine = QueryEngine::open(&path).unwrap();
+        assert!(engine.is_ready().unwrap());
+        let stats = engine.stats().unwrap();
+        assert_eq!(stats.total_licenses, 0);
+    }
+
+    #[test]
+    fn test_search_operator_class_join_returns_class() {
+        use uls_core::records::{AmateurRecord, HeaderRecord, UlsRecord};
+
+        let config = DatabaseConfig::in_memory();
+        let db = Database::with_config(config).unwrap();
+        db.initialize().unwrap();
+
+        // Header for the license.
+        let mut header = HeaderRecord::from_fields(&["HD", "555"]);
+        header.unique_system_identifier = 555;
+        header.call_sign = Some("W1EXT".to_string());
+        header.license_status = Some('A');
+        header.radio_service_code = Some("HA".to_string());
+        db.insert_record(&UlsRecord::Header(header)).unwrap();
+
+        // Amateur record carrying the Extra operator class.
+        let amateur = AmateurRecord {
+            unique_system_identifier: 555,
+            operator_class: Some('E'),
+            ..AmateurRecord::from_fields(&["AM", "555"])
+        };
+        db.insert_record(&UlsRecord::Amateur(amateur)).unwrap();
+
+        let engine = QueryEngine::with_database(db);
+
+        // Filtering by operator class exercises the amateur_operators join.
+        let filter = SearchFilter::callsign("W1EXT").with_operator_class('E');
+        let results = engine.search(filter).unwrap();
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].operator_class, Some('E'));
+
+        // A different class must not match the joined row.
+        let filter = SearchFilter::callsign("W1EXT").with_operator_class('T');
+        assert!(engine.search(filter).unwrap().is_empty());
+    }
+
+    #[test]
+    fn test_search_orders_and_limits_multiple_rows() {
+        use uls_core::records::{HeaderRecord, UlsRecord};
+
+        let config = DatabaseConfig::in_memory();
+        let db = Database::with_config(config).unwrap();
+        db.initialize().unwrap();
+
+        for (id, call) in [(1_i64, "W3CCC"), (2, "W1AAA"), (3, "W2BBB")] {
+            let mut header = HeaderRecord::from_fields(&["HD", "0"]);
+            header.unique_system_identifier = id;
+            header.call_sign = Some(call.to_string());
+            header.license_status = Some('A');
+            header.radio_service_code = Some("HA".to_string());
+            db.insert_record(&UlsRecord::Header(header)).unwrap();
+        }
+
+        let engine = QueryEngine::with_database(db);
+
+        // Default callsign-ascending sort across all rows.
+        let all = engine.search(SearchFilter::default()).unwrap();
+        let calls: Vec<&str> = all.iter().map(|l| l.call_sign.as_str()).collect();
+        assert_eq!(calls, vec!["W1AAA", "W2BBB", "W3CCC"]);
+
+        // Descending sort with a limit returns the top single row only.
+        let filter = SearchFilter::default()
+            .with_sort(crate::filter::SortOrder::CallSignDesc)
+            .with_limit(1);
+        let top = engine.search(filter).unwrap();
+        assert_eq!(top.len(), 1);
+        assert_eq!(top[0].call_sign, "W3CCC");
+
+        // Count ignores limit and reflects the full match set.
+        assert_eq!(engine.count(SearchFilter::default()).unwrap(), 3);
+    }
+
+    #[test]
+    fn test_lookup_and_lookup_by_frn_return_populated_license() {
+        use uls_core::records::{EntityRecord, HeaderRecord, UlsRecord};
+
+        let config = DatabaseConfig::in_memory();
+        let db = Database::with_config(config).unwrap();
+        db.initialize().unwrap();
+
+        let mut header = HeaderRecord::from_fields(&["HD", "777"]);
+        header.unique_system_identifier = 777;
+        header.call_sign = Some("W1ABC".to_string());
+        header.license_status = Some('A');
+        header.radio_service_code = Some("HA".to_string());
+        db.insert_record(&UlsRecord::Header(header)).unwrap();
+
+        let entity = EntityRecord {
+            unique_system_identifier: 777,
+            call_sign: Some("W1ABC".to_string()),
+            entity_name: Some("Jane Operator".to_string()),
+            frn: Some("0009876543".to_string()),
+            city: Some("NEWINGTON".to_string()),
+            state: Some("CT".to_string()),
+            ..EntityRecord::from_fields(&["EN", "777"])
+        };
+        db.insert_record(&UlsRecord::Entity(entity)).unwrap();
+
+        let engine = QueryEngine::with_database(db);
+
+        // Callsign lookup is case-insensitive and returns the joined entity data.
+        let found = engine.lookup("w1abc").unwrap().expect("license present");
+        assert_eq!(found.call_sign, "W1ABC");
+        assert_eq!(found.frn.as_deref(), Some("0009876543"));
+        assert_eq!(found.licensee_name, "Jane Operator");
+        assert_eq!(found.city.as_deref(), Some("NEWINGTON"));
+
+        // FRN lookup resolves the same license via the entities inner join.
+        let by_frn = engine.lookup_by_frn("0009876543").unwrap();
+        assert_eq!(by_frn.len(), 1);
+        assert_eq!(by_frn[0].call_sign, "W1ABC");
+        assert_eq!(by_frn[0].unique_system_identifier, 777);
+
+        // A non-matching FRN yields no rows.
+        assert!(engine.lookup_by_frn("0000000000").unwrap().is_empty());
+    }
 }
