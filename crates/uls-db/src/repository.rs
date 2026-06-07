@@ -688,12 +688,16 @@ impl Database {
             threshold_days,
         );
 
-        // Get last weekly date from metadata
+        // Get last weekly date from metadata. Scope the connection so it returns
+        // to the pool before get_applied_patches checks out another one; holding
+        // two pooled connections on one thread can exhaust the pool and deadlock.
         let weekly_key = format!("last_weekly_date_{}", service);
-        let conn = self.conn()?;
-        if let Some(date_str) = Schema::get_metadata(&conn, &weekly_key)? {
-            freshness.last_weekly_date =
-                chrono::NaiveDate::parse_from_str(&date_str, "%Y-%m-%d").ok();
+        {
+            let conn = self.conn()?;
+            if let Some(date_str) = Schema::get_metadata(&conn, &weekly_key)? {
+                freshness.last_weekly_date =
+                    chrono::NaiveDate::parse_from_str(&date_str, "%Y-%m-%d").ok();
+            }
         }
 
         // Get applied patches
