@@ -55,7 +55,7 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 
 # ZIP handling
-zip = "4.2"
+zip = "8.6"
 
 # Compression
 flate2 = "1.1"
