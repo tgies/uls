@@ -2,8 +2,9 @@
 //!
 //! Benchmarks the critical database operations used during ULS data import and querying.
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use criterion::{criterion_group, criterion_main, Criterion};
 use rusqlite::Connection;
+use std::hint::black_box;
 use uls_core::records::{AmateurRecord, EntityRecord, HeaderRecord, UlsRecord};
 use uls_db::{BulkInserter, Schema};
 
