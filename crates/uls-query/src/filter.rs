@@ -821,4 +821,152 @@ mod tests {
         // Falls back to original string since parse failed
         assert!(params.contains(&"UNKNOWN".to_string()));
     }
+
+    #[test]
+    fn test_default_filter_is_empty() {
+        // The derived Default and new() must agree and produce no conditions.
+        let from_default = SearchFilter::default();
+        let from_new = SearchFilter::new();
+
+        assert_eq!(from_default.to_where_clause(), from_new.to_where_clause());
+        assert_eq!(from_default.to_where_clause().0, "1=1");
+        assert_eq!(from_default.order_clause(), "ORDER BY l.call_sign ASC");
+        assert_eq!(from_default.limit_clause(), "");
+        assert_eq!(from_default.sort, SortOrder::CallSign);
+        assert!(!from_default.active_only);
+        assert!(from_default.callsign.is_none());
+    }
+
+    #[test]
+    fn test_convert_enum_value_class() {
+        // class field maps the operator-class char to its integer code.
+        let converted = convert_enum_value("class", "E");
+        assert_eq!(converted, Some(OperatorClass::Extra.to_u8().to_string()));
+
+        // The operator_class alias resolves the same way.
+        assert_eq!(
+            convert_enum_value("operator_class", "E"),
+            Some(OperatorClass::Extra.to_u8().to_string())
+        );
+
+        // An unparseable class char yields None (no conversion).
+        assert_eq!(convert_enum_value("class", "Z"), None);
+    }
+
+    #[test]
+    fn test_convert_enum_value_service() {
+        // service field maps the radio-service code to its integer code.
+        assert_eq!(
+            convert_enum_value("service", "HA"),
+            Some(RadioService::HA.to_u8().to_string())
+        );
+        assert_eq!(
+            convert_enum_value("radio_service", "HV"),
+            Some(RadioService::HV.to_u8().to_string())
+        );
+
+        // An unparseable service code yields None.
+        assert_eq!(convert_enum_value("service", "ZZ"), None);
+    }
+
+    #[test]
+    fn test_convert_enum_value_non_enum_field() {
+        // A non-enum field is never converted.
+        assert_eq!(convert_enum_value("call_sign", "W1AW"), None);
+    }
+
+    #[test]
+    fn test_generic_filter_class_enum_conversion() {
+        // class=E goes through convert_enum_value and stores the integer code.
+        let filter = SearchFilter::new().with_filter("class=E");
+        let (clause, params) = filter.to_where_clause();
+
+        assert!(clause.contains("a.operator_class"));
+        assert!(params.contains(&OperatorClass::Extra.to_u8().to_string()));
+    }
+
+    #[test]
+    fn test_generic_filter_service_enum_conversion() {
+        // service=HA goes through convert_enum_value and stores the integer code.
+        let filter = SearchFilter::new().with_filter("service=HA");
+        let (clause, params) = filter.to_where_clause();
+
+        assert!(clause.contains("l.radio_service_code"));
+        assert!(params.contains(&RadioService::HA.to_u8().to_string()));
+    }
+
+    #[test]
+    fn test_active_only_without_status_inlines_code() {
+        // Setting active_only directly (with status unset) emits an inline code
+        // comparison rather than a bound parameter.
+        let mut filter = SearchFilter::new();
+        filter.active_only = true;
+        let (clause, params) = filter.to_where_clause();
+
+        let active_code = LicenseStatus::Active.to_u8();
+        assert!(clause.contains(&format!("l.license_status = {}", active_code)));
+        assert!(params.is_empty());
+    }
+
+    #[test]
+    fn test_status_takes_precedence_over_active_only() {
+        // When both status and active_only are set, status wins and binds a param.
+        let mut filter = SearchFilter::new();
+        filter.status = Some('E');
+        filter.active_only = true;
+        let (clause, params) = filter.to_where_clause();
+
+        // Parameterized status comparison, not the inline active_only code.
+        assert!(clause.contains("l.license_status = ?"));
+        let expired_code = LicenseStatus::Expired.to_u8().to_string();
+        assert!(params.contains(&expired_code));
+        assert!(!clause.contains(&format!(
+            "l.license_status = {}",
+            LicenseStatus::Active.to_u8()
+        )));
+    }
+
+    #[test]
+    fn test_invalid_operator_class_char_skipped() {
+        // An unparseable operator_class char produces no condition at all.
+        let mut filter = SearchFilter::new();
+        filter.operator_class = Some('Z');
+        let (clause, params) = filter.to_where_clause();
+
+        assert_eq!(clause, "1=1");
+        assert!(params.is_empty());
+    }
+
+    #[test]
+    fn test_generic_filter_invalid_op_for_char_field_skipped() {
+        // class is a Char field; the > operator is invalid for it, so the
+        // expression is dropped and no condition is emitted.
+        let filter = SearchFilter::new().with_filter("class>E");
+        let (clause, params) = filter.to_where_clause();
+
+        assert_eq!(clause, "1=1");
+        assert!(params.is_empty());
+    }
+
+    #[test]
+    fn test_order_clause_generic_field_descending() {
+        // A registered sort field with the descending prefix maps to its column.
+        let filter = SearchFilter::new().with_sort_field("-grant_date");
+        assert_eq!(filter.order_clause(), "ORDER BY l.grant_date DESC");
+    }
+
+    #[test]
+    fn test_order_clause_generic_field_ascending() {
+        let filter = SearchFilter::new().with_sort_field("call_sign");
+        assert_eq!(filter.order_clause(), "ORDER BY l.call_sign ASC");
+    }
+
+    #[test]
+    fn test_order_clause_unknown_field_falls_back_to_legacy() {
+        // An unregistered sort_field falls through to the legacy SortOrder.
+        let mut filter = SearchFilter::new();
+        filter.sort_field = Some("not_a_field".to_string());
+        filter.sort = SortOrder::State;
+        assert_eq!(filter.order_clause(), "ORDER BY e.state ASC, e.city ASC");
+    }
 }

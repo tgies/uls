@@ -632,6 +632,49 @@ mod tests {
     }
 
     #[test]
+    fn test_vec_table_no_operator_class_shows_dash() {
+        // A license with no operator class renders "-" in the CLASS column.
+        let mut license = test_license();
+        license.operator_class = None;
+        let output = vec![license].format(OutputFormat::Table);
+
+        // The data row pads the class column to width 5; the placeholder is "-".
+        let data_line = output
+            .lines()
+            .find(|l| l.contains("W1TEST"))
+            .expect("data row present");
+        assert!(
+            data_line.contains(" -    "),
+            "expected dash placeholder in class column: {:?}",
+            data_line
+        );
+    }
+
+    #[test]
+    fn test_vec_table_with_operator_class_shows_class() {
+        // A license with an operator class renders the class letter in the
+        // CLASS column, not a dash. test_license has operator_class Some('E').
+        let output = vec![test_license()].format(OutputFormat::Table);
+        let data_line = output
+            .lines()
+            .find(|l| l.contains("W1TEST"))
+            .expect("data row present");
+        // The CLASS column is {:<5} preceded by a separator space, so the
+        // populated slot is a space, the class letter, then four pad spaces.
+        // Matching the exact slot avoids passing on the 'E' in "NEWINGTON".
+        assert!(
+            data_line.contains(" E    "),
+            "expected class letter in class column slot: {:?}",
+            data_line
+        );
+        assert!(
+            !data_line.contains(" -    "),
+            "class column should not render the dash placeholder: {:?}",
+            data_line
+        );
+    }
+
+    #[test]
     fn test_output_format_aliases() {
         // Test alternative format names
         assert_eq!("yml".parse::<OutputFormat>(), Ok(OutputFormat::Yaml));
