@@ -39,7 +39,7 @@ dirs = "6.0"
 [dev-dependencies]
 tempfile.workspace = true
 rstest.workspace = true
-assert_cmd = "2.0"
+assert_cmd = "2.2"
 predicates = "3.1"
 zip.workspace = true
 wiremock.workspace = true
