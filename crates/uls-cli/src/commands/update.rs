@@ -299,11 +299,15 @@ async fn apply_weekly_then_dailies(
 
     let weekly_date = apply_weekly(db, client, service_code, import_mode).await?;
 
-    // Now try dailies after the fresh weekly, skipping the daily that matches
-    // the weekly's publication day (its data is already in the weekly).
+    // A weekly created on date D covers through Sunday D and holds the same
+    // records as the Sunday daily, whose canonical (creation) date is D+1.
+    // Resume the chain from D+1: the Monday daily (canonical D+2) stays
+    // contiguous and the redundant Sunday daily is gated out. The weekday skip
+    // avoids downloading that Sunday daily.
     let applied = HashSet::new();
+    let resume_from = weekly_date.succ_opt().unwrap_or(weekly_date);
     let skip = Some(uls_download::catalog::Weekday::for_date(weekly_date));
-    let chain = build_daily_chain(client, service_code, weekly_date, &applied, today, skip).await?;
+    let chain = build_daily_chain(client, service_code, resume_from, &applied, today, skip).await?;
 
     let daily_count = if let DailyChainResult::Complete(dailies) = chain {
         apply_dailies(db, service_code, import_mode, &dailies)?
@@ -578,7 +582,9 @@ mod tests {
         let db = fresh_db(tmp.path());
         let client = test_client(&server, tmp.path());
 
-        // Weekly published Sunday 2026-01-18; one Monday daily one day later.
+        // Weekly published Sunday 2026-01-18. FCC stamps each daily the next
+        // morning, so the Monday daily (data 2026-01-19) is created Tue
+        // 2026-01-20.
         mount_zip(
             &server,
             "/complete/l_amat.zip",
@@ -588,7 +594,7 @@ mod tests {
         mount_zip(
             &server,
             "/daily/l_am_mon.zip",
-            build_fixture_zip("l_amat", "Mon Jan 19 12:01:25 EST 2026"),
+            build_fixture_zip("l_amat", "Tue Jan 20 08:00:00 EST 2026"),
         )
         .await;
 
@@ -621,7 +627,81 @@ mod tests {
         assert_eq!(patches.len(), 1);
         assert_eq!(
             patches[0].patch_date,
-            NaiveDate::from_ymd_opt(2026, 1, 19).unwrap()
+            NaiveDate::from_ymd_opt(2026, 1, 20).unwrap()
+        );
+    }
+
+    #[tokio::test]
+    async fn test_run_update_fresh_weekly_applies_full_daily_week() {
+        // Regression: after a fresh weekly the chain resumes from the day after
+        // the weekly (the weekly subsumes the Sunday daily at D+1), so a full
+        // week of dailies stamped with FCC's data-day+1 convention applies
+        // contiguously instead of tripping a false "chain broken" at the seam
+        // between the weekly (Sun, canonical D) and the Monday daily (canonical
+        // D+2).
+        let server = MockServer::start().await;
+        let tmp = TempDir::new().unwrap();
+        let db = fresh_db(tmp.path());
+        let client = test_client(&server, tmp.path());
+
+        mount_zip(
+            &server,
+            "/complete/l_amat.zip",
+            build_fixture_zip("l_amat", "Sun Jan 18 12:01:25 EST 2026"),
+        )
+        .await;
+        // Each weekday daily is stamped the next morning (data day + 1).
+        for (day, stamp) in [
+            ("mon", "Tue Jan 20 08:00:00 EST 2026"),
+            ("tue", "Wed Jan 21 08:00:00 EST 2026"),
+            ("wed", "Thu Jan 22 08:00:00 EST 2026"),
+            ("thu", "Fri Jan 23 08:00:00 EST 2026"),
+            ("fri", "Sat Jan 24 08:00:00 EST 2026"),
+        ] {
+            mount_zip(
+                &server,
+                &format!("/daily/l_am_{day}.zip"),
+                build_fixture_zip("l_amat", stamp),
+            )
+            .await;
+        }
+
+        let result = run_update(
+            &db,
+            &client,
+            "HA",
+            &ImportMode::Minimal,
+            false,
+            false,
+            false,
+        )
+        .await
+        .unwrap();
+
+        match result {
+            UpdateResult::Updated { dailies, weekly } => {
+                assert!(weekly, "weekly should be applied on a fresh DB");
+                assert_eq!(dailies, 5, "all five weekday dailies should apply");
+            }
+            other => panic!("expected Updated, got {:?}", DebugResult(&other)),
+        }
+
+        let mut dates: Vec<_> = db
+            .get_applied_patches("HA")
+            .unwrap()
+            .iter()
+            .map(|p| p.patch_date)
+            .collect();
+        dates.sort();
+        assert_eq!(
+            dates,
+            vec![
+                NaiveDate::from_ymd_opt(2026, 1, 20).unwrap(),
+                NaiveDate::from_ymd_opt(2026, 1, 21).unwrap(),
+                NaiveDate::from_ymd_opt(2026, 1, 22).unwrap(),
+                NaiveDate::from_ymd_opt(2026, 1, 23).unwrap(),
+                NaiveDate::from_ymd_opt(2026, 1, 24).unwrap(),
+            ]
         );
     }
 
