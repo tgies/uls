@@ -16,10 +16,10 @@ all-features = true
 
 [advisories]
 ignore = [
-    # gungraun (benchmark crate) depends on bincode 1.3.3, which is
+    # gungraun (benchmark crate) pulls in proc-macro-error2, which is
     # unmaintained. This is a dev-only dependency used for benchmarks
     # and never ships in release binaries.
-    { id = "RUSTSEC-2025-0141", reason = "transitive dev dep via gungraun benchmarks; not in release binary" },
+    { id = "RUSTSEC-2026-0173", reason = "transitive dev dep via gungraun benchmarks; not in release binary" },
 
 ]
 
