@@ -40,7 +40,7 @@ reqwest = { version = "0.13", default-features = false, features = ["json", "str
 # Web server
 axum = { version = "0.8", features = ["macros"] }
 tower = "0.5"
-tower-http = { version = "0.6", features = ["cors", "trace"] }
+tower-http = { version = "0.7", features = ["cors", "trace"] }
 
 # Database
 rusqlite = { version = "0.38", features = ["bundled", "backup"] }
