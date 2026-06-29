@@ -48,12 +48,12 @@ jobs:
     runs-on: ${{ matrix.platform.runs-on }}
     steps:
       - name: Checkout
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           persist-credentials: false
 
       - name: Build binary
-        uses: houseabsolute/actions-rust-cross@fe6ede73c7f0a50412ec05994e2aa5a7bf635eac # v1.0.7
+        uses: houseabsolute/actions-rust-cross@21b0f18dc621b25bfae556ff2791fca4173121e8 # v1.0.8
         with:
           command: build
           target: ${{ matrix.platform.target }}
@@ -61,7 +61,7 @@ jobs:
           strip: true
 
       - name: Publish artifacts and release
-        uses: houseabsolute/actions-rust-release@c44c1813a888b1d070680a3783d0ed0d8cc2b6b6 # v0.0.7
+        uses: houseabsolute/actions-rust-release@d4224577aca6ac71a9d6aab18adf766c5656594c # v0.0.8
         with:
           executable-name: uls
           archive-name: uls-${{ matrix.platform.target }}
