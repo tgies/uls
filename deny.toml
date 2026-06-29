@@ -15,13 +15,7 @@ all-features = true
 # --- Advisories (known vulnerabilities & unmaintained crates) ---
 
 [advisories]
-ignore = [
-    # gungraun (benchmark crate) pulls in proc-macro-error2, which is
-    # unmaintained. This is a dev-only dependency used for benchmarks
-    # and never ships in release binaries.
-    { id = "RUSTSEC-2026-0173", reason = "transitive dev dep via gungraun benchmarks; not in release binary" },
-
-]
+ignore = []
 
 # --- Licenses ---
 
