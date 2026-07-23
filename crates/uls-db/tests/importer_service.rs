@@ -7,7 +7,7 @@ use tempfile::TempDir;
 use zip::write::FileOptions;
 use zip::ZipWriter;
 
-use uls_db::{Database, DatabaseConfig, ImportMode, Importer};
+use uls_db::{Database, DatabaseConfig, DbError, ImportMode, Importer};
 
 fn create_test_db() -> (TempDir, Database) {
     let temp_dir = TempDir::new().unwrap();
@@ -209,9 +209,145 @@ fn test_import_patch_does_not_clear_import_status() {
     assert!(db.has_record_type("HA", "AM").unwrap());
 }
 
+#[test]
+fn test_import_patch_stream_error_rolls_back() {
+    let (temp_dir, db) = create_test_db();
+    let importer = Importer::new(&db);
+    importer
+        .import_for_service(&weekly_zip(&temp_dir), "HA", ImportMode::Full, None)
+        .unwrap();
+
+    let mut malformed = hd_line("100001", "W1WEEK", "C").into_bytes();
+    malformed.extend_from_slice(hd_line("200002", "W2TEMP", "A").as_bytes());
+    malformed.extend_from_slice(&[0xff, b'\n']);
+    let patch = write_zip(
+        &temp_dir,
+        "patch_stream_error.zip",
+        &[("HD.dat", &malformed)],
+    );
+
+    let error = importer
+        .import_patch(&patch, ImportMode::Full, None)
+        .unwrap_err();
+    assert!(matches!(error, DbError::Parser(_)));
+    assert_eq!(
+        db.get_license_by_callsign("W1WEEK")
+            .unwrap()
+            .unwrap()
+            .status,
+        'A'
+    );
+    assert!(db.get_license_by_callsign("W2TEMP").unwrap().is_none());
+
+    // The rolled-back transaction must not poison the pooled connection.
+    let retry = write_zip(
+        &temp_dir,
+        "patch_retry.zip",
+        &[("HD.dat", hd_line("100001", "W1WEEK", "C").as_bytes())],
+    );
+    importer
+        .import_patch(&retry, ImportMode::Full, None)
+        .unwrap();
+    assert_eq!(
+        db.get_license_by_callsign("W1WEEK")
+            .unwrap()
+            .unwrap()
+            .status,
+        'C'
+    );
+}
+
+#[test]
+fn test_import_patch_insert_error_rolls_back() {
+    let (temp_dir, db) = create_test_db();
+    let importer = Importer::new(&db);
+    importer
+        .import_for_service(&weekly_zip(&temp_dir), "HA", ImportMode::Full, None)
+        .unwrap();
+
+    let patch = write_zip(
+        &temp_dir,
+        "patch_insert_error.zip",
+        &[
+            ("HD.dat", hd_line("100001", "W1WEEK", "C").as_bytes()),
+            (
+                "EN.dat",
+                b"EN|999999|||W9ORPHAN|L|L00999999|DOE, JANE|JANE||DOE||||||||||||000|0099999999|I||||||\n",
+            ),
+        ],
+    );
+
+    let error = importer
+        .import_patch(&patch, ImportMode::Full, None)
+        .unwrap_err();
+    assert!(matches!(error, DbError::InvalidData(_)));
+    assert_eq!(
+        db.get_license_by_callsign("W1WEEK")
+            .unwrap()
+            .unwrap()
+            .status,
+        'A'
+    );
+    assert!(db.get_license_by_callsign("W9ORPHAN").unwrap().is_none());
+}
+
 // =============================================================================
 // Error paths
 // =============================================================================
+
+#[test]
+fn test_import_for_service_stream_error_rolls_back_and_preserves_status() {
+    let (temp_dir, db) = create_test_db();
+    let importer = Importer::new(&db);
+    importer
+        .import_for_service(&weekly_zip(&temp_dir), "HA", ImportMode::Full, None)
+        .unwrap();
+    db.mark_imported("HA", "LA", 999).unwrap();
+
+    let mut malformed = hd_line("200002", "W2BAD", "A").into_bytes();
+    malformed.extend_from_slice(hd_line("200003", "W3TEMP", "A").as_bytes());
+    malformed.extend_from_slice(&[0xff, b'\n']);
+    let bad_weekly = write_zip(&temp_dir, "bad_weekly.zip", &[("HD.dat", &malformed)]);
+
+    let error = importer
+        .import_for_service(&bad_weekly, "HA", ImportMode::Full, None)
+        .unwrap_err();
+    assert!(matches!(error, DbError::Parser(_)));
+    assert!(db.get_license_by_callsign("W2BAD").unwrap().is_none());
+    assert!(db.get_license_by_callsign("W3TEMP").unwrap().is_none());
+    assert!(db.get_license_by_callsign("W1WEEK").unwrap().is_some());
+    assert!(db.has_record_type("HA", "LA").unwrap());
+}
+
+#[test]
+fn test_import_for_service_insert_error_rolls_back_and_preserves_status() {
+    let (temp_dir, db) = create_test_db();
+    let importer = Importer::new(&db);
+    importer
+        .import_for_service(&weekly_zip(&temp_dir), "HA", ImportMode::Full, None)
+        .unwrap();
+    db.mark_imported("HA", "LA", 999).unwrap();
+
+    let bad_weekly = write_zip(
+        &temp_dir,
+        "bad_weekly_insert.zip",
+        &[
+            ("HD.dat", hd_line("200002", "W2BAD", "A").as_bytes()),
+            (
+                "EN.dat",
+                b"EN|999999|||W9ORPHAN|L|L00999999|DOE, JANE|JANE||DOE||||||||||||000|0099999999|I||||||\n",
+            ),
+        ],
+    );
+
+    let error = importer
+        .import_for_service(&bad_weekly, "HA", ImportMode::Full, None)
+        .unwrap_err();
+    assert!(matches!(error, DbError::InvalidData(_)));
+    assert!(db.get_license_by_callsign("W2BAD").unwrap().is_none());
+    assert!(db.get_license_by_callsign("W1WEEK").unwrap().is_some());
+    assert!(db.has_record_type("HA", "LA").unwrap());
+}
 
 #[test]
 fn test_import_for_service_bad_zip_errors() {
