@@ -199,12 +199,6 @@ pub(super) async fn build_update_plan(
         }
     };
 
-    if current_source_date.is_none() && weekly_observation.is_err() {
-        return Err(weekly_observation
-            .expect_err("checked above")
-            .context("cannot plan an initial database without a valid weekly archive"));
-    }
-
     let weekly_route = weekly_observation.ok().and_then(|archive| {
         let newer_snapshot = current_weekly_date
             .map(|date| archive.date > date)

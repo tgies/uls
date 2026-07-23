@@ -1964,6 +1964,39 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_update_plan_reports_pending_bootstrap_without_a_weekly() {
+        let server = MockServer::start().await;
+        let tmp = TempDir::new().unwrap();
+        let db = fresh_db(tmp.path());
+        let client = test_client(&server, tmp.path());
+
+        let plan = planner::build_update_plan(
+            &db,
+            &client,
+            "amateur",
+            "HA",
+            NaiveDate::from_ymd_opt(2026, 7, 23).unwrap(),
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(plan.document.current.weekly_date, None);
+        assert_eq!(plan.document.current.source_date, None);
+        assert!(plan.document.reachable_source_dates.is_empty());
+        assert_eq!(plan.document.recommended_source_date, None);
+        assert_eq!(plan.document.observed.weekly_date, None);
+        assert_eq!(
+            plan.document.observed.weekly_status,
+            planner::WeeklyObservationStatus::NotPublished
+        );
+        assert!(plan
+            .route_to(NaiveDate::from_ymd_opt(2026, 7, 23).unwrap())
+            .is_none());
+        assert!(db.get_last_weekly_date("HA").unwrap().is_none());
+        assert!(db.get_applied_patches("HA").unwrap().is_empty());
+    }
+
+    #[tokio::test]
     async fn test_update_plan_rejects_noncontiguous_local_metadata() {
         let server = MockServer::start().await;
         let tmp = TempDir::new().unwrap();
