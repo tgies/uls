@@ -193,6 +193,103 @@ fn test_stats_help() {
         .success();
 }
 
+#[test]
+fn test_update_help_describes_planning_and_bounded_updates() {
+    Command::cargo_bin("uls")
+        .unwrap()
+        .args(["update", "--help"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("--plan"))
+        .stdout(predicate::str::contains("--through <YYYY-MM-DD>"))
+        .stdout(predicate::str::contains(
+            "Show the safe update plan without changing the database",
+        ))
+        .stdout(predicate::str::contains(
+            "Update exactly through this FCC source date",
+        ));
+}
+
+#[test]
+fn test_update_plan_requires_json_output() {
+    Command::cargo_bin("uls")
+        .unwrap()
+        .args(["update", "--plan"])
+        .assert()
+        .failure()
+        .stdout(predicate::str::is_empty())
+        .stderr(predicate::str::contains("--plan requires --format json"));
+}
+
+#[test]
+fn test_update_through_requires_strict_iso_date() {
+    for invalid_date in [
+        "2026-7-03",
+        "2026-07-3",
+        "2026/07/03",
+        "2026-02-30",
+        "not-a-date",
+    ] {
+        Command::cargo_bin("uls")
+            .unwrap()
+            .args(["update", "--through", invalid_date])
+            .assert()
+            .failure()
+            .stderr(predicate::str::contains("YYYY-MM-DD"));
+    }
+
+    // A valid date reaches command dispatch; the deliberately invalid service
+    // then stops execution before any database or network work begins.
+    Command::cargo_bin("uls")
+        .unwrap()
+        .args(["update", "--service", "invalid", "--through", "2026-07-03"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("Unknown service"));
+}
+
+#[test]
+fn test_update_plan_and_through_conflicts_are_rejected() {
+    for args in [
+        vec!["update", "--plan", "--check"],
+        vec!["update", "--plan", "--force"],
+        vec!["update", "--plan", "--daily-only"],
+        vec!["update", "--plan", "--through", "2026-07-03"],
+        vec!["update", "--through", "2026-07-03", "--check"],
+        vec!["update", "--through", "2026-07-03", "--force"],
+        vec!["update", "--through", "2026-07-03", "--daily-only"],
+    ] {
+        Command::cargo_bin("uls")
+            .unwrap()
+            .args(args)
+            .assert()
+            .failure()
+            .stderr(predicate::str::contains("cannot be used with"));
+    }
+}
+
+#[test]
+fn test_update_minimal_is_allowed_with_plan_and_through() {
+    for args in [
+        vec!["update", "--service", "invalid", "--plan", "--minimal"],
+        vec![
+            "update",
+            "--service",
+            "invalid",
+            "--through",
+            "2026-07-03",
+            "--minimal",
+        ],
+    ] {
+        Command::cargo_bin("uls")
+            .unwrap()
+            .args(args)
+            .assert()
+            .failure()
+            .stderr(predicate::str::contains("Unknown service"));
+    }
+}
+
 // =============================================================================
 // Lookup command tests (with database)
 // =============================================================================

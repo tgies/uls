@@ -10,6 +10,7 @@
 //! ```
 
 use anyhow::Result;
+use chrono::NaiveDate;
 use clap::{Parser, Subcommand};
 use clap_complete::Shell;
 use tracing_subscriber::EnvFilter;
@@ -92,9 +93,25 @@ enum Commands {
         #[arg(long)]
         daily_only: bool,
 
-        /// Check for available updates without downloading
+        /// Check for available updates without changing the database
         #[arg(long)]
         check: bool,
+
+        /// Show the safe update plan without changing the database
+        #[arg(
+            long,
+            conflicts_with_all = ["check", "force", "daily_only", "through"]
+        )]
+        plan: bool,
+
+        /// Update exactly through this FCC source date (YYYY-MM-DD)
+        #[arg(
+            long,
+            value_name = "YYYY-MM-DD",
+            value_parser = parse_iso_date,
+            conflicts_with_all = ["check", "force", "daily_only", "plan"]
+        )]
+        through: Option<NaiveDate>,
     },
 
     /// Look up all licenses by FRN (FCC Registration Number)
@@ -252,6 +269,23 @@ fn looks_like_callsign(s: &str) -> bool {
     chars.iter().all(|c| c.is_ascii_alphanumeric())
 }
 
+fn parse_iso_date(value: &str) -> std::result::Result<NaiveDate, String> {
+    let bytes = value.as_bytes();
+    if bytes.len() != 10
+        || bytes[4] != b'-'
+        || bytes[7] != b'-'
+        || bytes
+            .iter()
+            .enumerate()
+            .any(|(index, byte)| index != 4 && index != 7 && !byte.is_ascii_digit())
+    {
+        return Err("expected a date in YYYY-MM-DD format".to_string());
+    }
+
+    NaiveDate::parse_from_str(value, "%Y-%m-%d")
+        .map_err(|error| format!("invalid date (expected YYYY-MM-DD): {error}"))
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     let cli = Cli::parse();
@@ -316,9 +350,20 @@ async fn main() -> Result<()> {
             minimal,
             daily_only,
             check,
+            plan,
+            through,
         }) => {
-            commands::update::execute_with_options(&service, force, minimal, daily_only, check)
-                .await
+            commands::update::execute_with_options(commands::update::UpdateOptions {
+                service,
+                force,
+                minimal,
+                daily_only,
+                check_only: check,
+                plan,
+                through,
+                format: cli.format.clone(),
+            })
+            .await
         }
         Some(Commands::Frn { frns, service }) => {
             commands::frn::execute(&frns, &service, &cli.format, &staleness_opts).await
