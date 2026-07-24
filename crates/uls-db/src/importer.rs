@@ -12,7 +12,7 @@ use uls_parser::archive::ZipExtractor;
 
 use crate::bulk_inserter::BulkInserter;
 use crate::schema::Schema;
-use crate::{Database, Result};
+use crate::{Database, DbError, Result};
 
 /// RAII guard that restores database state (indexes and PRAGMAs) on drop.
 ///
@@ -101,7 +101,7 @@ impl ImportStats {
 
     /// Whether the import completed without errors.
     pub fn is_successful(&self) -> bool {
-        self.insert_errors == 0
+        self.parse_errors == 0 && self.insert_errors == 0
     }
 }
 
@@ -244,24 +244,25 @@ impl<'a> Importer<'a> {
         // Create guard to ensure cleanup even on early error return
         let mut guard = ImportGuard::new(&conn);
 
+        guard.mark_pragmas_modified();
         conn.execute_batch(
             "PRAGMA synchronous = OFF;
              PRAGMA journal_mode = MEMORY;
              PRAGMA temp_store = MEMORY;
              PRAGMA cache_size = -64000;",
         )?;
-        guard.mark_pragmas_modified();
 
         // Drop indexes for faster bulk insert (will be recreated after import)
         debug!("Dropping indexes for bulk import performance");
-        Schema::drop_indexes(&conn)?;
         guard.mark_indexes_dropped();
+        Schema::drop_indexes(&conn)?;
 
-        // Begin transaction
-        conn.execute("BEGIN TRANSACTION", [])?;
+        // Use a rollback-on-drop transaction so every early-return path leaves
+        // the database contents unchanged.
+        let transaction = conn.unchecked_transaction()?;
 
         // Create bulk inserter with prepared statements (statements compiled ONCE)
-        let mut inserter = BulkInserter::new(&conn)?;
+        let mut inserter = BulkInserter::new(&transaction)?;
 
         let mut stats = ImportStats {
             files: dat_files.len(),
@@ -343,11 +344,15 @@ impl<'a> Importer<'a> {
             }
         }
 
-        // Drop inserter to release statement borrows before commit
+        // Drop inserter to release statement borrows before closing the transaction.
         drop(inserter);
 
-        // Commit transaction
-        conn.execute("COMMIT", [])?;
+        if !stats.is_successful() {
+            let error = failed_import_error("weekly import", &stats);
+            transaction.rollback()?;
+            return Err(error);
+        }
+        transaction.commit()?;
 
         // Rebuild indexes (this is much faster than maintaining them during insert)
         let index_start = Instant::now();
@@ -391,9 +396,6 @@ impl<'a> Importer<'a> {
         mode: ImportMode,
         progress: Option<ProgressCallback>,
     ) -> Result<ImportStats> {
-        // Clear previous import status for this service
-        self.db.clear_import_status(service)?;
-
         let mut extractor = uls_parser::archive::ZipExtractor::open(zip_path)?;
         let all_dat_files = extractor.list_dat_files();
 
@@ -406,6 +408,10 @@ impl<'a> Importer<'a> {
 
         // Perform the import
         let stats = self.import_zip_with_mode(zip_path, mode, progress)?;
+
+        // Only replace status after the import itself has committed
+        // successfully. A rejected archive must leave prior status intact.
+        self.db.clear_import_status(service)?;
 
         // Record import status for each record type
         // Note: We estimate record counts per type based on file structure
@@ -467,20 +473,14 @@ impl<'a> Importer<'a> {
             dat_files
         );
 
-        // Optimize SQLite but DON'T drop indexes (unlike full import)
+        // Daily patches are small enough to keep the database's normal WAL and
+        // synchronous durability settings. Unlike full imports, do not drop
+        // indexes or weaken durability while applying a patch.
         let conn = self.db.conn()?;
-        conn.execute_batch(
-            "PRAGMA synchronous = OFF;
-             PRAGMA journal_mode = MEMORY;
-             PRAGMA temp_store = MEMORY;
-             PRAGMA cache_size = -64000;",
-        )?;
-
-        // Begin transaction
-        conn.execute("BEGIN TRANSACTION", [])?;
+        let transaction = conn.unchecked_transaction()?;
 
         // Create bulk inserter
-        let mut inserter = BulkInserter::new(&conn)?;
+        let mut inserter = BulkInserter::new(&transaction)?;
 
         let mut stats = ImportStats {
             files: dat_files.len(),
@@ -554,17 +554,15 @@ impl<'a> Importer<'a> {
             }
         }
 
-        // Drop inserter to release statement borrows before commit
+        // Drop inserter to release statement borrows before closing the transaction.
         drop(inserter);
 
-        // Commit transaction
-        conn.execute("COMMIT", [])?;
-
-        // Reset SQLite settings
-        conn.execute_batch(
-            "PRAGMA synchronous = NORMAL;
-             PRAGMA journal_mode = WAL;",
-        )?;
+        if !stats.is_successful() {
+            let error = failed_import_error("daily patch", &stats);
+            transaction.rollback()?;
+            return Err(error);
+        }
+        transaction.commit()?;
 
         stats.duration_secs = start.elapsed().as_secs_f64();
 
@@ -577,6 +575,13 @@ impl<'a> Importer<'a> {
 
         Ok(stats)
     }
+}
+
+fn failed_import_error(kind: &str, stats: &ImportStats) -> DbError {
+    DbError::InvalidData(format!(
+        "{kind} rejected: {} parse error(s), {} insert error(s)",
+        stats.parse_errors, stats.insert_errors
+    ))
 }
 
 #[cfg(test)]
@@ -663,6 +668,12 @@ mod tests {
             ..Default::default()
         };
         assert!(!stats_with_errors.is_successful());
+
+        let stats_with_parse_errors = ImportStats {
+            parse_errors: 1,
+            ..Default::default()
+        };
+        assert!(!stats_with_parse_errors.is_successful());
     }
 
     #[test]

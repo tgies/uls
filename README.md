@@ -52,6 +52,31 @@ Additional FCC radio services are planned for future releases.
 | `uls download` | Download FCC files without building database |
 | `uls completions <SHELL>` | Generate shell completions (bash, zsh, fish, elvish, powershell) |
 
+### Safe update planning
+
+Automation can inspect the exact FCC source dates that are currently reachable
+without changing the database:
+
+```bash
+uls update --service amateur --plan --format json
+```
+
+The versioned `uls.update_plan` document includes the current weekly and source
+dates, every exactly reachable source date, the recommended date, observed FCC
+archive dates, and any gap in the current daily path. The reachable dates may be
+disjoint when a newer weekly snapshot safely bridges missing daily archives.
+
+After coordinating a common date across services, apply no farther than that
+date and require the database to reach it:
+
+```bash
+uls update --service amateur --through 2026-07-23 --format json
+```
+
+An unreachable target is rejected before database initialization or migration.
+Each imported archive is transactional. If a later archive fails, the command
+returns an error while retaining only the earlier, valid contiguous prefix.
+
 ## Configuration
 
 Environment variables:
