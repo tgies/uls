@@ -7,9 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.7](https://github.com/tgies/uls/compare/v0.1.6...v0.1.7) - 2026-07-24
+
 ### Added
 
-- *(update)* add machine-readable exact-date planning and bounded apply
+- *(update)* add machine-readable exact-date planning and bounded `--through` apply
 
 ### Fixed
 
@@ -17,6 +19,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - *(update)* validate FCC archive dates and weekly coverage boundaries
 - *(update)* represent an unavailable bootstrap source as a valid empty plan
 - *(db)* roll back weekly and daily imports on parser or insert failure
+- *(query)* remain warning-free under the latest supported Clippy
+
+### Other
+
+- *(update)* add deterministic command-orchestration coverage
+
+### Security
+
+- *(deps)* update the vulnerable transitive `crossbeam-epoch` development dependency
 
 ## [0.1.6](https://github.com/tgies/uls/compare/v0.1.5...v0.1.6) - 2026-06-22
 
