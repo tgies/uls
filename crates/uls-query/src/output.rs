@@ -185,7 +185,7 @@ fn format_license_csv(license: &License) -> String {
         csv_escape(&license.call_sign),
         csv_escape(&license.display_name()),
         license.status,
-        &license.radio_service,
+        license.radio_service,
         license
             .operator_class
             .map(|c| c.to_string())
