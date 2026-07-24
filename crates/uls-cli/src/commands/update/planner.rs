@@ -233,6 +233,10 @@ pub(super) async fn build_update_plan(
         .as_ref()
         .and_then(|chain| chain.gap)
         .map(Into::into);
+    let archive_observations_complete = matches!(
+        weekly_status,
+        WeeklyObservationStatus::Available | WeeklyObservationStatus::NotPublished
+    ) && daily_status == DailyObservationStatus::Complete;
 
     Ok(PlannedUpdate {
         document: UpdatePlanDocument {
@@ -250,10 +254,7 @@ pub(super) async fn build_update_plan(
                 weekly_date: observed_weekly,
                 weekly_status,
                 daily_status,
-                complete: matches!(
-                    weekly_status,
-                    WeeklyObservationStatus::Available | WeeklyObservationStatus::NotPublished
-                ) && daily_status == DailyObservationStatus::Complete,
+                complete: archive_observations_complete,
                 latest_daily_date,
             },
             current_daily_gap,

@@ -49,6 +49,17 @@ pub async fn execute(service: &str, force: bool, minimal: bool) -> Result<()> {
 }
 
 pub async fn execute_with_options(options: UpdateOptions) -> Result<()> {
+    let db_path = default_db_path();
+    let download_config = DownloadConfig::with_cache_dir(default_cache_path());
+    execute_with_context(options, &db_path, download_config, Utc::now().date_naive()).await
+}
+
+async fn execute_with_context(
+    options: UpdateOptions,
+    db_path: &Path,
+    download_config: DownloadConfig,
+    today: NaiveDate,
+) -> Result<()> {
     let UpdateOptions {
         service,
         force,
@@ -59,8 +70,6 @@ pub async fn execute_with_options(options: UpdateOptions) -> Result<()> {
         through,
         format,
     } = options;
-    let db_path = default_db_path();
-    let cache_path = default_cache_path();
 
     let service_code = match service.to_lowercase().as_str() {
         "amateur" | "ham" => "HA",
@@ -90,19 +99,12 @@ pub async fn execute_with_options(options: UpdateOptions) -> Result<()> {
         status_message(structured, format!("Database: {}", db_path.display()));
     }
 
-    let download_config = DownloadConfig::with_cache_dir(cache_path);
     let client = FccClient::new(download_config)?;
 
     if plan {
-        let db = open_database_for_planning(&db_path)?;
-        let planned = planner::build_update_plan(
-            &db,
-            &client,
-            service_name,
-            service_code,
-            Utc::now().date_naive(),
-        )
-        .await?;
+        let db = open_database_for_planning(db_path)?;
+        let planned =
+            planner::build_update_plan(&db, &client, service_name, service_code, today).await?;
         println!("{}", serde_json::to_string_pretty(&planned.document)?);
         return Ok(());
     }
@@ -111,15 +113,10 @@ pub async fn execute_with_options(options: UpdateOptions) -> Result<()> {
         // Inspect the current state and all candidate archives before opening
         // the serving database in write mode. An unreachable target must not
         // initialize or migrate the database as a side effect.
-        let planning_db = open_database_for_planning(&db_path)?;
-        let planned = planner::build_update_plan(
-            &planning_db,
-            &client,
-            service_name,
-            service_code,
-            Utc::now().date_naive(),
-        )
-        .await?;
+        let planning_db = open_database_for_planning(db_path)?;
+        let planned =
+            planner::build_update_plan(&planning_db, &client, service_name, service_code, today)
+                .await?;
         if planned.route_to(target).is_none() {
             bail!(
                 "source date {} is not exactly reachable for {}",
@@ -129,7 +126,7 @@ pub async fn execute_with_options(options: UpdateOptions) -> Result<()> {
         }
         drop(planning_db);
 
-        let db = open_database_for_update(&db_path, structured)?;
+        let db = open_database_for_update(db_path, structured)?;
         verify_planned_base(&db, &planned, service_code)?;
         return apply_planned_target(
             &db,
@@ -142,15 +139,18 @@ pub async fn execute_with_options(options: UpdateOptions) -> Result<()> {
         );
     }
 
-    let db = open_database_for_update(&db_path, structured)?;
-    let result = run_update(
+    let db = open_database_for_update(db_path, structured)?;
+    let result = run_update_at(
         &db,
         &client,
         service_code,
         &import_mode,
-        force,
-        daily_only,
-        check_only,
+        RunUpdateOptions {
+            force,
+            daily_only,
+            check_only,
+            today,
+        },
     )
     .await?;
 
@@ -417,6 +417,7 @@ fn print_daily_gap(gap: DailyGap) {
     );
 }
 
+#[cfg(test)]
 async fn run_update(
     db: &Database,
     client: &FccClient,
@@ -426,7 +427,42 @@ async fn run_update(
     daily_only: bool,
     check_only: bool,
 ) -> Result<UpdateResult> {
-    let today = Utc::now().date_naive();
+    run_update_at(
+        db,
+        client,
+        service_code,
+        import_mode,
+        RunUpdateOptions {
+            force,
+            daily_only,
+            check_only,
+            today: Utc::now().date_naive(),
+        },
+    )
+    .await
+}
+
+#[derive(Clone, Copy)]
+struct RunUpdateOptions {
+    force: bool,
+    daily_only: bool,
+    check_only: bool,
+    today: NaiveDate,
+}
+
+async fn run_update_at(
+    db: &Database,
+    client: &FccClient,
+    service_code: &str,
+    import_mode: &ImportMode,
+    options: RunUpdateOptions,
+) -> Result<UpdateResult> {
+    let RunUpdateOptions {
+        force,
+        daily_only,
+        check_only,
+        today,
+    } = options;
     let db_weekly_date = db.get_last_weekly_date(service_code)?;
     let applied_patches: HashSet<NaiveDate> = db
         .get_applied_patches(service_code)?
@@ -997,6 +1033,12 @@ mod tests {
             planner::WeeklyObservationStatus::Unavailable
         );
         assert_eq!(
+            planner::classify_weekly_error(&anyhow::Error::new(DownloadError::Zip(
+                zip::result::ZipError::FileNotFound,
+            ))),
+            planner::WeeklyObservationStatus::InvalidArchive
+        );
+        assert_eq!(
             planner::classify_weekly_error(&anyhow::anyhow!("invalid FCC creation date")),
             planner::WeeklyObservationStatus::InvalidArchive
         );
@@ -1177,12 +1219,207 @@ mod tests {
         db
     }
 
-    fn test_client(server: &MockServer, cache: &Path) -> FccClient {
+    fn test_download_config(server: &MockServer, cache: &Path) -> DownloadConfig {
         let mut config = DownloadConfig::with_cache_dir(cache.to_path_buf())
             .with_base_url(server.uri())
             .with_timeout(std::time::Duration::from_secs(10));
         config.max_retries = 0;
-        FccClient::new(config).unwrap()
+        config
+    }
+
+    fn test_client(server: &MockServer, cache: &Path) -> FccClient {
+        FccClient::new(test_download_config(server, cache)).unwrap()
+    }
+
+    fn default_update_options(service: &str) -> UpdateOptions {
+        UpdateOptions {
+            service: service.to_owned(),
+            force: false,
+            minimal: true,
+            daily_only: false,
+            check_only: false,
+            plan: false,
+            through: None,
+            format: "json".to_owned(),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_execute_compatibility_wrapper_rejects_unimplemented_service() {
+        let error = execute("all", false, false).await.unwrap_err();
+        assert_eq!(error.to_string(), "'all' services not yet implemented");
+    }
+
+    #[tokio::test]
+    async fn test_execute_context_plan_is_read_only() {
+        let server = MockServer::start().await;
+        let tmp = TempDir::new().unwrap();
+        let db_path = tmp.path().join("missing.db");
+        let mut options = default_update_options("amateur");
+        options.plan = true;
+
+        execute_with_context(
+            options,
+            &db_path,
+            test_download_config(&server, &tmp.path().join("cache")),
+            NaiveDate::from_ymd_opt(2026, 7, 23).unwrap(),
+        )
+        .await
+        .unwrap();
+
+        assert!(
+            !db_path.exists(),
+            "planning must not create the serving database"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_execute_context_unreachable_target_is_read_only() {
+        let server = MockServer::start().await;
+        let tmp = TempDir::new().unwrap();
+        let db_path = tmp.path().join("missing.db");
+        let mut options = default_update_options("amateur");
+        options.through = NaiveDate::from_ymd_opt(2026, 7, 23);
+
+        let error = execute_with_context(
+            options,
+            &db_path,
+            test_download_config(&server, &tmp.path().join("cache")),
+            NaiveDate::from_ymd_opt(2026, 7, 23).unwrap(),
+        )
+        .await
+        .unwrap_err();
+
+        assert!(
+            error
+                .to_string()
+                .contains("source date 2026-07-23 is not exactly reachable for HA"),
+            "unexpected error: {error:#}"
+        );
+        assert!(
+            !db_path.exists(),
+            "an unreachable target must not initialize the serving database"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_execute_context_applies_exact_daily_target() {
+        let server = MockServer::start().await;
+        let tmp = TempDir::new().unwrap();
+        let db_path = tmp.path().join("serving.db");
+        let db = Database::with_config(DatabaseConfig::with_path(&db_path)).unwrap();
+        db.initialize().unwrap();
+        db.set_last_weekly_date("HA", NaiveDate::from_ymd_opt(2026, 7, 12).unwrap())
+            .unwrap();
+        for day in 13..=16 {
+            db.record_applied_patch(
+                "HA",
+                NaiveDate::from_ymd_opt(2026, 7, day).unwrap(),
+                "fixture",
+                None,
+                Some(1),
+            )
+            .unwrap();
+        }
+        drop(db);
+
+        mount_zip(
+            &server,
+            "/daily/l_am_thu.zip",
+            build_fixture_zip("l_amat", "Fri Jul 17 08:00:00 EDT 2026"),
+        )
+        .await;
+        mount_zip(
+            &server,
+            "/daily/l_am_wed.zip",
+            build_fixture_zip("l_amat", "Thu Jul 23 08:00:00 EDT 2026"),
+        )
+        .await;
+
+        let mut options = default_update_options("amateur");
+        options.through = NaiveDate::from_ymd_opt(2026, 7, 17);
+        execute_with_context(
+            options,
+            &db_path,
+            test_download_config(&server, &tmp.path().join("cache")),
+            NaiveDate::from_ymd_opt(2026, 7, 23).unwrap(),
+        )
+        .await
+        .unwrap();
+
+        let db = Database::with_config(DatabaseConfig::with_path(&db_path)).unwrap();
+        assert_eq!(
+            database_source_date(&db, "HA").unwrap(),
+            NaiveDate::from_ymd_opt(2026, 7, 17)
+        );
+        let applied: HashSet<_> = db
+            .get_applied_patches("HA")
+            .unwrap()
+            .into_iter()
+            .map(|patch| patch.patch_date)
+            .collect();
+        assert!(applied.contains(&NaiveDate::from_ymd_opt(2026, 7, 17).unwrap()));
+        assert!(!applied.contains(&NaiveDate::from_ymd_opt(2026, 7, 23).unwrap()));
+    }
+
+    #[tokio::test]
+    async fn test_execute_context_applies_only_contiguous_prefix() {
+        let server = MockServer::start().await;
+        let tmp = TempDir::new().unwrap();
+        let db_path = tmp.path().join("serving.db");
+        let db = Database::with_config(DatabaseConfig::with_path(&db_path)).unwrap();
+        db.initialize().unwrap();
+        db.set_last_weekly_date("HA", NaiveDate::from_ymd_opt(2026, 7, 12).unwrap())
+            .unwrap();
+        for day in 13..=16 {
+            db.record_applied_patch(
+                "HA",
+                NaiveDate::from_ymd_opt(2026, 7, day).unwrap(),
+                "fixture",
+                None,
+                Some(1),
+            )
+            .unwrap();
+        }
+        drop(db);
+
+        mount_zip(
+            &server,
+            "/daily/l_am_thu.zip",
+            build_fixture_zip("l_amat", "Fri Jul 17 08:00:00 EDT 2026"),
+        )
+        .await;
+        mount_zip(
+            &server,
+            "/daily/l_am_wed.zip",
+            build_fixture_zip("l_amat", "Thu Jul 23 08:00:00 EDT 2026"),
+        )
+        .await;
+
+        let mut options = default_update_options("amateur");
+        options.format = "table".to_owned();
+        execute_with_context(
+            options,
+            &db_path,
+            test_download_config(&server, &tmp.path().join("cache")),
+            NaiveDate::from_ymd_opt(2026, 7, 23).unwrap(),
+        )
+        .await
+        .unwrap();
+
+        let db = Database::with_config(DatabaseConfig::with_path(&db_path)).unwrap();
+        assert_eq!(
+            database_source_date(&db, "HA").unwrap(),
+            NaiveDate::from_ymd_opt(2026, 7, 17)
+        );
+        let applied: HashSet<_> = db
+            .get_applied_patches("HA")
+            .unwrap()
+            .into_iter()
+            .map(|patch| patch.patch_date)
+            .collect();
+        assert!(applied.contains(&NaiveDate::from_ymd_opt(2026, 7, 17).unwrap()));
+        assert!(!applied.contains(&NaiveDate::from_ymd_opt(2026, 7, 23).unwrap()));
     }
 
     #[test]
@@ -1270,6 +1507,35 @@ mod tests {
         assert!(
             error.to_string().contains("server error 503"),
             "unexpected error: {error:#}"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_build_daily_chain_rejects_noncontiguous_local_metadata_before_download() {
+        let server = MockServer::start().await;
+        let tmp = TempDir::new().unwrap();
+        let client = test_client(&server, tmp.path());
+        let weekly = NaiveDate::from_ymd_opt(2026, 7, 12).unwrap();
+        let applied = HashSet::from([NaiveDate::from_ymd_opt(2026, 7, 14).unwrap()]);
+
+        let chain = build_daily_chain(
+            &client,
+            "HA",
+            weekly,
+            &applied,
+            NaiveDate::from_ymd_opt(2026, 7, 23).unwrap(),
+            None,
+        )
+        .await
+        .unwrap();
+
+        assert!(chain.contiguous.is_empty());
+        assert_eq!(
+            chain.gap,
+            Some(DailyGap {
+                missing_date: NaiveDate::from_ymd_opt(2026, 7, 13).unwrap(),
+                next_available_date: NaiveDate::from_ymd_opt(2026, 7, 14).unwrap(),
+            })
         );
     }
 
@@ -1994,6 +2260,37 @@ mod tests {
             .is_none());
         assert!(db.get_last_weekly_date("HA").unwrap().is_none());
         assert!(db.get_applied_patches("HA").unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_update_plan_rejects_patch_metadata_without_weekly_anchor() {
+        let server = MockServer::start().await;
+        let tmp = TempDir::new().unwrap();
+        let db = fresh_db(tmp.path());
+        let client = test_client(&server, tmp.path());
+        db.record_applied_patch(
+            "HA",
+            NaiveDate::from_ymd_opt(2026, 7, 17).unwrap(),
+            "fixture",
+            None,
+            Some(1),
+        )
+        .unwrap();
+
+        let error = planner::build_update_plan(
+            &db,
+            &client,
+            "amateur",
+            "HA",
+            NaiveDate::from_ymd_opt(2026, 7, 23).unwrap(),
+        )
+        .await
+        .unwrap_err();
+
+        assert_eq!(
+            error.to_string(),
+            "HA has daily patch metadata but no weekly anchor"
+        );
     }
 
     #[tokio::test]
