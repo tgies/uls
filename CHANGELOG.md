@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.7](https://github.com/tgies/uls/compare/v0.1.6...v0.1.7) - 2026-07-24
+
+### Added
+
+- *(update)* add exact update planning
+
+### Fixed
+
+- *(update)* expose pending bootstrap plans
+- *(update)* preserve contiguous daily progress
+- *(db)* roll back failed imports
+- *(query)* satisfy latest clippy
+
+### Other
+
+- *(update)* cover command orchestration
+
 ### Added
 
 - *(update)* add machine-readable exact-date planning and bounded apply
