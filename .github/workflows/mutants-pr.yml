@@ -29,7 +29,7 @@ jobs:
           BASE_REF: ${{ github.base_ref }}
         run: git diff origin/"$BASE_REF"...HEAD | tee git.diff
       - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
-      - uses: taiki-e/install-action@07b4745e0c39a41822af610387492e3e53aa222b # v2.83.4
+      - uses: taiki-e/install-action@41049aa56687c35e0afa74eed4f09cec4f9afabf # v2.85.2
         with:
           tool: cargo-mutants,nextest
       - name: Run cargo-mutants on diff
