@@ -7,7 +7,7 @@ use rusqlite::Connection;
 use crate::error::Result;
 
 /// Current schema version.
-pub const SCHEMA_VERSION: i32 = 6;
+pub const SCHEMA_VERSION: i32 = 7;
 
 /// Database schema management.
 pub struct Schema;
@@ -244,6 +244,7 @@ impl Schema {
             CREATE INDEX IF NOT EXISTS idx_entities_city_state ON entities(city, state);
             CREATE INDEX IF NOT EXISTS idx_entities_name ON entities(entity_name);
             CREATE INDEX IF NOT EXISTS idx_entities_last_name ON entities(last_name);
+            CREATE INDEX IF NOT EXISTS idx_entities_zip ON entities(zip_code);
             
             -- Amateur operator indexes
             CREATE INDEX IF NOT EXISTS idx_amateur_usi ON amateur_operators(unique_system_identifier);
@@ -287,6 +288,7 @@ impl Schema {
             DROP INDEX IF EXISTS idx_entities_city_state;
             DROP INDEX IF EXISTS idx_entities_name;
             DROP INDEX IF EXISTS idx_entities_last_name;
+            DROP INDEX IF EXISTS idx_entities_zip;
             
             -- Amateur operator indexes
             DROP INDEX IF EXISTS idx_amateur_usi;
@@ -387,6 +389,9 @@ impl Schema {
                 if v < 5 {
                     Self::migrate_to_v5(conn)?;
                 }
+                if v < 7 {
+                    Self::migrate_to_v7(conn)?;
+                }
 
                 // Update schema version
                 conn.execute(
@@ -400,6 +405,18 @@ impl Schema {
     }
 
     /// Migrate from v4 to v5: Add applied_patches table.
+    /// A ZIP-code search has to scan every entity row without this index,
+    /// which costs the same whether it matches nineteen rows or none. City is
+    /// the leading column of `idx_entities_city_state` and so is already
+    /// searchable; ZIP had no index of its own.
+    fn migrate_to_v7(conn: &Connection) -> Result<()> {
+        tracing::info!("Applying migration to v7: indexing entity ZIP codes");
+
+        conn.execute_batch("CREATE INDEX IF NOT EXISTS idx_entities_zip ON entities(zip_code);")?;
+
+        Ok(())
+    }
+
     fn migrate_to_v5(conn: &Connection) -> Result<()> {
         tracing::info!("Applying migration to v5: adding applied_patches table");
 
@@ -588,6 +605,41 @@ mod tests {
             Schema::get_metadata(&conn, "k").unwrap(),
             Some("second".to_string())
         );
+    }
+
+    fn has_index(conn: &Connection, name: &str) -> bool {
+        conn.query_row(
+            "SELECT COUNT(*) FROM sqlite_master WHERE type = 'index' AND name = ?1",
+            [name],
+            |row| row.get::<_, i32>(0),
+        )
+        .unwrap()
+            == 1
+    }
+
+    #[test]
+    fn initialize_indexes_entity_zip_codes() {
+        let conn = Connection::open_in_memory().unwrap();
+        Schema::initialize(&conn).unwrap();
+        assert!(has_index(&conn, "idx_entities_zip"));
+    }
+
+    #[test]
+    fn migrating_an_older_database_adds_the_zip_index() {
+        let conn = Connection::open_in_memory().unwrap();
+        Schema::initialize(&conn).unwrap();
+        conn.execute(
+            "INSERT OR REPLACE INTO metadata (key, value) VALUES ('schema_version', '6')",
+            [],
+        )
+        .unwrap();
+        conn.execute_batch("DROP INDEX IF EXISTS idx_entities_zip;")
+            .unwrap();
+
+        Schema::migrate_if_needed(&conn).unwrap();
+
+        assert_eq!(Schema::get_version(&conn).unwrap(), Some(SCHEMA_VERSION));
+        assert!(has_index(&conn, "idx_entities_zip"));
     }
 
     #[test]
