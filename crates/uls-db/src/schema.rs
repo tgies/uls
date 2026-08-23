@@ -7,7 +7,7 @@ use rusqlite::Connection;
 use crate::error::Result;
 
 /// Current schema version.
-pub const SCHEMA_VERSION: i32 = 7;
+pub const SCHEMA_VERSION: i32 = 8;
 
 /// Database schema management.
 pub struct Schema;
@@ -245,6 +245,7 @@ impl Schema {
             CREATE INDEX IF NOT EXISTS idx_entities_name ON entities(entity_name);
             CREATE INDEX IF NOT EXISTS idx_entities_last_name ON entities(last_name);
             CREATE INDEX IF NOT EXISTS idx_entities_zip ON entities(zip_code);
+            CREATE INDEX IF NOT EXISTS idx_entities_state ON entities(state);
             
             -- Amateur operator indexes
             CREATE INDEX IF NOT EXISTS idx_amateur_usi ON amateur_operators(unique_system_identifier);
@@ -289,6 +290,7 @@ impl Schema {
             DROP INDEX IF EXISTS idx_entities_name;
             DROP INDEX IF EXISTS idx_entities_last_name;
             DROP INDEX IF EXISTS idx_entities_zip;
+            DROP INDEX IF EXISTS idx_entities_state;
             
             -- Amateur operator indexes
             DROP INDEX IF EXISTS idx_amateur_usi;
@@ -392,6 +394,9 @@ impl Schema {
                 if v < 7 {
                     Self::migrate_to_v7(conn)?;
                 }
+                if v < 8 {
+                    Self::migrate_to_v8(conn)?;
+                }
 
                 // Update schema version
                 conn.execute(
@@ -409,6 +414,17 @@ impl Schema {
     /// which costs the same whether it matches nineteen rows or none. City is
     /// the leading column of `idx_entities_city_state` and so is already
     /// searchable; ZIP had no index of its own.
+    /// State is the trailing column of `idx_entities_city_state`, so a search
+    /// by state alone reached it only through a skip-scan over every distinct
+    /// city. A dedicated index searches it directly.
+    fn migrate_to_v8(conn: &Connection) -> Result<()> {
+        tracing::info!("Applying migration to v8: indexing entity states");
+
+        conn.execute_batch("CREATE INDEX IF NOT EXISTS idx_entities_state ON entities(state);")?;
+
+        Ok(())
+    }
+
     fn migrate_to_v7(conn: &Connection) -> Result<()> {
         tracing::info!("Applying migration to v7: indexing entity ZIP codes");
 
@@ -622,6 +638,31 @@ mod tests {
         let conn = Connection::open_in_memory().unwrap();
         Schema::initialize(&conn).unwrap();
         assert!(has_index(&conn, "idx_entities_zip"));
+    }
+
+    #[test]
+    fn initialize_indexes_entity_states() {
+        let conn = Connection::open_in_memory().unwrap();
+        Schema::initialize(&conn).unwrap();
+        assert!(has_index(&conn, "idx_entities_state"));
+    }
+
+    #[test]
+    fn migrating_an_older_database_adds_the_state_index() {
+        let conn = Connection::open_in_memory().unwrap();
+        Schema::initialize(&conn).unwrap();
+        conn.execute(
+            "INSERT OR REPLACE INTO metadata (key, value) VALUES ('schema_version', '7')",
+            [],
+        )
+        .unwrap();
+        conn.execute_batch("DROP INDEX IF EXISTS idx_entities_state;")
+            .unwrap();
+
+        Schema::migrate_if_needed(&conn).unwrap();
+
+        assert_eq!(Schema::get_version(&conn).unwrap(), Some(SCHEMA_VERSION));
+        assert!(has_index(&conn, "idx_entities_state"));
     }
 
     #[test]
