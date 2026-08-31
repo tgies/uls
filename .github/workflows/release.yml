@@ -61,7 +61,7 @@ jobs:
           strip: true
 
       - name: Publish artifacts and release
-        uses: houseabsolute/actions-rust-release@e47c661840f938dcc4587f52ef780bf05b1e1381 # v0.0.9
+        uses: houseabsolute/actions-rust-release@9e126fd5fc18f4cecf358b3909f3991ad59663dc # v1.0.1
         with:
           executable-name: uls
           archive-name: uls-${{ matrix.platform.target }}
