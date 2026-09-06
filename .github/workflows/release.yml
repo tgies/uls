@@ -12,7 +12,11 @@ on:
         type: string
 
 permissions:
-  contents: write
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
 
 env:
   CARGO_TERM_COLOR: always
@@ -60,8 +64,8 @@ jobs:
           args: "--locked --release"
           strip: true
 
-      - name: Publish artifacts and release
-        uses: houseabsolute/actions-rust-release@e47c661840f938dcc4587f52ef780bf05b1e1381 # v0.0.9
+      - name: Package artifacts
+        uses: houseabsolute/actions-rust-release@9e126fd5fc18f4cecf358b3909f3991ad59663dc # v1.0.1
         with:
           executable-name: uls
           archive-name: uls-${{ matrix.platform.target }}
@@ -71,3 +75,22 @@ jobs:
             README.md
             LICENSE-MIT
             LICENSE-APACHE
+
+  publish:
+    name: Publish GitHub release
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      actions: read
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Publish release
+        uses: houseabsolute/actions-rust-release/publish@9e126fd5fc18f4cecf358b3909f3991ad59663dc # v1.0.1
+        with:
+          executable-name: uls
+          changes-file: CHANGELOG.md
