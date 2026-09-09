@@ -865,29 +865,28 @@ fn import_weekly_archive(
 ) -> Result<()> {
     status_message(structured, "\nImporting weekly data...");
 
-    // Count total records for progress bar
-    let mut extractor = ZipExtractor::open(&archive.path)?;
-    let counts = extractor.count_all_records()?;
-    let total_records: usize = counts.values().sum();
-
-    let import_pb = ProgressBar::new(total_records as u64);
+    // Counting first would decompress every DAT file before import can start.
+    let import_pb = ProgressBar::new_spinner();
     import_pb.set_style(
-        ProgressStyle::default_bar()
-            .template("{spinner:.green} [{bar:40.cyan/blue}] {pos}/{len} records")?
-            .progress_chars("#>-"),
+        ProgressStyle::default_spinner()
+            .template("{spinner:.green} [{elapsed_precise}] {pos} records")?,
     );
+    import_pb.enable_steady_tick(std::time::Duration::from_millis(100));
 
+    let progress_display = import_pb.clone();
     let import_progress: ImportProgressCallback = Some(Box::new(move |p| {
-        import_pb.set_position(p.records as u64);
+        progress_display.set_position(p.records as u64);
     }));
 
     let importer = Importer::new(db);
-    let stats = importer.import_for_service(
+    let result = importer.import_for_service(
         &archive.path,
         service_code,
         import_mode.clone(),
         import_progress,
-    )?;
+    );
+    import_pb.finish_and_clear();
+    let stats = result?;
 
     status_message(
         structured,
@@ -1448,6 +1447,51 @@ mod tests {
         assert_eq!(
             db.get_last_updated().unwrap().as_deref(),
             Some("before-patch")
+        );
+    }
+
+    #[tokio::test]
+    async fn test_weekly_streaming_parser_failure_preserves_data_and_metadata() {
+        let server = MockServer::start().await;
+        let tmp = TempDir::new().unwrap();
+        let db = fresh_db(tmp.path());
+        let client = test_client(&server, tmp.path());
+        let weekly_date = NaiveDate::from_ymd_opt(2026, 7, 12).unwrap();
+        let patch_date = NaiveDate::from_ymd_opt(2026, 7, 13).unwrap();
+        db.set_last_weekly_date("HA", weekly_date).unwrap();
+        db.record_applied_patch("HA", patch_date, "prior", None, Some(1))
+            .unwrap();
+        db.set_imported_etag("HA", "prior-etag").unwrap();
+        db.set_last_updated("before-weekly").unwrap();
+        let path = tmp.path().join("malformed-weekly.zip");
+        write_malformed_patch(&path);
+
+        let error = import_weekly_archive(
+            &db,
+            &client,
+            "HA",
+            &ImportMode::Minimal,
+            &WeeklyArchive {
+                date: NaiveDate::from_ymd_opt(2026, 7, 17).unwrap(),
+                path,
+            },
+            true,
+        )
+        .unwrap_err();
+
+        assert!(error.to_string().contains("parser error"), "{error:#}");
+        assert_eq!(db.get_stats().unwrap().total_licenses, 0);
+        assert_eq!(db.get_last_weekly_date("HA").unwrap(), Some(weekly_date));
+        let patches = db.get_applied_patches("HA").unwrap();
+        assert_eq!(patches.len(), 1);
+        assert_eq!(patches[0].patch_date, patch_date);
+        assert_eq!(
+            db.get_imported_etag("HA").unwrap().as_deref(),
+            Some("prior-etag")
+        );
+        assert_eq!(
+            db.get_last_updated().unwrap().as_deref(),
+            Some("before-weekly")
         );
     }
 
