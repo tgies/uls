@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Start weekly imports without decompressing every DAT file to count records
+  first; progress now shows elapsed time and records processed.
+
 ## [0.1.7](https://github.com/tgies/uls/compare/v0.1.6...v0.1.7) - 2026-07-24
 
 ### Added
