@@ -27,6 +27,7 @@ tempfile.workspace = true
 rstest.workspace = true
 zip.workspace = true
 criterion.workspace = true
+tracing-subscriber.workspace = true
 
 [[bench]]
 name = "db_bench"

@@ -58,12 +58,14 @@ fn weekly_zip(temp_dir: &TempDir) -> PathBuf {
 // import_for_service
 // =============================================================================
 
-#[test]
-fn test_import_for_service_records_import_status() {
+#[rstest::rstest]
+#[case(false)]
+#[case(true)]
+fn test_import_for_service_records_import_status(#[case] pipelined: bool) {
     let (temp_dir, db) = create_test_db();
     let zip = weekly_zip(&temp_dir);
 
-    let importer = Importer::new(&db);
+    let importer = Importer::new(&db).with_pipelined_parsing(pipelined);
     let stats = importer
         .import_for_service(&zip, "HA", ImportMode::Full, None)
         .unwrap();
@@ -85,12 +87,14 @@ fn test_import_for_service_records_import_status() {
     assert!(db.get_license_by_callsign("W1WEEK").unwrap().is_some());
 }
 
-#[test]
-fn test_import_for_service_minimal_skips_history() {
+#[rstest::rstest]
+#[case(false)]
+#[case(true)]
+fn test_import_for_service_minimal_skips_history(#[case] pipelined: bool) {
     let (temp_dir, db) = create_test_db();
     let zip = weekly_zip(&temp_dir);
 
-    let importer = Importer::new(&db);
+    let importer = Importer::new(&db).with_pipelined_parsing(pipelined);
     let stats = importer
         .import_for_service(&zip, "HA", ImportMode::Minimal, None)
         .unwrap();
@@ -104,8 +108,10 @@ fn test_import_for_service_minimal_skips_history() {
     assert!(!db.has_record_type("HA", "HS").unwrap());
 }
 
-#[test]
-fn test_import_for_service_clears_prior_status() {
+#[rstest::rstest]
+#[case(false)]
+#[case(true)]
+fn test_import_for_service_clears_prior_status(#[case] pipelined: bool) {
     let (temp_dir, db) = create_test_db();
 
     // Pre-seed a stale status entry that a fresh import should clear.
@@ -113,7 +119,7 @@ fn test_import_for_service_clears_prior_status() {
     assert!(db.has_record_type("HA", "LA").unwrap());
 
     let zip = weekly_zip(&temp_dir);
-    let importer = Importer::new(&db);
+    let importer = Importer::new(&db).with_pipelined_parsing(pipelined);
     importer
         .import_for_service(&zip, "HA", ImportMode::Full, None)
         .unwrap();
@@ -295,10 +301,107 @@ fn test_import_patch_insert_error_rolls_back() {
 // Error paths
 // =============================================================================
 
-#[test]
-fn test_import_for_service_stream_error_rolls_back_and_preserves_status() {
+#[rstest::rstest]
+#[case(false)]
+#[case(true)]
+fn test_weekly_records_remain_ordered_across_batches(#[case] pipelined: bool) {
     let (temp_dir, db) = create_test_db();
-    let importer = Importer::new(&db);
+    let mut headers = String::new();
+    for i in 0..1025 {
+        headers.push_str(&hd_line(
+            &(100000 + i % 17).to_string(),
+            &format!("K{i}A"),
+            "A",
+        ));
+    }
+    let zip = write_zip(
+        &temp_dir,
+        "ordered.zip",
+        &[
+            ("EN.dat", b"EN|100000|||KFINAL|L||Final name\n"),
+            ("HD.dat", headers.as_bytes()),
+        ],
+    );
+    let stats = Importer::new(&db)
+        .with_pipelined_parsing(pipelined)
+        .import_for_service(&zip, "HA", ImportMode::Full, None)
+        .unwrap();
+    assert_eq!(stats.records, 1026);
+    assert_eq!(db.get_stats().unwrap().total_licenses, 17);
+    let conn = db.conn().unwrap();
+    for key in 0..17 {
+        let last = (0..1025).rev().find(|i| i % 17 == key).unwrap();
+        let callsign: String = conn
+            .query_row(
+                "SELECT call_sign FROM licenses WHERE unique_system_identifier = ?",
+                [100000 + key],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(callsign, format!("K{last}A"));
+    }
+    assert_eq!(
+        conn.query_row("SELECT COUNT(*) FROM entities", [], |row| row
+            .get::<_, i64>(0))
+            .unwrap(),
+        1
+    );
+}
+
+#[test]
+fn test_pipelined_progress_panic_cancels_worker_and_rolls_back() {
+    let (temp_dir, db) = create_test_db();
+    let importer = Importer::new(&db).with_pipelined_parsing(true);
+    importer
+        .import_for_service(&weekly_zip(&temp_dir), "HA", ImportMode::Full, None)
+        .unwrap();
+    let mut headers = String::new();
+    for i in 0..12000 {
+        headers.push_str(&hd_line(&(200000 + i).to_string(), "K1TEMP", "A"));
+    }
+    let zip = write_zip(
+        &temp_dir,
+        "cancelled.zip",
+        &[("HD.dat", headers.as_bytes())],
+    );
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        importer.import_for_service(
+            &zip,
+            "HA",
+            ImportMode::Full,
+            Some(Box::new(|_| panic!("progress callback failed"))),
+        )
+    }));
+    assert!(result.is_err());
+    assert!(db.get_license_by_callsign("K1TEMP").unwrap().is_none());
+    assert_eq!(db.get_stats().unwrap().total_licenses, 1);
+    assert!(db.has_record_type("HA", "AM").unwrap());
+    {
+        let conn = db.conn().unwrap();
+        let journal: String = conn
+            .query_row("PRAGMA journal_mode", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(journal, "wal");
+        let indexed: bool = conn
+            .query_row(
+                "SELECT EXISTS(SELECT 1 FROM sqlite_schema WHERE name = 'idx_licenses_call_sign')",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert!(indexed);
+    }
+    importer
+        .import_for_service(&weekly_zip(&temp_dir), "HA", ImportMode::Full, None)
+        .unwrap();
+}
+
+#[rstest::rstest]
+#[case(false)]
+#[case(true)]
+fn test_import_for_service_stream_error_rolls_back_and_preserves_status(#[case] pipelined: bool) {
+    let (temp_dir, db) = create_test_db();
+    let importer = Importer::new(&db).with_pipelined_parsing(pipelined);
     importer
         .import_for_service(&weekly_zip(&temp_dir), "HA", ImportMode::Full, None)
         .unwrap();
@@ -319,10 +422,12 @@ fn test_import_for_service_stream_error_rolls_back_and_preserves_status() {
     assert!(db.has_record_type("HA", "LA").unwrap());
 }
 
-#[test]
-fn test_import_for_service_insert_error_rolls_back_and_preserves_status() {
+#[rstest::rstest]
+#[case(false)]
+#[case(true)]
+fn test_import_for_service_insert_error_rolls_back_and_preserves_status(#[case] pipelined: bool) {
     let (temp_dir, db) = create_test_db();
-    let importer = Importer::new(&db);
+    let importer = Importer::new(&db).with_pipelined_parsing(pipelined);
     importer
         .import_for_service(&weekly_zip(&temp_dir), "HA", ImportMode::Full, None)
         .unwrap();

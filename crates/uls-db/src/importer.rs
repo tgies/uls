@@ -4,10 +4,12 @@
 //! of FCC data from ZIP files into the database.
 
 use std::path::Path;
+use std::sync::mpsc::sync_channel;
 use std::time::Instant;
 
 use rusqlite::Connection;
 use tracing::{debug, info, warn};
+use uls_core::records::UlsRecord;
 use uls_parser::archive::ZipExtractor;
 
 use crate::bulk_inserter::BulkInserter;
@@ -162,12 +164,23 @@ impl ImportMode {
 /// Importer handles bulk import of FCC data into the database.
 pub struct Importer<'a> {
     db: &'a Database,
+    pipelined_parsing: bool,
 }
 
 impl<'a> Importer<'a> {
     /// Create a new importer for the given database.
     pub fn new(db: &'a Database) -> Self {
-        Self { db }
+        Self {
+            db,
+            pipelined_parsing: false,
+        }
+    }
+
+    /// Parse weekly archives on one worker while this thread writes SQLite.
+    /// The bounded queue preserves record order and limits records in flight.
+    pub fn with_pipelined_parsing(mut self, enabled: bool) -> Self {
+        self.pipelined_parsing = enabled;
+        self
     }
 
     /// Import records from a ZIP file (full import of all record types).
@@ -274,12 +287,13 @@ impl<'a> Importer<'a> {
             std::collections::HashMap::new();
 
         for (idx, dat_file) in dat_files.iter().enumerate() {
+            let file_start = Instant::now();
             let mut file_records = 0usize;
             let mut file_parse_errors = 0usize;
             let mut file_insert_errors = 0usize;
 
-            extractor.process_dat_streaming(dat_file, |line| {
-                match line.to_record() {
+            let mut consume = |record| {
+                match record {
                     Ok(record) => {
                         if let Err(e) = inserter.insert(&record) {
                             file_insert_errors += 1;
@@ -314,12 +328,26 @@ impl<'a> Importer<'a> {
                         });
                     }
                 }
-                true
-            })?;
+            };
+            if self.pipelined_parsing {
+                process_pipelined(&mut extractor, dat_file, consume)?;
+            } else {
+                extractor.process_dat_streaming(dat_file, |line| {
+                    consume(line.to_record());
+                    true
+                })?;
+            }
 
             stats.records += file_records;
             stats.parse_errors += file_parse_errors;
             stats.insert_errors += file_insert_errors;
+
+            debug!(
+                file = dat_file,
+                records = file_records,
+                elapsed_seconds = file_start.elapsed().as_secs_f64(),
+                "DAT import completed"
+            );
 
             // Track per-file-type records
             let record_type = dat_file.split('.').next().unwrap_or("").to_uppercase();
@@ -575,6 +603,53 @@ impl<'a> Importer<'a> {
 
         Ok(stats)
     }
+}
+
+fn process_pipelined<R, F>(
+    extractor: &mut ZipExtractor<R>,
+    dat_file: &str,
+    mut consume: F,
+) -> Result<()>
+where
+    R: std::io::Read + std::io::Seek + Send,
+    F: FnMut(uls_parser::Result<UlsRecord>),
+{
+    const BATCH_RECORDS: usize = 256;
+    const QUEUED_BATCHES: usize = 2;
+
+    std::thread::scope(|scope| {
+        let (sender, receiver) = sync_channel(QUEUED_BATCHES);
+        let worker = std::thread::Builder::new()
+            .name("uls-archive-parser".into())
+            .spawn_scoped(scope, move || {
+                let mut batch = Vec::with_capacity(BATCH_RECORDS);
+                let result = extractor.process_dat_streaming(dat_file, |line| {
+                    batch.push(line.to_record());
+                    if batch.len() == BATCH_RECORDS {
+                        let full = std::mem::replace(&mut batch, Vec::with_capacity(BATCH_RECORDS));
+                        // Receiver drop cancels a blocked producer when the writer unwinds.
+                        sender.send(full).is_ok()
+                    } else {
+                        true
+                    }
+                });
+                if !batch.is_empty() {
+                    // A disconnected receiver means the consumer already unwound.
+                    let _ = sender.send(batch);
+                }
+                result.map(|_| ())
+            })?;
+
+        for batch in receiver {
+            for record in batch {
+                consume(record);
+            }
+        }
+        match worker.join() {
+            Ok(result) => result.map_err(DbError::Parser),
+            Err(panic) => std::panic::resume_unwind(panic),
+        }
+    })
 }
 
 fn failed_import_error(kind: &str, stats: &ImportStats) -> DbError {
