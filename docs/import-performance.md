@@ -1,172 +1,169 @@
 # Weekly import performance
 
-This work measures complete imports from fixed FCC weekly archives. The selected
-implementation reuses parser buffers and keeps the existing serial importer.
-The bounded-thread prototypes are retained at the historical checkpoints below
-for reproducibility, rather than adding an unhelpful production option. Final
-full-size qualification remains pending. This does not change the published CLI
-version.
+The selected change reuses the DAT line buffer and inspects a borrowed record
+prefix, eliminating two avoidable allocation/copy passes. The existing serial
+importer and public parsed-line API stay intact. The bounded parser workers
+remain reproducible experiments, with no new production threading option.
+This work does not release a CLI version or deploy a service image.
 
-## Acceptance plan
+## Repeated full-size comparison
 
-- [x] Record immutable archive inputs and a repeatable full-import baseline.
-- [ ] Measure the already-merged removal of the archive counting pass.
-- [ ] Remove duplicate parser allocations while preserving the public parsed-line
-      API, continuation handling, raw records, and error behavior.
-- [ ] Compare serial import with bounded parsing alongside one SQLite writer.
-      Preserve file/record order, archive rollback, and worker error reporting.
-- [ ] Measure index rebuilding once across a combined service refresh, and
-      identify the orchestration changes required to use it safely.
-- [ ] Compare complete database contents, schema/indexes, and import reports;
-      record time, CPU, peak memory, and cache conditions separately.
-- [x] Run relevant regressions, workspace tests, formatting, and Clippy.
-- [ ] Commit and merge selected changes; leave release-plz excluded.
-
-Run comparisons in disposable directories, using private copies of fixed
-archives. Never overwrite a serving database or evict the host's global cache.
-Keep exploratory workstation results separate from isolated qualification.
-
-The first inputs are the cached August 9, 2026 Amateur and GMRS full releases:
+The fixed inputs are the August 9, 2026 Amateur and GMRS full releases:
 
 | Archive | Bytes | SHA-256 |
 | --- | ---: | --- |
 | `l_amat.zip` | 198102897 | `82fcd37ecdf3f82b68382c2c0d831cc7ea83c313ecd17f0566335d94018eaf8c` |
 | `l_gmrs.zip` | 53697810 | `efa2c1489c04f6a17468eef29e20215cd69995fddecfaadec44cdbb50ef0a87c` |
 
-The source files are unchanged; measurement copies are read-only. The service
-uses full import mode and invokes Amateur and GMRS updates separately.
+Each full comparison applies 12,918,713 DAT records: 10,514,698 Amateur records
+from eight files and 2,404,015 GMRS records from six. Both isolated workers had
+two logical CPUs, reported as two hardware threads on one Intel Xeon core,
+and approximately 8 GiB RAM. Imports ran with networking disabled. The driver
+pre-read private archive copies before each run, used a fresh output database,
+and rotated variant order. Database verification is outside the measured import.
+
+The first worker ran three fresh imports per variant at source
+`1a478a67bc655667715993fa771d5325c96fdf4a`:
+
+| Variant | Median wall seconds | Range | Median CPU seconds |
+| --- | ---: | ---: | ---: |
+| Old parser, counting pass | 299.90 | 296.78–313.64 | 297.96 |
+| Old parser, immediate streaming | 279.90 | 278.85–287.67 | 277.81 |
+| Buffer reuse, serial | 256.28 | 253.54–259.07 | 253.78 |
+| Buffer reuse, parser worker | 262.30 | 259.24–267.45 | 311.98 |
+| Parser worker, one combined index rebuild | 201.03 | 198.34–206.64 | 249.54 |
+
+Buffer reuse reduced median complete-import time by **8.4%** against immediate
+streaming. Combined with the previously merged removal of the counting pass,
+the reduction is **14.5%**. Peak RSS across these runs was 619,260–622,340 KiB.
+The counting baseline reconstructs the removed pass with the same locked
+current dependencies; it is not a benchmark of the published 0.1.7 executable.
+
+The worker alone made fresh imports slightly slower and used 22.9% more CPU
+than serial buffer reuse. A second worker tested recycled batches at
+`54cccfbd633cbb709d6d2f9ee1112537ad3e5f85`, using the same executable for its
+serial and threaded modes:
+
+| Variant | Median wall seconds | Range | Median CPU seconds |
+| --- | ---: | ---: | ---: |
+| Serial control | 265.72 | 259.51–296.38 | 264.04 |
+| Recycled parser batches | 276.56 | 276.11–278.22 | 331.15 |
+
+The recycled worker was 4.1% slower by median and used 25.4% more CPU. Compare
+variants within each worker; their absolute timings are not interchangeable.
+The complete [measurement receipt](benchmark-receipts/2026-09-11-import-cloud.json)
+retains every sample, import report, executable/input hash and resource scope.
+
+## Existing-database refreshes
+
+Five additional full-size refreshes passed the same data checks. Each variant
+has only one sample, so these are operational/correctness observations rather
+than repeated performance estimates. The import timer excludes the private
+seed copy; whole-process CPU, RSS and wall measurements include it.
+
+On the first worker, the old serial parser took 359.71 seconds of import time,
+buffer reuse plus the original parser worker took 320.32, and that worker with
+a combined index rebuild took 274.51. The first comparison changes both parser
+allocation and threading; it does not isolate the worker.
+
+On the second worker, the same-binary serial/recycled pair took **397.06 /
+341.46 seconds** of import time. Whole-process CPU was **370.76 / 399.67
+seconds**, and seed copying took 5.07 / 3.52 seconds. The faster threaded refresh
+is a useful signal, but it was a single serial-first pair. Repeat seeded
+refreshes with rotated order before selecting threading for that workload.
+These results do not establish a universal threading improvement or regression.
+
+The production importer remains serial because the repeated fresh comparisons
+regressed and the refresh signal still needs qualification. The experiments
+remain available for that follow-up; they have not been discarded as evidence.
+
+## Data and final-code verification
+
+All **21 fresh comparisons and five seeded refreshes** produced equal complete
+databases within their respective fresh/seeded groups, with zero parse or
+insert errors. The two workers' independent references also match. The
+[database references](benchmark-receipts/2026-09-11-import-database-references.json)
+contain the exact schema, table counts and SHA3 digests of every stored field,
+primary key and SQLite sequence value. Only generated `import_status.imported_at`
+values are excluded after checking that each is a timestamp with a timezone.
+The verifier runs SQLite quick_check and foreign_key_check and rejects nonempty WAL or
+rollback journals before reading the completed private child-process output.
+
+The selected code checkpoint is `3b2ad54e2505bcdd5430dae9001cfee44bb405fe`.
+Its parser file is identical to the measured buffer-reuse variants, and
+`crates/uls-db/src/importer.rs` is identical to the pre-existing serial importer.
+All **697 workspace tests**, three doctests, current-stable workspace Clippy
+and formatting pass. Three independent comparison-oracle tests cover a changed
+FCC value, a missing index, and uncheckpointed WAL. Regressions preserve Unicode,
+CRLF, continuation and raw-record behavior, duplicate-record order, late
+stream-error rollback, and callback-panic restoration/retry. The existing
+`unty-next` benchmark dependency moves from Rust-1.90-requiring 0.1.1 to compatible
+0.1.2 so the locked all-feature build works on Rust 1.88.
+
+The [exact-final-binary fresh and seeded checks](benchmark-receipts/2026-09-11-import-final.json)
+both passed against the isolated references, with every value, index and
+sequence equal and all source hashes unchanged. A WSL restart removed the
+original temporary output; the rebuilt executable had the same SHA-256 as
+before the restart:
+`0e120928a96a1ea26a499d0d5b26a2d511d13b909e24f0860522a4981402939e`.
+The isolated comparisons completed independently of WSL and their reports were
+recovered and hash-verified from retained artifact generations.
 
 ## Reproduction
 
-Build `cargo build --release -p uls-db --example benchmark_import --locked`.
-Keep each variant's binary separately, then run:
+Build `cargo +1.88.0 build --release -p uls-db --example benchmark_import --locked`.
+Use a separate source checkout **and Cargo target directory for each variant**.
+An initial shared-target build reused an executable across source trees; those
+artifacts were rejected before qualification. All qualified variants have
+separately verified source and executable hashes.
 
 ```sh
 python3 scripts/compare-imports.py --inputs /path/to/fixed/archives \
   --output /path/to/new/results --repetitions 3 \
   --variant baseline /path/to/baseline stream \
-  --variant candidate /path/to/candidate stream
+  --variant buffers /path/to/buffers stream
 ```
 
-The driver makes its own archive copies and pre-reads them before every run.
-Each run creates a new database and imports both complete services. It records
-wall/CPU time and peak RSS, checks all tables and foreign keys, and compares a
-SHA3 digest of every stored value, primary key and SQLite sequence value, plus
-the exact schema. Only generated `import_status.imported_at` values are excluded
-from equality, after checking that each remains a timestamp with a timezone.
-Verification is outside the measured import. Its immutable SQLite readers are
-limited to the completed private child-process outputs and reject nonempty WAL
-or rollback journals; they are not a serving-database validation shortcut.
+Use `--seed /path/to/completed/benchmark/import.db` for existing-data refreshes.
+Every child gets a private writable copy. The driver verifies source, copy and
+executable hashes before/afterward and removes only its generated databases,
+unless `--keep-databases` is requested. Never use a serving database, overwrite
+an existing output directory, or evict the host's global cache for this driver.
+Run `python3 scripts/test_compare_imports.py` to check the comparison oracle.
 
-Run `python3 scripts/test_compare_imports.py` to check that the independent
-comparison catches a changed FCC value, a missing index and an uncheckpointed
-WAL. `count-first` measures the removed progress-counting pass using the same
-baseline binary. This is a controlled reconstruction, not a timing claim about
-the separately published 0.1.7 binary and its older dependencies.
+The current example accepts `count-first` and `stream`. The Python driver also
+accepts `pipeline` for historical executables. The
+[prototype reconstruction patches](benchmark-receipts/2026-09-11-import-prototype-patches.json)
+recreate either worker from the selected serial source. Join one variant's
+`patch_lines` and apply it, then verify every recorded source-file hash before
+building. Both reconstructions have been checked against the original hashes.
+For the old-parser baseline, restore `crates/uls-parser/src/dat.rs` from
+`a47e55127b837a5bc480bc1fdd4d0ae4ab2c3be1` in the original-worker checkout and
+use serial mode. This keeps dependencies and instrumentation matched.
 
-The historical pipeline prototype uses one parser, two queued batches of 256
-records, and one SQLite writer. To reproduce `pipeline` runs, build the exact
-prototype checkpoint below; the selected example accepts `count-first` and
-`stream`. The Python comparison driver still accepts historical pipeline binaries.
-The public `ParsedLine` representation and continuation semantics stay intact.
-The Rust 1.88 test run also required the existing `unty-next` benchmark
-dependency to move from 0.1.1 (which required Rust 1.90) to compatible 0.1.2.
+## Next: index ownership across services
 
-Initial workstation runs are exploratory: 157.13 seconds for the counting
-baseline, 182.96 for buffer reuse without counting, and 136.45 for the bounded
-pipeline. CPU totals were 142.39, 130.57 and 125.20 seconds. The wall/CPU mismatch
-and changing host conditions prevent choosing an implementation from these
-single samples. Both candidate databases match the baseline's full contents.
-Repeated isolated qualification remains required.
+Rebuilding indexes once saved **61.27 seconds**, or **23.4%**, against the
+otherwise identical original-worker variant. The exact benchmark-only patch is
+in the [original source receipt](benchmark-receipts/2026-09-11-import-provenance.json).
+It omits successful intermediate index restoration and rebuilds in the example
+after both full archives. It is not a production index-deferral option.
 
-Use `--seed /path/to/completed/benchmark/import.db` to check a full refresh of
-existing data as well as a fresh import. Every child copies the fixed seed into
-its new output directory. Its import timer excludes the copy; the outer process
-CPU/RSS and wall-time measurements include it. Source hashes are checked again
-afterward. This also checks replacement ordering and SQLite sequence values.
+Adoption needs one owner spanning the complete service batch, restoring indexes
+and PRAGMAs on later archive/metadata/progress failure while retaining archive
+rollback, record order and committed source/status prefixes. Separate CLI
+processes cannot share the current restoration guard. Qualify mixed weekly/daily
+batches as well: applying dailies while indexes are absent changes the tradeoff.
 
-## Variant isolation and review checkpoint
+SQLite sorting threads are a separate experiment. Bundled SQLite 3.51.1 sets
+sorter workers to zero when temporary storage is in memory. The importer uses
+`PRAGMA temp_store=MEMORY`, so `PRAGMA threads=2` alone would not parallelize
+sorting. File-backed sorting needs its own I/O/memory comparison. See the
+[thread limit](https://www.sqlite.org/pragma.html#pragma_threads) and
+[sorter source](https://github.com/sqlite/sqlite/blob/version-3.51.1/src/vdbesort.c).
 
-The first comparison source checkpoint is `1a478a67bc655667715993fa771d5325c96fdf4a`.
-Build each source variant in its own checkout **and its own Cargo target
-directory**. Record each source and executable hash before running. An initial
-shared-target build reused an executable across different source trees; those
-artifacts were rejected before qualification. The rebuilt baseline, candidate
-and combined-index binaries have different verified hashes.
-
-The instrumented baseline restores only `crates/uls-parser/src/dat.rs` from
-`a47e55127b837a5bc480bc1fdd4d0ae4ab2c3be1`, using the same locked dependencies,
-benchmark example and serial importer as the candidate. Compare its
-`count-first` and `stream` modes to isolate the removed counting pass; compare
-baseline `stream` with candidate `stream` to isolate buffer reuse; compare
-candidate `stream` with `pipeline` to isolate the worker.
-
-The [source and binary receipt](benchmark-receipts/2026-09-11-import-provenance.json)
-includes the exact combined-index experiment as `combined_index_patch_lines`.
-Join those lines to recover a patch against the tested source checkpoint.
-Apply it only in a separate benchmark checkout. It defers successful index
-restoration to the example after both archives; the shipping importer does
-not defer indexes. A production implementation needs one owner for the
-complete service batch, including restoration on a later archive failure and
-preservation of per-archive status/source metadata. Independent CLI invocations
-cannot share the current restoration guard. The benchmark does not establish
-that production orchestration contract.
-
-All 703 workspace tests and three doctests passed on Rust 1.88, as did
-current-stable workspace Clippy and formatting. Three independent comparison
-oracle tests and fresh/seeded smoke imports passed. The draft
-[PR #72](https://github.com/tgies/uls/pull/72) passed all 11 hosted checks at this
-checkpoint. Repeated full-size performance qualification was pending at that checkpoint.
-
-The [full-size workstation refresh check](benchmark-receipts/2026-09-11-import-wsl-refresh.json)
-also passed: both variants replaced existing data and produced identical full
-databases and import reports, preserving input and binary hashes. One serial
-sample took 343.46 seconds of import time; one pipeline sample took 275.28.
-Whole-process CPU totals were 276.17 and 235.90 seconds. Seed copies alone took
-46.95 and 5.44 seconds, showing substantial shared-host variability. These
-single observations establish the full-size refresh correctness check, not a
-controlled performance improvement. Repeated isolated measurement is running.
-
-SQLite's auxiliary sorting threads are a separate possible experiment. In the
-bundled SQLite 3.51.1, `sqlite3VdbeSorterInit` sets the worker count to zero when
-`sqlite3TempInMemory(db)` is true. The importer currently uses
-`PRAGMA temp_store=MEMORY`, so adding `PRAGMA threads=2` alone would not parallelize
-index sorting. Testing file-backed sorting would change the temporary-I/O and
-memory tradeoff and needs its own comparison; it is outside this implementation.
-See SQLite's [thread limit](https://www.sqlite.org/pragma.html#pragma_threads)
-and [sorter source](https://github.com/sqlite/sqlite/blob/version-3.51.1/src/vdbesort.c).
-
-
-## Recycling the parser batches
-
-The first isolated round showed the original pipeline spending more CPU than
-serial buffer reuse. A [local diagnostic](benchmark-receipts/2026-09-11-parser-handoff.json)
-then parsed all 12,918,713 records without SQLite work. Two serial samples took
-10.39–10.61 seconds and 10.38–10.61 CPU seconds. Transferring owned records to
-another thread for destruction took 16.83–17.14 seconds and 20.04–20.35 CPU
-seconds. Returning consumed batches to the parser for destruction and reuse
-reduced that to 13.24–13.32 seconds and 13.48–13.56 CPU seconds. This isolates
-handoff/ownership overhead; it does not establish a full-import speedup.
-
-The revised prototype at `54cccfbd633cbb709d6d2f9ee1112537ad3e5f85` returns
-batches to their producer, consumes records
-by reference and reuses at most four batch buffers. Both channels are bounded.
-Parser allocation/destruction stays on its thread except the last in-flight
-batches after it finishes or a consumer unwinds. Existing ordering and callback
-panic regressions pass, and the stream-error test now fails after multiple
-reuse cycles with a partial final batch. All 703 workspace tests, three doctests,
-Rust 1.88 formatting and current-stable Clippy passed again. Repeated complete-import qualification is still running. Its first two
-recycled-pipeline samples took 276.11 and 278.22 seconds, versus 259.51 seconds
-for the first serial control, and used substantially more CPU. The earlier
-pipeline completed all three fresh samples with a 262.30-second median versus
-256.28 seconds for serial buffer reuse, also with more CPU work. These results
-support keeping the importer serial; final receipts will include every sample.
-
-The final candidate removes both pipeline prototypes and leaves
-`crates/uls-db/src/importer.rs` identical to the existing serial implementation.
-The parser file is identical to the buffer-reuse variant under measurement.
-Ordering, late stream-failure and callback-panic regressions remain. All 697
-selected workspace tests and three doctests, formatting and current-stable
-Clippy pass. The six duplicate mode cases were removed with the threading
-option. An exact-final-binary fresh and seeded comparison is running locally
-as a data-equivalence check, separately from the isolated performance estimates.
+The [parser-only handoff diagnostic](benchmark-receipts/2026-09-11-parser-handoff.json)
+and [earlier workstation refresh check](benchmark-receipts/2026-09-11-import-wsl-refresh.json)
+remain supplementary evidence. Recycling reduced handoff CPU in the diagnostic;
+that improvement did not carry through to repeated fresh imports. Shared-host
+workstation timings are not used for the selected performance claims.

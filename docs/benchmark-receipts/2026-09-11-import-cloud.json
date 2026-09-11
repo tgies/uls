@@ -1,0 +1,1485 @@
+{
+  "format": "uls.import_qualification.v1",
+  "date": "2026-09-11",
+  "scope": "Fixed August 9 FCC archives; isolated two-vCPU workers; not production update timings",
+  "selection": "Keep parser buffer reuse and the existing serial importer. Threading is a workload-dependent prototype, pending repeated seeded-refresh qualification.",
+  "comparisons": {
+    "original": {
+      "accepted": true,
+      "started_at": "2026-09-11T16:39:00.705066+00:00",
+      "finished_at": "2026-09-11T18:19:23.555545+00:00",
+      "source": {
+        "source_commit": "1a478a67bc655667715993fa771d5325c96fdf4a",
+        "baseline_commit": "a47e55127b837a5bc480bc1fdd4d0ae4ab2c3be1",
+        "variants": {
+          "baseline": {
+            "binary_sha256": "497720100a58f82f568448cd7c8a63e19825d6dbc90ee5130bfa0537b60ba692",
+            "source_files_sha256": {
+              "Cargo.lock": "87577d3ae8c549580f68ff4c6577303c5ecd41ebd72e335d0057f6655b562714",
+              "crates/uls-parser/src/dat.rs": "f8888ea82f6d44947bda8e12f5993fe7011e48f45be90ae32047c6bb90f38c06",
+              "crates/uls-db/src/importer.rs": "fe1bccc940827d089b8faad9e4abdece0e3185e401ae5100ae8d71f9cac6e9cb",
+              "crates/uls-db/examples/benchmark_import.rs": "3a30de3f985e7cd63eb5719bfd5982390f6d892c5a71536a887a8dbeaf36daa3"
+            }
+          },
+          "candidate": {
+            "binary_sha256": "35a1e90f5325f49e30681f3a6690764df05f9cf3d8e6bb2c24c8324f42003ca2",
+            "source_files_sha256": {
+              "Cargo.lock": "87577d3ae8c549580f68ff4c6577303c5ecd41ebd72e335d0057f6655b562714",
+              "crates/uls-parser/src/dat.rs": "60cfeb9930ea6c1e8cfc6f5fe08e02280f50cc79b167d561e9f4988695683e11",
+              "crates/uls-db/src/importer.rs": "fe1bccc940827d089b8faad9e4abdece0e3185e401ae5100ae8d71f9cac6e9cb",
+              "crates/uls-db/examples/benchmark_import.rs": "3a30de3f985e7cd63eb5719bfd5982390f6d892c5a71536a887a8dbeaf36daa3"
+            }
+          },
+          "combined": {
+            "binary_sha256": "21025699c51b4abaa990c1601495d25e485e5f4399c5280c998bbc07540764dc",
+            "source_files_sha256": {
+              "Cargo.lock": "87577d3ae8c549580f68ff4c6577303c5ecd41ebd72e335d0057f6655b562714",
+              "crates/uls-parser/src/dat.rs": "60cfeb9930ea6c1e8cfc6f5fe08e02280f50cc79b167d561e9f4988695683e11",
+              "crates/uls-db/src/importer.rs": "c9482e07ed3111e42b1446a6c2604325993750c374be9c1bf165df08d629cd67",
+              "crates/uls-db/examples/benchmark_import.rs": "c9c35b79313a6daf58add68fe19190f5e8a997cdc29c28125ae9163416919a23"
+            }
+          }
+        },
+        "rustc": "rustc 1.88.0 (6b00bc388 2025-06-23)\nbinary: rustc\ncommit-hash: 6b00bc3880198600130e1cf62b8f8a93494488cc\ncommit-date: 2025-06-23\nhost: x86_64-unknown-linux-gnu\nrelease: 1.88.0\nLLVM version: 20.1.5\n"
+      },
+      "environment": {
+        "cpu_model": "Intel(R) Xeon(R) CPU @ 2.20GHz",
+        "logical_cpus": 2,
+        "reported_core_pairs": [
+          [
+            "0",
+            "0"
+          ]
+        ],
+        "memory_total": "8147688 kB",
+        "archive_cache": "sequentially pre-read before each run",
+        "network": "disabled during imports"
+      },
+      "fresh": {
+        "format": "uls.import_benchmark.v1",
+        "cpu_affinity": [
+          0,
+          1
+        ],
+        "sqlite_verifier": "3.45.1 2024-01-30 16:01:20 e876e51a0ed5c5b3126f52e532044363a014bc594cfefa87ffb5b82257ccalt1 (64-bit)",
+        "inputs_sha256": {
+          "l_amat.zip": "82fcd37ecdf3f82b68382c2c0d831cc7ea83c313ecd17f0566335d94018eaf8c",
+          "l_gmrs.zip": "efa2c1489c04f6a17468eef29e20215cd69995fddecfaadec44cdbb50ef0a87c"
+        },
+        "binaries_sha256": {
+          "baseline-import": "497720100a58f82f568448cd7c8a63e19825d6dbc90ee5130bfa0537b60ba692",
+          "candidate-import": "35a1e90f5325f49e30681f3a6690764df05f9cf3d8e6bb2c24c8324f42003ca2",
+          "combined-import": "21025699c51b4abaa990c1601495d25e485e5f4399c5280c998bbc07540764dc"
+        },
+        "cache_condition": "archive files sequentially pre-read before every run; fresh output database",
+        "seeded_refresh": false,
+        "resource_scope": "complete child process, including seed copy when requested; report.elapsed_seconds excludes seed copy",
+        "database_comparison": "all rows including primary keys and sequence state; imported_at timestamps checked but excluded from digest",
+        "runs": [
+          {
+            "variant": "baseline_count",
+            "mode": "count-first",
+            "repetition": 1,
+            "resources": {
+              "wall_seconds": 296.78,
+              "user_seconds": 285.19,
+              "system_seconds": 9.77,
+              "max_rss_kib": 619260
+            },
+            "report": {
+              "archives": [
+                {
+                  "archive": "l_amat.zip",
+                  "count_seconds": 24.130382152,
+                  "counts": {
+                    "AM.dat": 1690602,
+                    "CO.dat": 234864,
+                    "EN.dat": 1692864,
+                    "HD.dat": 1692864,
+                    "HS.dat": 5136881,
+                    "LA.dat": 4771,
+                    "SC.dat": 61766,
+                    "SF.dat": 86
+                  },
+                  "files": 8,
+                  "import_seconds": 173.381709608,
+                  "insert_errors": 0,
+                  "parse_errors": 0,
+                  "records": 10514698,
+                  "service": "HA"
+                },
+                {
+                  "archive": "l_gmrs.zip",
+                  "count_seconds": 6.822559251,
+                  "counts": {
+                    "CO.dat": 85,
+                    "EN.dat": 604174,
+                    "HD.dat": 604174,
+                    "HS.dat": 1041160,
+                    "LA.dat": 158,
+                    "SC.dat": 154264
+                  },
+                  "files": 6,
+                  "import_seconds": 92.415600947,
+                  "insert_errors": 0,
+                  "parse_errors": 0,
+                  "records": 2404015,
+                  "service": "ZA"
+                }
+              ],
+              "count_first": true,
+              "elapsed_seconds": 296.772059901,
+              "initialize_seconds": 0.016554128,
+              "mode": "full",
+              "pipelined_parsing": false,
+              "seed_copy_seconds": 2.85e-07,
+              "seeded": false
+            },
+            "database_bytes": 1887571968,
+            "database_equal": true,
+            "stats_equal": true
+          },
+          {
+            "variant": "baseline_stream",
+            "mode": "stream",
+            "repetition": 1,
+            "resources": {
+              "wall_seconds": 278.85,
+              "user_seconds": 260.87,
+              "system_seconds": 12.34,
+              "max_rss_kib": 619316
+            },
+            "report": {
+              "archives": [
+                {
+                  "archive": "l_amat.zip",
+                  "count_seconds": 6.4e-08,
+                  "counts": null,
+                  "files": 8,
+                  "import_seconds": 182.195479016,
+                  "insert_errors": 0,
+                  "parse_errors": 0,
+                  "records": 10514698,
+                  "service": "HA"
+                },
+                {
+                  "archive": "l_gmrs.zip",
+                  "count_seconds": 1.5e-07,
+                  "counts": null,
+                  "files": 6,
+                  "import_seconds": 96.617647444,
+                  "insert_errors": 0,
+                  "parse_errors": 0,
+                  "records": 2404015,
+                  "service": "ZA"
+                }
+              ],
+              "count_first": false,
+              "elapsed_seconds": 278.842556005,
+              "initialize_seconds": 0.024117714,
+              "mode": "full",
+              "pipelined_parsing": false,
+              "seed_copy_seconds": 5.42e-07,
+              "seeded": false
+            },
+            "database_bytes": 1887571968,
+            "database_equal": true,
+            "stats_equal": true
+          },
+          {
+            "variant": "line_buffers",
+            "mode": "stream",
+            "repetition": 1,
+            "resources": {
+              "wall_seconds": 256.28,
+              "user_seconds": 244.45,
+              "system_seconds": 9.33,
+              "max_rss_kib": 619356
+            },
+            "report": {
+              "archives": [
+                {
+                  "archive": "l_amat.zip",
+                  "count_seconds": 5.6e-08,
+                  "counts": null,
+                  "files": 8,
+                  "import_seconds": 162.927950776,
+                  "insert_errors": 0,
+                  "parse_errors": 0,
+                  "records": 10514698,
+                  "service": "HA"
+                },
+                {
+                  "archive": "l_gmrs.zip",
+                  "count_seconds": 6e-08,
+                  "counts": null,
+                  "files": 6,
+                  "import_seconds": 93.311087833,
+                  "insert_errors": 0,
+                  "parse_errors": 0,
+                  "records": 2404015,
+                  "service": "ZA"
+                }
+              ],
+              "count_first": false,
+              "elapsed_seconds": 256.27328401,
+              "initialize_seconds": 0.029682455,
+              "mode": "full",
+              "pipelined_parsing": false,
+              "seed_copy_seconds": 6.624e-06,
+              "seeded": false
+            },
+            "database_bytes": 1887571968,
+            "database_equal": true,
+            "stats_equal": true
+          },
+          {
+            "variant": "pipeline",
+            "mode": "pipeline",
+            "repetition": 1,
+            "resources": {
+              "wall_seconds": 267.45,
+              "user_seconds": 297.15,
+              "system_seconds": 16.74,
+              "max_rss_kib": 621684
+            },
+            "report": {
+              "archives": [
+                {
+                  "archive": "l_amat.zip",
+                  "count_seconds": 4.6e-08,
+                  "counts": null,
+                  "files": 8,
+                  "import_seconds": 170.352685081,
+                  "insert_errors": 0,
+                  "parse_errors": 0,
+                  "records": 10514698,
+                  "service": "HA"
+                },
+                {
+                  "archive": "l_gmrs.zip",
+                  "count_seconds": 1.36e-07,
+                  "counts": null,
+                  "files": 6,
+                  "import_seconds": 97.05781364,
+                  "insert_errors": 0,
+                  "parse_errors": 0,
+                  "records": 2404015,
+                  "service": "ZA"
+                }
+              ],
+              "count_first": false,
+              "elapsed_seconds": 267.443464552,
+              "initialize_seconds": 0.028164351,
+              "mode": "full",
+              "pipelined_parsing": true,
+              "seed_copy_seconds": 3.87e-07,
+              "seeded": false
+            },
+            "database_bytes": 1887571968,
+            "database_equal": true,
+            "stats_equal": true
+          },
+          {
+            "variant": "combined_indexes",
+            "mode": "pipeline",
+            "repetition": 1,
+            "resources": {
+              "wall_seconds": 201.03,
+              "user_seconds": 239.99,
+              "system_seconds": 9.55,
+              "max_rss_kib": 620260
+            },
+            "report": {
+              "archives": [
+                {
+                  "archive": "l_amat.zip",
+                  "count_seconds": 1.17e-07,
+                  "counts": null,
+                  "files": 8,
+                  "import_seconds": 107.553363022,
+                  "insert_errors": 0,
+                  "parse_errors": 0,
+                  "records": 10514698,
+                  "service": "HA"
+                },
+                {
+                  "archive": "l_gmrs.zip",
+                  "count_seconds": 4.5e-08,
+                  "counts": null,
+                  "files": 6,
+                  "import_seconds": 25.021564182,
+                  "insert_errors": 0,
+                  "parse_errors": 0,
+                  "records": 2404015,
+                  "service": "ZA"
+                }
+              ],
+              "combined_index_seconds": 68.38748656,
+              "count_first": false,
+              "elapsed_seconds": 201.020834234,
+              "initialize_seconds": 0.027144783,
+              "mode": "full",
+              "pipelined_parsing": true,
+              "seed_copy_seconds": 6.129e-06,
+              "seeded": false
+            },
+            "database_bytes": 1887571968,
+            "database_equal": true,
+            "stats_equal": true
+          },
+          {
+            "variant": "baseline_stream",
+            "mode": "stream",
+            "repetition": 2,
+            "resources": {
+              "wall_seconds": 287.67,
+              "user_seconds": 271.24,
+              "system_seconds": 12.74,
+              "max_rss_kib": 621232
+            },
+            "report": {
+              "archives": [
+                {
+                  "archive": "l_amat.zip",
+                  "count_seconds": 5.5e-08,
+                  "counts": null,
+                  "files": 8,
+                  "import_seconds": 174.618706156,
+                  "insert_errors": 0,
+                  "parse_errors": 0,
+                  "records": 10514698,
+                  "service": "HA"
+                },
+                {
+                  "archive": "l_gmrs.zip",
+                  "count_seconds": 1.1e-07,
+                  "counts": null,
+                  "files": 6,
+                  "import_seconds": 113.007229459,
+                  "insert_errors": 0,
+                  "parse_errors": 0,
+                  "records": 2404015,
+                  "service": "ZA"
+                }
+              ],
+              "count_first": false,
+              "elapsed_seconds": 287.661408024,
+              "initialize_seconds": 0.030164071,
+              "mode": "full",
+              "pipelined_parsing": false,
+              "seed_copy_seconds": 2.822e-06,
+              "seeded": false
+            },
+            "database_bytes": 1887571968,
+            "database_equal": true,
+            "stats_equal": true
+          },
+          {
+            "variant": "line_buffers",
+            "mode": "stream",
+            "repetition": 2,
+            "resources": {
+              "wall_seconds": 259.07,
+              "user_seconds": 247.67,
+              "system_seconds": 9.97,
+              "max_rss_kib": 619268
+            },
+            "report": {
+              "archives": [
+                {
+                  "archive": "l_amat.zip",
+                  "count_seconds": 4.6e-08,
+                  "counts": null,
+                  "files": 8,
+                  "import_seconds": 160.629649863,
+                  "insert_errors": 0,
+                  "parse_errors": 0,
+                  "records": 10514698,
+                  "service": "HA"
+                },
+                {
+                  "archive": "l_gmrs.zip",
+                  "count_seconds": 2.86e-07,
+                  "counts": null,
+                  "files": 6,
+                  "import_seconds": 98.389502135,
+                  "insert_errors": 0,
+                  "parse_errors": 0,
+                  "records": 2404015,
+                  "service": "ZA"
+                }
+              ],
+              "count_first": false,
+              "elapsed_seconds": 259.058077365,
+              "initialize_seconds": 0.033631066,
+              "mode": "full",
+              "pipelined_parsing": false,
+              "seed_copy_seconds": 1.054e-06,
+              "seeded": false
+            },
+            "database_bytes": 1887571968,
+            "database_equal": true,
+            "stats_equal": true
+          },
+          {
+            "variant": "pipeline",
+            "mode": "pipeline",
+            "repetition": 2,
+            "resources": {
+              "wall_seconds": 259.24,
+              "user_seconds": 293.98,
+              "system_seconds": 13.96,
+              "max_rss_kib": 620216
+            },
+            "report": {
+              "archives": [
+                {
+                  "archive": "l_amat.zip",
+                  "count_seconds": 5.5e-08,
+                  "counts": null,
+                  "files": 8,
+                  "import_seconds": 152.819151628,
+                  "insert_errors": 0,
+                  "parse_errors": 0,
+                  "records": 10514698,
+                  "service": "HA"
+                },
+                {
+                  "archive": "l_gmrs.zip",
+                  "count_seconds": 5.8e-08,
+                  "counts": null,
+                  "files": 6,
+                  "import_seconds": 106.390758347,
+                  "insert_errors": 0,
+                  "parse_errors": 0,
+                  "records": 2404015,
+                  "service": "ZA"
+                }
+              ],
+              "count_first": false,
+              "elapsed_seconds": 259.240136104,
+              "initialize_seconds": 0.024855334,
+              "mode": "full",
+              "pipelined_parsing": true,
+              "seed_copy_seconds": 3.61e-07,
+              "seeded": false
+            },
+            "database_bytes": 1887571968,
+            "database_equal": true,
+            "stats_equal": true
+          },
+          {
+            "variant": "combined_indexes",
+            "mode": "pipeline",
+            "repetition": 2,
+            "resources": {
+              "wall_seconds": 206.64,
+              "user_seconds": 246.36,
+              "system_seconds": 10.6,
+              "max_rss_kib": 620356
+            },
+            "report": {
+              "archives": [
+                {
+                  "archive": "l_amat.zip",
+                  "count_seconds": 5.8e-08,
+                  "counts": null,
+                  "files": 8,
+                  "import_seconds": 109.53786306800001,
+                  "insert_errors": 0,
+                  "parse_errors": 0,
+                  "records": 10514698,
+                  "service": "HA"
+                },
+                {
+                  "archive": "l_gmrs.zip",
+                  "count_seconds": 5.8e-08,
+                  "counts": null,
+                  "files": 6,
+                  "import_seconds": 25.668462315,
+                  "insert_errors": 0,
+                  "parse_errors": 0,
+                  "records": 2404015,
+                  "service": "ZA"
+                }
+              ],
+              "combined_index_seconds": 71.362471404,
+              "count_first": false,
+              "elapsed_seconds": 206.622821845,
+              "initialize_seconds": 0.028935693,
+              "mode": "full",
+              "pipelined_parsing": true,
+              "seed_copy_seconds": 4.51e-07,
+              "seeded": false
+            },
+            "database_bytes": 1887571968,
+            "database_equal": true,
+            "stats_equal": true
+          },
+          {
+            "variant": "baseline_count",
+            "mode": "count-first",
+            "repetition": 2,
+            "resources": {
+              "wall_seconds": 313.64,
+              "user_seconds": 298.04,
+              "system_seconds": 11.94,
+              "max_rss_kib": 621104
+            },
+            "report": {
+              "archives": [
+                {
+                  "archive": "l_amat.zip",
+                  "count_seconds": 23.542490435,
+                  "counts": {
+                    "AM.dat": 1690602,
+                    "CO.dat": 234864,
+                    "EN.dat": 1692864,
+                    "HD.dat": 1692864,
+                    "HS.dat": 5136881,
+                    "LA.dat": 4771,
+                    "SC.dat": 61766,
+                    "SF.dat": 86
+                  },
+                  "files": 8,
+                  "import_seconds": 173.23807116,
+                  "insert_errors": 0,
+                  "parse_errors": 0,
+                  "records": 10514698,
+                  "service": "HA"
+                },
+                {
+                  "archive": "l_gmrs.zip",
+                  "count_seconds": 6.854456658,
+                  "counts": {
+                    "CO.dat": 85,
+                    "EN.dat": 604174,
+                    "HD.dat": 604174,
+                    "HS.dat": 1041160,
+                    "LA.dat": 158,
+                    "SC.dat": 154264
+                  },
+                  "files": 6,
+                  "import_seconds": 109.971839129,
+                  "insert_errors": 0,
+                  "parse_errors": 0,
+                  "records": 2404015,
+                  "service": "ZA"
+                }
+              ],
+              "count_first": true,
+              "elapsed_seconds": 313.638278747,
+              "initialize_seconds": 0.026581072,
+              "mode": "full",
+              "pipelined_parsing": false,
+              "seed_copy_seconds": 4.02e-07,
+              "seeded": false
+            },
+            "database_bytes": 1887571968,
+            "database_equal": true,
+            "stats_equal": true
+          },
+          {
+            "variant": "line_buffers",
+            "mode": "stream",
+            "repetition": 3,
+            "resources": {
+              "wall_seconds": 253.54,
+              "user_seconds": 241.55,
+              "system_seconds": 9.8,
+              "max_rss_kib": 619308
+            },
+            "report": {
+              "archives": [
+                {
+                  "archive": "l_amat.zip",
+                  "count_seconds": 5.5e-08,
+                  "counts": null,
+                  "files": 8,
+                  "import_seconds": 160.660463777,
+                  "insert_errors": 0,
+                  "parse_errors": 0,
+                  "records": 10514698,
+                  "service": "HA"
+                },
+                {
+                  "archive": "l_gmrs.zip",
+                  "count_seconds": 1.18e-07,
+                  "counts": null,
+                  "files": 6,
+                  "import_seconds": 92.842597084,
+                  "insert_errors": 0,
+                  "parse_errors": 0,
+                  "records": 2404015,
+                  "service": "ZA"
+                }
+              ],
+              "count_first": false,
+              "elapsed_seconds": 253.5295616,
+              "initialize_seconds": 0.020508441,
+              "mode": "full",
+              "pipelined_parsing": false,
+              "seed_copy_seconds": 5.13e-07,
+              "seeded": false
+            },
+            "database_bytes": 1887571968,
+            "database_equal": true,
+            "stats_equal": true
+          },
+          {
+            "variant": "pipeline",
+            "mode": "pipeline",
+            "repetition": 3,
+            "resources": {
+              "wall_seconds": 262.3,
+              "user_seconds": 298.72,
+              "system_seconds": 13.26,
+              "max_rss_kib": 622124
+            },
+            "report": {
+              "archives": [
+                {
+                  "archive": "l_amat.zip",
+                  "count_seconds": 4.6e-08,
+                  "counts": null,
+                  "files": 8,
+                  "import_seconds": 160.415674614,
+                  "insert_errors": 0,
+                  "parse_errors": 0,
+                  "records": 10514698,
+                  "service": "HA"
+                },
+                {
+                  "archive": "l_gmrs.zip",
+                  "count_seconds": 9e-08,
+                  "counts": null,
+                  "files": 6,
+                  "import_seconds": 101.839989109,
+                  "insert_errors": 0,
+                  "parse_errors": 0,
+                  "records": 2404015,
+                  "service": "ZA"
+                }
+              ],
+              "count_first": false,
+              "elapsed_seconds": 262.289899613,
+              "initialize_seconds": 0.027434081,
+              "mode": "full",
+              "pipelined_parsing": true,
+              "seed_copy_seconds": 4.53e-07,
+              "seeded": false
+            },
+            "database_bytes": 1887571968,
+            "database_equal": true,
+            "stats_equal": true
+          },
+          {
+            "variant": "combined_indexes",
+            "mode": "pipeline",
+            "repetition": 3,
+            "resources": {
+              "wall_seconds": 198.34,
+              "user_seconds": 237.05,
+              "system_seconds": 9.27,
+              "max_rss_kib": 622340
+            },
+            "report": {
+              "archives": [
+                {
+                  "archive": "l_amat.zip",
+                  "count_seconds": 9.4e-08,
+                  "counts": null,
+                  "files": 8,
+                  "import_seconds": 105.274586309,
+                  "insert_errors": 0,
+                  "parse_errors": 0,
+                  "records": 10514698,
+                  "service": "HA"
+                },
+                {
+                  "archive": "l_gmrs.zip",
+                  "count_seconds": 2.1e-07,
+                  "counts": null,
+                  "files": 6,
+                  "import_seconds": 24.002563516,
+                  "insert_errors": 0,
+                  "parse_errors": 0,
+                  "records": 2404015,
+                  "service": "ZA"
+                }
+              ],
+              "combined_index_seconds": 69.011186462,
+              "count_first": false,
+              "elapsed_seconds": 198.333718157,
+              "initialize_seconds": 0.020388617,
+              "mode": "full",
+              "pipelined_parsing": true,
+              "seed_copy_seconds": 6.095e-06,
+              "seeded": false
+            },
+            "database_bytes": 1887571968,
+            "database_equal": true,
+            "stats_equal": true
+          },
+          {
+            "variant": "baseline_count",
+            "mode": "count-first",
+            "repetition": 3,
+            "resources": {
+              "wall_seconds": 299.9,
+              "user_seconds": 288.25,
+              "system_seconds": 9.71,
+              "max_rss_kib": 620632
+            },
+            "report": {
+              "archives": [
+                {
+                  "archive": "l_amat.zip",
+                  "count_seconds": 23.665445527,
+                  "counts": {
+                    "AM.dat": 1690602,
+                    "CO.dat": 234864,
+                    "EN.dat": 1692864,
+                    "HD.dat": 1692864,
+                    "HS.dat": 5136881,
+                    "LA.dat": 4771,
+                    "SC.dat": 61766,
+                    "SF.dat": 86
+                  },
+                  "files": 8,
+                  "import_seconds": 171.759288268,
+                  "insert_errors": 0,
+                  "parse_errors": 0,
+                  "records": 10514698,
+                  "service": "HA"
+                },
+                {
+                  "archive": "l_gmrs.zip",
+                  "count_seconds": 6.834064256,
+                  "counts": {
+                    "CO.dat": 85,
+                    "EN.dat": 604174,
+                    "HD.dat": 604174,
+                    "HS.dat": 1041160,
+                    "LA.dat": 158,
+                    "SC.dat": 154264
+                  },
+                  "files": 6,
+                  "import_seconds": 97.562742984,
+                  "insert_errors": 0,
+                  "parse_errors": 0,
+                  "records": 2404015,
+                  "service": "ZA"
+                }
+              ],
+              "count_first": true,
+              "elapsed_seconds": 299.872794435,
+              "initialize_seconds": 0.044438008,
+              "mode": "full",
+              "pipelined_parsing": false,
+              "seed_copy_seconds": 2.46e-07,
+              "seeded": false
+            },
+            "database_bytes": 1887571968,
+            "database_equal": true,
+            "stats_equal": true
+          },
+          {
+            "variant": "baseline_stream",
+            "mode": "stream",
+            "repetition": 3,
+            "resources": {
+              "wall_seconds": 279.9,
+              "user_seconds": 267.35,
+              "system_seconds": 10.46,
+              "max_rss_kib": 621372
+            },
+            "report": {
+              "archives": [
+                {
+                  "archive": "l_amat.zip",
+                  "count_seconds": 7.7e-08,
+                  "counts": null,
+                  "files": 8,
+                  "import_seconds": 170.363973591,
+                  "insert_errors": 0,
+                  "parse_errors": 0,
+                  "records": 10514698,
+                  "service": "HA"
+                },
+                {
+                  "archive": "l_gmrs.zip",
+                  "count_seconds": 4.7e-08,
+                  "counts": null,
+                  "files": 6,
+                  "import_seconds": 109.49521928,
+                  "insert_errors": 0,
+                  "parse_errors": 0,
+                  "records": 2404015,
+                  "service": "ZA"
+                }
+              ],
+              "count_first": false,
+              "elapsed_seconds": 279.897810835,
+              "initialize_seconds": 0.033981547,
+              "mode": "full",
+              "pipelined_parsing": false,
+              "seed_copy_seconds": 3.02e-07,
+              "seeded": false
+            },
+            "database_bytes": 1887571968,
+            "database_equal": true,
+            "stats_equal": true
+          }
+        ],
+        "inputs_unchanged": true,
+        "all_databases_equal": true,
+        "source_metrics_sha256": "bc6bb204093b332932ddeaedcaaddbcf57d29da9557d324214252ac0c83be860"
+      },
+      "refresh": {
+        "format": "uls.import_benchmark.v1",
+        "cpu_affinity": [
+          0,
+          1
+        ],
+        "sqlite_verifier": "3.45.1 2024-01-30 16:01:20 e876e51a0ed5c5b3126f52e532044363a014bc594cfefa87ffb5b82257ccalt1 (64-bit)",
+        "inputs_sha256": {
+          "l_amat.zip": "82fcd37ecdf3f82b68382c2c0d831cc7ea83c313ecd17f0566335d94018eaf8c",
+          "l_gmrs.zip": "efa2c1489c04f6a17468eef29e20215cd69995fddecfaadec44cdbb50ef0a87c",
+          "import.db": "e5680bb87bce9abbe85fab99a5195a4475d26c0f7dc3be35645614072a08634e"
+        },
+        "binaries_sha256": {
+          "baseline-import": "497720100a58f82f568448cd7c8a63e19825d6dbc90ee5130bfa0537b60ba692",
+          "candidate-import": "35a1e90f5325f49e30681f3a6690764df05f9cf3d8e6bb2c24c8324f42003ca2",
+          "combined-import": "21025699c51b4abaa990c1601495d25e485e5f4399c5280c998bbc07540764dc"
+        },
+        "cache_condition": "archive files sequentially pre-read before every run; fresh output database",
+        "seeded_refresh": true,
+        "resource_scope": "complete child process, including seed copy when requested; report.elapsed_seconds excludes seed copy",
+        "database_comparison": "all rows including primary keys and sequence state; imported_at timestamps checked but excluded from digest",
+        "runs": [
+          {
+            "variant": "baseline_stream",
+            "mode": "stream",
+            "repetition": 1,
+            "resources": {
+              "wall_seconds": 364.58,
+              "user_seconds": 322.39,
+              "system_seconds": 28.81,
+              "max_rss_kib": 1321152
+            },
+            "report": {
+              "archives": [
+                {
+                  "archive": "l_amat.zip",
+                  "count_seconds": 5.7e-08,
+                  "counts": null,
+                  "files": 8,
+                  "import_seconds": 249.004405835,
+                  "insert_errors": 0,
+                  "parse_errors": 0,
+                  "records": 10514698,
+                  "service": "HA"
+                },
+                {
+                  "archive": "l_gmrs.zip",
+                  "count_seconds": 2.19e-07,
+                  "counts": null,
+                  "files": 6,
+                  "import_seconds": 110.665045195,
+                  "insert_errors": 0,
+                  "parse_errors": 0,
+                  "records": 2404015,
+                  "service": "ZA"
+                }
+              ],
+              "count_first": false,
+              "elapsed_seconds": 359.707293285,
+              "initialize_seconds": 0.001855762,
+              "mode": "full",
+              "pipelined_parsing": false,
+              "seed_copy_seconds": 4.796321664,
+              "seeded": true
+            },
+            "database_bytes": 1903443968,
+            "database_equal": true,
+            "stats_equal": true
+          },
+          {
+            "variant": "pipeline",
+            "mode": "pipeline",
+            "repetition": 1,
+            "resources": {
+              "wall_seconds": 323.66,
+              "user_seconds": 349.95,
+              "system_seconds": 22.9,
+              "max_rss_kib": 1323872
+            },
+            "report": {
+              "archives": [
+                {
+                  "archive": "l_amat.zip",
+                  "count_seconds": 9.4e-08,
+                  "counts": null,
+                  "files": 8,
+                  "import_seconds": 220.340389936,
+                  "insert_errors": 0,
+                  "parse_errors": 0,
+                  "records": 10514698,
+                  "service": "HA"
+                },
+                {
+                  "archive": "l_gmrs.zip",
+                  "count_seconds": 8.1e-08,
+                  "counts": null,
+                  "files": 6,
+                  "import_seconds": 99.964836305,
+                  "insert_errors": 0,
+                  "parse_errors": 0,
+                  "records": 2404015,
+                  "service": "ZA"
+                }
+              ],
+              "count_first": false,
+              "elapsed_seconds": 320.3216912,
+              "initialize_seconds": 0.011536257,
+              "mode": "full",
+              "pipelined_parsing": true,
+              "seed_copy_seconds": 3.302257637,
+              "seeded": true
+            },
+            "database_bytes": 1903443968,
+            "database_equal": true,
+            "stats_equal": true
+          },
+          {
+            "variant": "combined_indexes",
+            "mode": "pipeline",
+            "repetition": 1,
+            "resources": {
+              "wall_seconds": 277.69,
+              "user_seconds": 299.55,
+              "system_seconds": 25.04,
+              "max_rss_kib": 1323940
+            },
+            "report": {
+              "archives": [
+                {
+                  "archive": "l_amat.zip",
+                  "count_seconds": 6.2e-08,
+                  "counts": null,
+                  "files": 8,
+                  "import_seconds": 167.90573861,
+                  "insert_errors": 0,
+                  "parse_errors": 0,
+                  "records": 10514698,
+                  "service": "HA"
+                },
+                {
+                  "archive": "l_gmrs.zip",
+                  "count_seconds": 1.35e-07,
+                  "counts": null,
+                  "files": 6,
+                  "import_seconds": 35.459667299,
+                  "insert_errors": 0,
+                  "parse_errors": 0,
+                  "records": 2404015,
+                  "service": "ZA"
+                }
+              ],
+              "combined_index_seconds": 71.03461233,
+              "count_first": false,
+              "elapsed_seconds": 274.506830236,
+              "initialize_seconds": 0.087643987,
+              "mode": "full",
+              "pipelined_parsing": true,
+              "seed_copy_seconds": 3.140357943,
+              "seeded": true
+            },
+            "database_bytes": 1903443968,
+            "database_equal": true,
+            "stats_equal": true
+          }
+        ],
+        "inputs_unchanged": true,
+        "all_databases_equal": true,
+        "source_metrics_sha256": "0efe5f1c02a73bef80980328137f8237f00fc187acb91a50d0fd71a946767ae4"
+      },
+      "refresh_scope": "one sample per variant; import timer excludes seed copy, process resource measurements include it"
+    },
+    "recycled": {
+      "accepted": true,
+      "started_at": "2026-09-11T17:36:41.111424+00:00",
+      "finished_at": "2026-09-11T18:27:57.772505+00:00",
+      "source": {
+        "source_commit": "54cccfbd633cbb709d6d2f9ee1112537ad3e5f85",
+        "comparison": "same executable, serial buffer reuse versus recycled-batch pipeline",
+        "variants": {
+          "candidate": {
+            "binary_sha256": "255344df6482102177e003bff1da692686d927f112517603e3669a2e47d5d866",
+            "source_files_sha256": {
+              "Cargo.lock": "87577d3ae8c549580f68ff4c6577303c5ecd41ebd72e335d0057f6655b562714",
+              "crates/uls-parser/src/dat.rs": "60cfeb9930ea6c1e8cfc6f5fe08e02280f50cc79b167d561e9f4988695683e11",
+              "crates/uls-db/src/importer.rs": "238d614cf44dfbfb0959881741dabcaf9f386d055f4f2c97845de1c9140602c5",
+              "crates/uls-db/examples/benchmark_import.rs": "3a30de3f985e7cd63eb5719bfd5982390f6d892c5a71536a887a8dbeaf36daa3"
+            }
+          }
+        },
+        "rustc": "rustc 1.88.0 (6b00bc388 2025-06-23)\nbinary: rustc\ncommit-hash: 6b00bc3880198600130e1cf62b8f8a93494488cc\ncommit-date: 2025-06-23\nhost: x86_64-unknown-linux-gnu\nrelease: 1.88.0\nLLVM version: 20.1.5\n",
+        "build_command": [
+          "cargo",
+          "+1.88.0",
+          "build",
+          "--release",
+          "-p",
+          "uls-db",
+          "--example",
+          "benchmark_import",
+          "--locked",
+          "--offline"
+        ],
+        "target_directory": "isolated candidate source tree, its own target directory"
+      },
+      "environment": {
+        "cpu_model": "Intel(R) Xeon(R) CPU @ 2.20GHz",
+        "logical_cpus": 2,
+        "reported_core_pairs": [
+          [
+            "0",
+            "0"
+          ]
+        ],
+        "memory_total": "8147688 kB",
+        "archive_cache": "sequentially pre-read before each run",
+        "network": "disabled during imports"
+      },
+      "fresh": {
+        "format": "uls.import_benchmark.v1",
+        "cpu_affinity": [
+          0,
+          1
+        ],
+        "sqlite_verifier": "3.45.1 2024-01-30 16:01:20 e876e51a0ed5c5b3126f52e532044363a014bc594cfefa87ffb5b82257ccalt1 (64-bit)",
+        "inputs_sha256": {
+          "l_amat.zip": "82fcd37ecdf3f82b68382c2c0d831cc7ea83c313ecd17f0566335d94018eaf8c",
+          "l_gmrs.zip": "efa2c1489c04f6a17468eef29e20215cd69995fddecfaadec44cdbb50ef0a87c"
+        },
+        "binaries_sha256": {
+          "candidate-import": "255344df6482102177e003bff1da692686d927f112517603e3669a2e47d5d866"
+        },
+        "cache_condition": "archive files sequentially pre-read before every run; fresh output database",
+        "seeded_refresh": false,
+        "resource_scope": "complete child process, including seed copy when requested; report.elapsed_seconds excludes seed copy",
+        "database_comparison": "all rows including primary keys and sequence state; imported_at timestamps checked but excluded from digest",
+        "runs": [
+          {
+            "variant": "recycle_serial",
+            "mode": "stream",
+            "repetition": 1,
+            "resources": {
+              "wall_seconds": 259.51,
+              "user_seconds": 248.27,
+              "system_seconds": 9.79,
+              "max_rss_kib": 619232
+            },
+            "report": {
+              "archives": [
+                {
+                  "archive": "l_amat.zip",
+                  "count_seconds": 2.86e-07,
+                  "counts": null,
+                  "files": 8,
+                  "import_seconds": 165.267707811,
+                  "insert_errors": 0,
+                  "parse_errors": 0,
+                  "records": 10514698,
+                  "service": "HA"
+                },
+                {
+                  "archive": "l_gmrs.zip",
+                  "count_seconds": 6.6e-08,
+                  "counts": null,
+                  "files": 6,
+                  "import_seconds": 94.206812541,
+                  "insert_errors": 0,
+                  "parse_errors": 0,
+                  "records": 2404015,
+                  "service": "ZA"
+                }
+              ],
+              "count_first": false,
+              "elapsed_seconds": 259.495036828,
+              "initialize_seconds": 0.015530942,
+              "mode": "full",
+              "pipelined_parsing": false,
+              "seed_copy_seconds": 4.02e-07,
+              "seeded": false
+            },
+            "database_bytes": 1887571968,
+            "database_equal": true,
+            "stats_equal": true
+          },
+          {
+            "variant": "recycle_pipeline",
+            "mode": "pipeline",
+            "repetition": 1,
+            "resources": {
+              "wall_seconds": 276.11,
+              "user_seconds": 312.44,
+              "system_seconds": 15.66,
+              "max_rss_kib": 619892
+            },
+            "report": {
+              "archives": [
+                {
+                  "archive": "l_amat.zip",
+                  "count_seconds": 5.8e-08,
+                  "counts": null,
+                  "files": 8,
+                  "import_seconds": 160.675340286,
+                  "insert_errors": 0,
+                  "parse_errors": 0,
+                  "records": 10514698,
+                  "service": "HA"
+                },
+                {
+                  "archive": "l_gmrs.zip",
+                  "count_seconds": 8.6e-08,
+                  "counts": null,
+                  "files": 6,
+                  "import_seconds": 115.388409766,
+                  "insert_errors": 0,
+                  "parse_errors": 0,
+                  "records": 2404015,
+                  "service": "ZA"
+                }
+              ],
+              "count_first": false,
+              "elapsed_seconds": 276.099019022,
+              "initialize_seconds": 0.028590896,
+              "mode": "full",
+              "pipelined_parsing": true,
+              "seed_copy_seconds": 3.4e-07,
+              "seeded": false
+            },
+            "database_bytes": 1887571968,
+            "database_equal": true,
+            "stats_equal": true
+          },
+          {
+            "variant": "recycle_pipeline",
+            "mode": "pipeline",
+            "repetition": 2,
+            "resources": {
+              "wall_seconds": 278.22,
+              "user_seconds": 322.68,
+              "system_seconds": 13.96,
+              "max_rss_kib": 620428
+            },
+            "report": {
+              "archives": [
+                {
+                  "archive": "l_amat.zip",
+                  "count_seconds": 7.2e-08,
+                  "counts": null,
+                  "files": 8,
+                  "import_seconds": 167.91599219,
+                  "insert_errors": 0,
+                  "parse_errors": 0,
+                  "records": 10514698,
+                  "service": "HA"
+                },
+                {
+                  "archive": "l_gmrs.zip",
+                  "count_seconds": 8.5e-08,
+                  "counts": null,
+                  "files": 6,
+                  "import_seconds": 110.245462135,
+                  "insert_errors": 0,
+                  "parse_errors": 0,
+                  "records": 2404015,
+                  "service": "ZA"
+                }
+              ],
+              "count_first": false,
+              "elapsed_seconds": 278.203435345,
+              "initialize_seconds": 0.033043629,
+              "mode": "full",
+              "pipelined_parsing": true,
+              "seed_copy_seconds": 6.13e-07,
+              "seeded": false
+            },
+            "database_bytes": 1887571968,
+            "database_equal": true,
+            "stats_equal": true
+          },
+          {
+            "variant": "recycle_serial",
+            "mode": "stream",
+            "repetition": 2,
+            "resources": {
+              "wall_seconds": 296.38,
+              "user_seconds": 276.46,
+              "system_seconds": 14.22,
+              "max_rss_kib": 619384
+            },
+            "report": {
+              "archives": [
+                {
+                  "archive": "l_amat.zip",
+                  "count_seconds": 6e-08,
+                  "counts": null,
+                  "files": 8,
+                  "import_seconds": 194.009783245,
+                  "insert_errors": 0,
+                  "parse_errors": 0,
+                  "records": 10514698,
+                  "service": "HA"
+                },
+                {
+                  "archive": "l_gmrs.zip",
+                  "count_seconds": 5.7e-08,
+                  "counts": null,
+                  "files": 6,
+                  "import_seconds": 102.314237226,
+                  "insert_errors": 0,
+                  "parse_errors": 0,
+                  "records": 2404015,
+                  "service": "ZA"
+                }
+              ],
+              "count_first": false,
+              "elapsed_seconds": 296.360857828,
+              "initialize_seconds": 0.02986885,
+              "mode": "full",
+              "pipelined_parsing": false,
+              "seed_copy_seconds": 8.05e-07,
+              "seeded": false
+            },
+            "database_bytes": 1887571968,
+            "database_equal": true,
+            "stats_equal": true
+          },
+          {
+            "variant": "recycle_serial",
+            "mode": "stream",
+            "repetition": 3,
+            "resources": {
+              "wall_seconds": 265.72,
+              "user_seconds": 253.05,
+              "system_seconds": 10.99,
+              "max_rss_kib": 619340
+            },
+            "report": {
+              "archives": [
+                {
+                  "archive": "l_amat.zip",
+                  "count_seconds": 5.6e-08,
+                  "counts": null,
+                  "files": 8,
+                  "import_seconds": 167.391352328,
+                  "insert_errors": 0,
+                  "parse_errors": 0,
+                  "records": 10514698,
+                  "service": "HA"
+                },
+                {
+                  "archive": "l_gmrs.zip",
+                  "count_seconds": 1.2e-07,
+                  "counts": null,
+                  "files": 6,
+                  "import_seconds": 98.270082309,
+                  "insert_errors": 0,
+                  "parse_errors": 0,
+                  "records": 2404015,
+                  "service": "ZA"
+                }
+              ],
+              "count_first": false,
+              "elapsed_seconds": 265.701221794,
+              "initialize_seconds": 0.030392246,
+              "mode": "full",
+              "pipelined_parsing": false,
+              "seed_copy_seconds": 5.31e-07,
+              "seeded": false
+            },
+            "database_bytes": 1887571968,
+            "database_equal": true,
+            "stats_equal": true
+          },
+          {
+            "variant": "recycle_pipeline",
+            "mode": "pipeline",
+            "repetition": 3,
+            "resources": {
+              "wall_seconds": 276.56,
+              "user_seconds": 315.51,
+              "system_seconds": 15.64,
+              "max_rss_kib": 620352
+            },
+            "report": {
+              "archives": [
+                {
+                  "archive": "l_amat.zip",
+                  "count_seconds": 5.6e-08,
+                  "counts": null,
+                  "files": 8,
+                  "import_seconds": 182.168238196,
+                  "insert_errors": 0,
+                  "parse_errors": 0,
+                  "records": 10514698,
+                  "service": "HA"
+                },
+                {
+                  "archive": "l_gmrs.zip",
+                  "count_seconds": 9.2e-08,
+                  "counts": null,
+                  "files": 6,
+                  "import_seconds": 94.341390198,
+                  "insert_errors": 0,
+                  "parse_errors": 0,
+                  "records": 2404015,
+                  "service": "ZA"
+                }
+              ],
+              "count_first": false,
+              "elapsed_seconds": 276.543786049,
+              "initialize_seconds": 0.028091967,
+              "mode": "full",
+              "pipelined_parsing": true,
+              "seed_copy_seconds": 3.84e-07,
+              "seeded": false
+            },
+            "database_bytes": 1887571968,
+            "database_equal": true,
+            "stats_equal": true
+          }
+        ],
+        "inputs_unchanged": true,
+        "all_databases_equal": true,
+        "source_metrics_sha256": "eaef0dda11c7d8546c142add0c9ccf925659230f0e35e57a1c2ebc8654fa7850"
+      },
+      "refresh": {
+        "format": "uls.import_benchmark.v1",
+        "cpu_affinity": [
+          0,
+          1
+        ],
+        "sqlite_verifier": "3.45.1 2024-01-30 16:01:20 e876e51a0ed5c5b3126f52e532044363a014bc594cfefa87ffb5b82257ccalt1 (64-bit)",
+        "inputs_sha256": {
+          "l_amat.zip": "82fcd37ecdf3f82b68382c2c0d831cc7ea83c313ecd17f0566335d94018eaf8c",
+          "l_gmrs.zip": "efa2c1489c04f6a17468eef29e20215cd69995fddecfaadec44cdbb50ef0a87c",
+          "import.db": "dcf3bad11531e49805e1c98726b6dfe8624048da256dce55f45bb1c507918556"
+        },
+        "binaries_sha256": {
+          "candidate-import": "255344df6482102177e003bff1da692686d927f112517603e3669a2e47d5d866"
+        },
+        "cache_condition": "archive files sequentially pre-read before every run; fresh output database",
+        "seeded_refresh": true,
+        "resource_scope": "complete child process, including seed copy when requested; report.elapsed_seconds excludes seed copy",
+        "database_comparison": "all rows including primary keys and sequence state; imported_at timestamps checked but excluded from digest",
+        "runs": [
+          {
+            "variant": "recycle_serial",
+            "mode": "stream",
+            "repetition": 1,
+            "resources": {
+              "wall_seconds": 402.17,
+              "user_seconds": 336.36,
+              "system_seconds": 34.4,
+              "max_rss_kib": 1321076
+            },
+            "report": {
+              "archives": [
+                {
+                  "archive": "l_amat.zip",
+                  "count_seconds": 5.9e-08,
+                  "counts": null,
+                  "files": 8,
+                  "import_seconds": 293.198078908,
+                  "insert_errors": 0,
+                  "parse_errors": 0,
+                  "records": 10514698,
+                  "service": "HA"
+                },
+                {
+                  "archive": "l_gmrs.zip",
+                  "count_seconds": 5.7e-08,
+                  "counts": null,
+                  "files": 6,
+                  "import_seconds": 103.854704756,
+                  "insert_errors": 0,
+                  "parse_errors": 0,
+                  "records": 2404015,
+                  "service": "ZA"
+                }
+              ],
+              "count_first": false,
+              "elapsed_seconds": 397.060796137,
+              "initialize_seconds": 0.002386098,
+              "mode": "full",
+              "pipelined_parsing": false,
+              "seed_copy_seconds": 5.070722938,
+              "seeded": true
+            },
+            "database_bytes": 1903443968,
+            "database_equal": true,
+            "stats_equal": true
+          },
+          {
+            "variant": "recycle_pipeline",
+            "mode": "pipeline",
+            "repetition": 1,
+            "resources": {
+              "wall_seconds": 345.03,
+              "user_seconds": 373.65,
+              "system_seconds": 26.02,
+              "max_rss_kib": 1322336
+            },
+            "report": {
+              "archives": [
+                {
+                  "archive": "l_amat.zip",
+                  "count_seconds": 8.1e-08,
+                  "counts": null,
+                  "files": 8,
+                  "import_seconds": 232.665263362,
+                  "insert_errors": 0,
+                  "parse_errors": 0,
+                  "records": 10514698,
+                  "service": "HA"
+                },
+                {
+                  "archive": "l_gmrs.zip",
+                  "count_seconds": 5.7e-08,
+                  "counts": null,
+                  "files": 6,
+                  "import_seconds": 108.780056702,
+                  "insert_errors": 0,
+                  "parse_errors": 0,
+                  "records": 2404015,
+                  "service": "ZA"
+                }
+              ],
+              "count_first": false,
+              "elapsed_seconds": 341.460980227,
+              "initialize_seconds": 0.002780621,
+              "mode": "full",
+              "pipelined_parsing": true,
+              "seed_copy_seconds": 3.522787844,
+              "seeded": true
+            },
+            "database_bytes": 1903443968,
+            "database_equal": true,
+            "stats_equal": true
+          }
+        ],
+        "inputs_unchanged": true,
+        "all_databases_equal": true,
+        "source_metrics_sha256": "c9c09aceeda7c26bbf0c7d49b2992b8ca06760948b95c89a9fcc963f61b05cb8"
+      },
+      "refresh_scope": "one sample per variant; import timer excludes seed copy, process resource measurements include it"
+    }
+  }
+}

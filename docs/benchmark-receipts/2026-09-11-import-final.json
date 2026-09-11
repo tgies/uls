@@ -1,0 +1,164 @@
+{
+  "format": "uls.import_final_qualification.v1",
+  "source": {
+    "source_commit": "3b2ad54e2505bcdd5430dae9001cfee44bb405fe",
+    "source_files_sha256": {
+      "Cargo.lock": "87577d3ae8c549580f68ff4c6577303c5ecd41ebd72e335d0057f6655b562714",
+      "crates/uls-parser/src/dat.rs": "60cfeb9930ea6c1e8cfc6f5fe08e02280f50cc79b167d561e9f4988695683e11",
+      "crates/uls-db/src/importer.rs": "a5f9f9de383067c36ae0e4fec98361f49833b5668beaa884805095a56318e360",
+      "crates/uls-db/examples/benchmark_import.rs": "ffa98b64ca81e4bc967baebaa7d3f01607aa38c0a8b0cc55715f69eaa1aacb57"
+    },
+    "binary_sha256": "0e120928a96a1ea26a499d0d5b26a2d511d13b909e24f0860522a4981402939e",
+    "rustc": "rustc 1.88.0 (6b00bc388 2025-06-23)\nbinary: rustc\ncommit-hash: 6b00bc3880198600130e1cf62b8f8a93494488cc\ncommit-date: 2025-06-23\nhost: x86_64-unknown-linux-gnu\nrelease: 1.88.0\nLLVM version: 20.1.5\n"
+  },
+  "scope": "Single local full-size data-equivalence checks after restoring WSL; these timings are not controlled performance comparisons.",
+  "checks": {
+    "fresh": {
+      "equal_to_isolated_baseline": true,
+      "metrics": {
+        "format": "uls.import_benchmark.v1",
+        "cpu_affinity": [
+          0,
+          1
+        ],
+        "sqlite_verifier": "3.53.2 2026-06-03 19:12:13 d6e03d8c777cfa2d35e3b60d8ec3e0187f3e9f99d8e2ee9cac695fd6fcdf1a24 (64-bit)",
+        "inputs_sha256": {
+          "l_amat.zip": "82fcd37ecdf3f82b68382c2c0d831cc7ea83c313ecd17f0566335d94018eaf8c",
+          "l_gmrs.zip": "efa2c1489c04f6a17468eef29e20215cd69995fddecfaadec44cdbb50ef0a87c"
+        },
+        "binaries_sha256": {
+          "final-import": "0e120928a96a1ea26a499d0d5b26a2d511d13b909e24f0860522a4981402939e"
+        },
+        "cache_condition": "archive files sequentially pre-read before every run; fresh output database",
+        "seeded_refresh": false,
+        "resource_scope": "complete child process, including seed copy when requested; report.elapsed_seconds excludes seed copy",
+        "database_comparison": "all rows including primary keys and sequence state; imported_at timestamps checked but excluded from digest",
+        "runs": [
+          {
+            "variant": "final",
+            "mode": "stream",
+            "repetition": 1,
+            "resources": {
+              "wall_seconds": 119.4,
+              "user_seconds": 111.17,
+              "system_seconds": 5.55,
+              "max_rss_kib": 620764
+            },
+            "report": {
+              "archives": [
+                {
+                  "archive": "l_amat.zip",
+                  "count_seconds": 0.0,
+                  "counts": null,
+                  "files": 8,
+                  "import_seconds": 75.640903246,
+                  "insert_errors": 0,
+                  "parse_errors": 0,
+                  "records": 10514698,
+                  "service": "HA"
+                },
+                {
+                  "archive": "l_gmrs.zip",
+                  "count_seconds": 1e-07,
+                  "counts": null,
+                  "files": 6,
+                  "import_seconds": 43.722430639,
+                  "insert_errors": 0,
+                  "parse_errors": 0,
+                  "records": 2404015,
+                  "service": "ZA"
+                }
+              ],
+              "count_first": false,
+              "elapsed_seconds": 119.397856986,
+              "initialize_seconds": 0.024053801,
+              "mode": "full",
+              "pipelined_parsing": false,
+              "seed_copy_seconds": 2e-07,
+              "seeded": false
+            },
+            "database_bytes": 1887571968,
+            "database_equal": true,
+            "stats_equal": true
+          }
+        ],
+        "inputs_unchanged": true,
+        "all_databases_equal": true
+      }
+    },
+    "refresh": {
+      "equal_to_isolated_baseline": true,
+      "metrics": {
+        "format": "uls.import_benchmark.v1",
+        "cpu_affinity": [
+          0,
+          1
+        ],
+        "sqlite_verifier": "3.53.2 2026-06-03 19:12:13 d6e03d8c777cfa2d35e3b60d8ec3e0187f3e9f99d8e2ee9cac695fd6fcdf1a24 (64-bit)",
+        "inputs_sha256": {
+          "l_amat.zip": "82fcd37ecdf3f82b68382c2c0d831cc7ea83c313ecd17f0566335d94018eaf8c",
+          "l_gmrs.zip": "efa2c1489c04f6a17468eef29e20215cd69995fddecfaadec44cdbb50ef0a87c",
+          "import.db": "48b47d66a69a3fa3b5b031f4488b4d7c39829e9da2918a318080781336e0349a"
+        },
+        "binaries_sha256": {
+          "final-import": "0e120928a96a1ea26a499d0d5b26a2d511d13b909e24f0860522a4981402939e"
+        },
+        "cache_condition": "archive files sequentially pre-read before every run; fresh output database",
+        "seeded_refresh": true,
+        "resource_scope": "complete child process, including seed copy when requested; report.elapsed_seconds excludes seed copy",
+        "database_comparison": "all rows including primary keys and sequence state; imported_at timestamps checked but excluded from digest",
+        "runs": [
+          {
+            "variant": "final",
+            "mode": "stream",
+            "repetition": 1,
+            "resources": {
+              "wall_seconds": 160.68,
+              "user_seconds": 142.71,
+              "system_seconds": 13.6,
+              "max_rss_kib": 1322864
+            },
+            "report": {
+              "archives": [
+                {
+                  "archive": "l_amat.zip",
+                  "count_seconds": 0.0,
+                  "counts": null,
+                  "files": 8,
+                  "import_seconds": 105.202213367,
+                  "insert_errors": 0,
+                  "parse_errors": 0,
+                  "records": 10514698,
+                  "service": "HA"
+                },
+                {
+                  "archive": "l_gmrs.zip",
+                  "count_seconds": 0.0,
+                  "counts": null,
+                  "files": 6,
+                  "import_seconds": 42.997299983,
+                  "insert_errors": 0,
+                  "parse_errors": 0,
+                  "records": 2404015,
+                  "service": "ZA"
+                }
+              ],
+              "count_first": false,
+              "elapsed_seconds": 148.21559955,
+              "initialize_seconds": 0.0058395,
+              "mode": "full",
+              "pipelined_parsing": false,
+              "seed_copy_seconds": 12.445687417,
+              "seeded": true
+            },
+            "database_bytes": 1903443968,
+            "database_equal": true,
+            "stats_equal": true
+          }
+        ],
+        "inputs_unchanged": true,
+        "all_databases_equal": true
+      }
+    }
+  }
+}
