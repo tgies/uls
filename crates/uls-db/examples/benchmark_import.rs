@@ -1,6 +1,6 @@
 //! Import fixed local archives into a new disposable database, without downloads.
 //!
-//! Usage: benchmark_import OUTPUT_DIR full|minimal count-first|stream HA=ZIP ZA=ZIP
+//! Usage: benchmark_import OUTPUT_DIR full|minimal count-first|stream|pipeline HA=ZIP ZA=ZIP [SEED=DB]
 //! The output directory must not exist. Timings exclude subsequent verification.
 
 use std::error::Error;
@@ -21,7 +21,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let args: Vec<_> = std::env::args().skip(1).collect();
     if args.len() < 4 {
         return Err(
-            "usage: benchmark_import OUTPUT_DIR full|minimal count-first|stream HA=ZIP [ZA=ZIP]"
+            "usage: benchmark_import OUTPUT_DIR full|minimal count-first|stream|pipeline HA=ZIP [ZA=ZIP] [SEED=DB]"
                 .into(),
         );
     }
@@ -36,8 +36,16 @@ fn main() -> Result<(), Box<dyn Error>> {
         "stream" | "pipeline" => false,
         _ => return Err("expected count-first, stream or pipeline".into()),
     };
+    let seeds: Vec<_> = args[3..]
+        .iter()
+        .filter_map(|arg| arg.strip_prefix("SEED="))
+        .collect();
+    if seeds.len() > 1 {
+        return Err("only one seed database is supported".into());
+    }
     let archives = args[3..]
         .iter()
+        .filter(|arg| !arg.starts_with("SEED="))
         .map(|arg| {
             let (service, path) = arg.split_once('=').ok_or("expected SERVICE=ZIP")?;
             if !matches!(service, "HA" | "ZA") || !Path::new(path).is_file() {
@@ -46,8 +54,28 @@ fn main() -> Result<(), Box<dyn Error>> {
             Ok((service, Path::new(path)))
         })
         .collect::<Result<Vec<_>, _>>()?;
+    if archives.is_empty() {
+        return Err("at least one archive is required".into());
+    }
 
     std::fs::create_dir(&output)?;
+    let copy_start = Instant::now();
+    if let Some(seed) = seeds.first() {
+        for suffix in ["-wal", "-journal"] {
+            let sidecar = PathBuf::from(format!("{seed}{suffix}"));
+            if sidecar.try_exists()? && sidecar.metadata()?.len() != 0 {
+                return Err(
+                    format!("seed has an uncheckpointed journal: {}", sidecar.display()).into(),
+                );
+            }
+        }
+        // Keep the disposable output writable even when the source is read-only.
+        std::io::copy(
+            &mut std::fs::File::open(seed)?,
+            &mut std::fs::File::create_new(output.join("import.db"))?,
+        )?;
+    }
+    let seed_copy_seconds = copy_start.elapsed().as_secs_f64();
     let start = Instant::now();
     let db = Database::open(output.join("import.db"))?;
     db.initialize()?;
@@ -86,6 +114,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         "mode": args[1],
         "count_first": count_first,
         "pipelined_parsing": args[2] == "pipeline",
+        "seeded": !seeds.is_empty(),
+        "seed_copy_seconds": seed_copy_seconds,
         "initialize_seconds": initialize_seconds,
         "elapsed_seconds": elapsed_seconds,
         "archives": reports,

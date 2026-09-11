@@ -72,3 +72,9 @@ pipeline. CPU totals were 142.39, 130.57 and 125.20 seconds. The wall/CPU mismat
 and changing host conditions prevent choosing an implementation from these
 single samples. Both candidate databases match the baseline's full contents.
 Repeated isolated qualification remains required.
+
+Use `--seed /path/to/completed/benchmark/import.db` to check a full refresh of
+existing data as well as a fresh import. Every child copies the fixed seed into
+its new output directory. Its import timer excludes the copy; the outer process
+CPU/RSS and wall-time measurements include it. Source hashes are checked again
+afterward. This also checks replacement ordering and SQLite sequence values.

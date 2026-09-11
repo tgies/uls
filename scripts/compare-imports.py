@@ -90,6 +90,7 @@ def main():
                         metavar=("NAME", "BINARY", "MODE"))
     parser.add_argument("--repetitions", type=int, default=3)
     parser.add_argument("--keep-databases", action="store_true")
+    parser.add_argument("--seed", type=Path, help="completed benchmark database to copy before each refresh")
     args = parser.parse_args()
     if args.repetitions < 1:
         parser.error("repetitions must be positive")
@@ -109,6 +110,15 @@ def main():
     private_inputs = output / "inputs"
     private_inputs.mkdir()
     source_hashes = {str(path): digest(path) for _, path in sources}
+    seed = args.seed.resolve(strict=True) if args.seed else None
+    if seed:
+        source_hashes[str(seed)] = digest(seed)
+        for suffix in ["-wal", "-journal"]:
+            sidecar = Path(str(seed) + suffix)
+            assert not sidecar.exists() or sidecar.stat().st_size == 0
+        copied_seed = private_inputs / "seed.db"
+        shutil.copyfile(seed, copied_seed)
+        assert digest(copied_seed) == source_hashes[str(seed)]
     binary_hashes = {str(path): digest(path) for _, path, _ in binaries}
     archives = []
     for service, source in sources:
@@ -124,6 +134,8 @@ def main():
         "inputs_sha256": source_hashes,
         "binaries_sha256": binary_hashes,
         "cache_condition": "archive files sequentially pre-read before every run; fresh output database",
+        "seeded_refresh": seed is not None,
+        "resource_scope": "complete child process, including seed copy when requested; report.elapsed_seconds excludes seed copy",
         "database_comparison": "all rows including primary keys and sequence state; imported_at timestamps checked but excluded from digest",
         "runs": [],
     }
@@ -143,6 +155,8 @@ def main():
                        '{"wall_seconds":%e,"user_seconds":%U,"system_seconds":%S,"max_rss_kib":%M}',
                        "-o", str(resource_path), str(binary), str(prefix), "full", mode]
             command += [f"{service}={archive}" for service, archive in archives]
+            if seed:
+                command += [f"SEED={copied_seed}"]
             with prefix.with_suffix(".stdout.log").open("w") as stdout, prefix.with_suffix(".stderr.log").open("w") as stderr:
                 subprocess.run(command, stdout=stdout, stderr=stderr, check=True)
             result = json.loads((prefix / "report.json").read_text())
@@ -168,6 +182,8 @@ def main():
     assert all(digest(Path(p)) == value for p, value in source_hashes.items())
     assert all(digest(Path(p)) == value for p, value in binary_hashes.items())
     assert all(digest(copy) == source_hashes[str(source)] for (_, copy), (_, source) in zip(archives, sources))
+    if seed:
+        assert digest(copied_seed) == source_hashes[str(seed)]
     report["inputs_unchanged"] = True
     report["all_databases_equal"] = True
     (output / "metrics.json").write_text(json.dumps(report, indent=2) + "\n")
