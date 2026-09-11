@@ -408,6 +408,10 @@ fn test_import_for_service_stream_error_rolls_back_and_preserves_status(#[case] 
     db.mark_imported("HA", "LA", 999).unwrap();
 
     let mut malformed = hd_line("200002", "W2BAD", "A").into_bytes();
+    // Fail after several buffer-reuse cycles, with a final partial batch.
+    for i in 0..2048 {
+        malformed.extend_from_slice(hd_line(&(300000 + i).to_string(), "K1TEMP", "A").as_bytes());
+    }
     malformed.extend_from_slice(hd_line("200003", "W3TEMP", "A").as_bytes());
     malformed.extend_from_slice(&[0xff, b'\n']);
     let bad_weekly = write_zip(&temp_dir, "bad_weekly.zip", &[("HD.dat", &malformed)]);
@@ -419,6 +423,7 @@ fn test_import_for_service_stream_error_rolls_back_and_preserves_status(#[case] 
     assert!(db.get_license_by_callsign("W2BAD").unwrap().is_none());
     assert!(db.get_license_by_callsign("W3TEMP").unwrap().is_none());
     assert!(db.get_license_by_callsign("W1WEEK").unwrap().is_some());
+    assert_eq!(db.get_stats().unwrap().total_licenses, 1);
     assert!(db.has_record_type("HA", "LA").unwrap());
 }
 

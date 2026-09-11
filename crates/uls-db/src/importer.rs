@@ -4,7 +4,7 @@
 //! of FCC data from ZIP files into the database.
 
 use std::path::Path;
-use std::sync::mpsc::sync_channel;
+use std::sync::mpsc::{sync_channel, TryRecvError};
 use std::time::Instant;
 
 use rusqlite::Connection;
@@ -292,10 +292,10 @@ impl<'a> Importer<'a> {
             let mut file_parse_errors = 0usize;
             let mut file_insert_errors = 0usize;
 
-            let mut consume = |record| {
+            let mut consume = |record: &uls_parser::Result<UlsRecord>| {
                 match record {
                     Ok(record) => {
-                        if let Err(e) = inserter.insert(&record) {
+                        if let Err(e) = inserter.insert(record) {
                             file_insert_errors += 1;
                             if file_insert_errors <= 5 {
                                 warn!("Insert error in {}: {}", dat_file, e);
@@ -333,7 +333,7 @@ impl<'a> Importer<'a> {
                 process_pipelined(&mut extractor, dat_file, consume)?;
             } else {
                 extractor.process_dat_streaming(dat_file, |line| {
-                    consume(line.to_record());
+                    consume(&line.to_record());
                     true
                 })?;
             }
@@ -612,13 +612,17 @@ fn process_pipelined<R, F>(
 ) -> Result<()>
 where
     R: std::io::Read + std::io::Seek + Send,
-    F: FnMut(uls_parser::Result<UlsRecord>),
+    F: FnMut(&uls_parser::Result<UlsRecord>),
 {
     const BATCH_RECORDS: usize = 256;
     const QUEUED_BATCHES: usize = 2;
 
     std::thread::scope(|scope| {
         let (sender, receiver) = sync_channel(QUEUED_BATCHES);
+        // Allocate only when the return queue is empty: at most two queued,
+        // one consumed and one parsed batch can then exist. Reuse those four.
+        let (recycle, returned) =
+            sync_channel::<Vec<uls_parser::Result<UlsRecord>>>(QUEUED_BATCHES + 1);
         let worker = std::thread::Builder::new()
             .name("uls-archive-parser".into())
             .spawn_scoped(scope, move || {
@@ -626,9 +630,20 @@ where
                 let result = extractor.process_dat_streaming(dat_file, |line| {
                     batch.push(line.to_record());
                     if batch.len() == BATCH_RECORDS {
-                        let full = std::mem::replace(&mut batch, Vec::with_capacity(BATCH_RECORDS));
                         // Receiver drop cancels a blocked producer when the writer unwinds.
-                        sender.send(full).is_ok()
+                        if sender.send(std::mem::take(&mut batch)).is_err() {
+                            return false;
+                        }
+                        batch = match returned.try_recv() {
+                            Ok(mut reusable) => {
+                                // Keep record allocation and destruction on the parser thread.
+                                reusable.clear();
+                                reusable
+                            }
+                            Err(TryRecvError::Empty) => Vec::with_capacity(BATCH_RECORDS),
+                            Err(TryRecvError::Disconnected) => return false,
+                        };
+                        true
                     } else {
                         true
                     }
@@ -641,9 +656,11 @@ where
             })?;
 
         for batch in receiver {
-            for record in batch {
+            for record in &batch {
                 consume(record);
             }
+            // The parser may already have finished. Joining below reports its errors.
+            let _ = recycle.send(batch);
         }
         match worker.join() {
             Ok(result) => result.map_err(DbError::Parser),

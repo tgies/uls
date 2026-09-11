@@ -79,7 +79,6 @@ its new output directory. Its import timer excludes the copy; the outer process
 CPU/RSS and wall-time measurements include it. Source hashes are checked again
 afterward. This also checks replacement ordering and SQLite sequence values.
 
-
 ## Variant isolation and review checkpoint
 
 The tested source checkpoint is `1a478a67bc655667715993fa771d5325c96fdf4a`.
@@ -113,3 +112,42 @@ oracle tests and fresh/seeded smoke imports passed. The draft
 [PR #72](https://github.com/tgies/uls/pull/72) passed all 11 hosted checks at this
 checkpoint. Repeated full-size performance qualification and final default
 selection remain pending.
+
+The [full-size workstation refresh check](benchmark-receipts/2026-09-11-import-wsl-refresh.json)
+also passed: both variants replaced existing data and produced identical full
+databases and import reports, preserving input and binary hashes. One serial
+sample took 343.46 seconds of import time; one pipeline sample took 275.28.
+Whole-process CPU totals were 276.17 and 235.90 seconds. Seed copies alone took
+46.95 and 5.44 seconds, showing substantial shared-host variability. These
+single observations establish the full-size refresh correctness check, not a
+controlled performance improvement. Repeated isolated measurement is running.
+
+SQLite's auxiliary sorting threads are a separate possible experiment. In the
+bundled SQLite 3.51.1, `sqlite3VdbeSorterInit` sets the worker count to zero when
+`sqlite3TempInMemory(db)` is true. The importer currently uses
+`PRAGMA temp_store=MEMORY`, so adding `PRAGMA threads=2` alone would not parallelize
+index sorting. Testing file-backed sorting would change the temporary-I/O and
+memory tradeoff and needs its own comparison; it is outside this implementation.
+See SQLite's [thread limit](https://www.sqlite.org/pragma.html#pragma_threads)
+and [sorter source](https://github.com/sqlite/sqlite/blob/version-3.51.1/src/vdbesort.c).
+
+
+## Recycling the parser batches
+
+The first isolated round showed the original pipeline spending more CPU than
+serial buffer reuse. A [local diagnostic](benchmark-receipts/2026-09-11-parser-handoff.json)
+then parsed all 12,918,713 records without SQLite work. Two serial samples took
+10.39–10.61 seconds and 10.38–10.61 CPU seconds. Transferring owned records to
+another thread for destruction took 16.83–17.14 seconds and 20.04–20.35 CPU
+seconds. Returning consumed batches to the parser for destruction and reuse
+reduced that to 13.24–13.32 seconds and 13.48–13.56 CPU seconds. This isolates
+handoff/ownership overhead; it does not establish a full-import speedup.
+
+The revised opt-in pipeline returns batches to their producer, consumes records
+by reference and reuses at most four batch buffers. Both channels are bounded.
+Parser allocation/destruction stays on its thread except the last in-flight
+batches after it finishes or a consumer unwinds. Existing ordering and callback
+panic regressions pass, and the stream-error test now fails after multiple
+reuse cycles with a partial final batch. All 703 workspace tests, three doctests,
+Rust 1.88 formatting and current-stable Clippy passed again. The revised binary
+still needs repeated complete-import qualification before default selection.
