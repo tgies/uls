@@ -7,72 +7,14 @@ use std::path::Path;
 use std::time::Instant;
 
 use rusqlite::Connection;
-use tracing::{debug, info, warn};
+use tracing::{info, warn};
 use uls_parser::archive::ZipExtractor;
 
 use crate::bulk_inserter::BulkInserter;
-use crate::schema::Schema;
 use crate::{Database, DbError, Result};
 
-/// RAII guard that restores database state (indexes and PRAGMAs) on drop.
-///
-/// This ensures cleanup happens even if an error causes early return from import.
-struct ImportGuard<'a> {
-    conn: &'a Connection,
-    indexes_dropped: bool,
-    pragmas_modified: bool,
-}
-
-impl<'a> ImportGuard<'a> {
-    fn new(conn: &'a Connection) -> Self {
-        Self {
-            conn,
-            indexes_dropped: false,
-            pragmas_modified: false,
-        }
-    }
-
-    /// Mark that indexes have been dropped and need restoration on cleanup.
-    fn mark_indexes_dropped(&mut self) {
-        self.indexes_dropped = true;
-    }
-
-    /// Mark that PRAGMAs have been modified and need restoration on cleanup.
-    fn mark_pragmas_modified(&mut self) {
-        self.pragmas_modified = true;
-    }
-
-    /// Mark that indexes have been restored successfully.
-    fn mark_indexes_restored(&mut self) {
-        self.indexes_dropped = false;
-    }
-
-    /// Mark that PRAGMAs have been restored successfully.
-    fn mark_pragmas_restored(&mut self) {
-        self.pragmas_modified = false;
-    }
-}
-
-impl Drop for ImportGuard<'_> {
-    fn drop(&mut self) {
-        // Restore indexes if they were dropped and not yet restored
-        if self.indexes_dropped {
-            if let Err(e) = Schema::create_indexes(self.conn) {
-                warn!("Failed to restore indexes during cleanup: {}", e);
-            }
-        }
-
-        // Restore PRAGMAs if they were modified and not yet restored
-        if self.pragmas_modified {
-            if let Err(e) = self.conn.execute_batch(
-                "PRAGMA synchronous = NORMAL;
-                 PRAGMA journal_mode = WAL;",
-            ) {
-                warn!("Failed to restore PRAGMAs during cleanup: {}", e);
-            }
-        }
-    }
-}
+mod batch;
+pub use batch::{ImportBatch, ImportSource};
 
 /// Statistics from an import operation.
 #[derive(Debug, Clone, Default)]
@@ -204,6 +146,19 @@ impl<'a> Importer<'a> {
         progress: Option<ProgressCallback>,
     ) -> Result<ImportStats> {
         let start = Instant::now();
+        let mut stats = self.batch(|batch| batch.import_zip_with_mode(zip_path, mode, progress))?;
+        stats.duration_secs = start.elapsed().as_secs_f64();
+        Ok(stats)
+    }
+
+    pub(super) fn import_zip_on_connection(
+        conn: &Connection,
+        zip_path: &Path,
+        mode: ImportMode,
+        progress: Option<ProgressCallback>,
+        before_commit: impl FnOnce(&Connection, &ImportStats, &[String]) -> Result<()>,
+    ) -> Result<ImportStats> {
+        let start = Instant::now();
 
         let mut extractor = ZipExtractor::open(zip_path)?;
         let all_dat_files = extractor.list_dat_files();
@@ -237,25 +192,6 @@ impl<'a> Importer<'a> {
             mode,
             dat_files
         );
-
-        // Optimize SQLite for bulk import
-        let conn = self.db.conn()?;
-
-        // Create guard to ensure cleanup even on early error return
-        let mut guard = ImportGuard::new(&conn);
-
-        guard.mark_pragmas_modified();
-        conn.execute_batch(
-            "PRAGMA synchronous = OFF;
-             PRAGMA journal_mode = MEMORY;
-             PRAGMA temp_store = MEMORY;
-             PRAGMA cache_size = -64000;",
-        )?;
-
-        // Drop indexes for faster bulk insert (will be recreated after import)
-        debug!("Dropping indexes for bulk import performance");
-        guard.mark_indexes_dropped();
-        Schema::drop_indexes(&conn)?;
 
         // Use a rollback-on-drop transaction so every early-return path leaves
         // the database contents unchanged.
@@ -352,36 +288,10 @@ impl<'a> Importer<'a> {
             transaction.rollback()?;
             return Err(error);
         }
+        before_commit(&transaction, &stats, &dat_files)?;
         transaction.commit()?;
 
-        // Rebuild indexes (this is much faster than maintaining them during insert)
-        let index_start = Instant::now();
-        debug!("Rebuilding indexes after bulk import");
-        Schema::create_indexes(&conn)?;
-        guard.mark_indexes_restored();
-        let index_duration = index_start.elapsed();
-        debug!(
-            "Index rebuild completed in {:.2}s",
-            index_duration.as_secs_f64()
-        );
-
-        // Reset SQLite settings
-        conn.execute_batch(
-            "PRAGMA synchronous = NORMAL;
-             PRAGMA journal_mode = WAL;",
-        )?;
-        guard.mark_pragmas_restored();
-
         stats.duration_secs = start.elapsed().as_secs_f64();
-
-        info!(
-            "Import complete: {} records in {:.1}s ({:.0}/sec), index rebuild: {:.2}s",
-            stats.records,
-            stats.duration_secs,
-            stats.rate(),
-            index_duration.as_secs_f64()
-        );
-
         Ok(stats)
     }
 
@@ -396,30 +306,10 @@ impl<'a> Importer<'a> {
         mode: ImportMode,
         progress: Option<ProgressCallback>,
     ) -> Result<ImportStats> {
-        let mut extractor = uls_parser::archive::ZipExtractor::open(zip_path)?;
-        let all_dat_files = extractor.list_dat_files();
-
-        // Determine which record types will be imported
-        let imported_types: Vec<String> = all_dat_files
-            .iter()
-            .filter(|f| mode.should_import_file(f))
-            .map(|f| f.split('.').next().unwrap_or("").to_uppercase())
-            .collect();
-
-        // Perform the import
-        let stats = self.import_zip_with_mode(zip_path, mode, progress)?;
-
-        // Only replace status after the import itself has committed
-        // successfully. A rejected archive must leave prior status intact.
-        self.db.clear_import_status(service)?;
-
-        // Record import status for each record type
-        // Note: We estimate record counts per type based on file structure
-        // For now, we just mark them as imported with 0 as placeholder count
-        for record_type in imported_types {
-            self.db.mark_imported(service, &record_type, 0)?;
-        }
-
+        let start = Instant::now();
+        let mut stats =
+            self.batch(|batch| batch.import_for_service(zip_path, service, mode, progress))?;
+        stats.duration_secs = start.elapsed().as_secs_f64();
         Ok(stats)
     }
 
@@ -437,6 +327,17 @@ impl<'a> Importer<'a> {
         zip_path: &Path,
         mode: ImportMode,
         progress: Option<ProgressCallback>,
+    ) -> Result<ImportStats> {
+        let conn = self.db.conn()?;
+        Self::import_patch_on_connection(&conn, zip_path, mode, progress, |_, _, _| Ok(()))
+    }
+
+    pub(super) fn import_patch_on_connection(
+        conn: &Connection,
+        zip_path: &Path,
+        mode: ImportMode,
+        progress: Option<ProgressCallback>,
+        before_commit: impl FnOnce(&Connection, &ImportStats, &[String]) -> Result<()>,
     ) -> Result<ImportStats> {
         let start = Instant::now();
 
@@ -476,7 +377,6 @@ impl<'a> Importer<'a> {
         // Daily patches are small enough to keep the database's normal WAL and
         // synchronous durability settings. Unlike full imports, do not drop
         // indexes or weaken durability while applying a patch.
-        let conn = self.db.conn()?;
         let transaction = conn.unchecked_transaction()?;
 
         // Create bulk inserter
@@ -562,6 +462,7 @@ impl<'a> Importer<'a> {
             transaction.rollback()?;
             return Err(error);
         }
+        before_commit(&transaction, &stats, &dat_files)?;
         transaction.commit()?;
 
         stats.duration_secs = start.elapsed().as_secs_f64();

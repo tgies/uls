@@ -631,6 +631,15 @@ impl Database {
     /// Mark record type as imported for a service.
     pub fn mark_imported(&self, service: &str, record_type: &str, count: usize) -> Result<()> {
         let conn = self.conn()?;
+        Self::mark_imported_conn(&conn, service, record_type, count)
+    }
+
+    pub(crate) fn mark_imported_conn(
+        conn: &Connection,
+        service: &str,
+        record_type: &str,
+        count: usize,
+    ) -> Result<()> {
         let now = chrono::Utc::now().to_rfc3339();
         conn.execute(
             "INSERT OR REPLACE INTO import_status (radio_service_code, record_type, imported_at, record_count) 
@@ -643,6 +652,10 @@ impl Database {
     /// Clear import status for a service (used when doing full re-import).
     pub fn clear_import_status(&self, service: &str) -> Result<()> {
         let conn = self.conn()?;
+        Self::clear_import_status_conn(&conn, service)
+    }
+
+    pub(crate) fn clear_import_status_conn(conn: &Connection, service: &str) -> Result<()> {
         conn.execute(
             "DELETE FROM import_status WHERE radio_service_code = ?1",
             params![service],
@@ -726,6 +739,17 @@ impl Database {
         record_count: Option<usize>,
     ) -> Result<()> {
         let conn = self.conn()?;
+        Self::record_applied_patch_conn(&conn, service, patch_date, weekday, etag, record_count)
+    }
+
+    pub(crate) fn record_applied_patch_conn(
+        conn: &Connection,
+        service: &str,
+        patch_date: chrono::NaiveDate,
+        weekday: &str,
+        etag: Option<&str>,
+        record_count: Option<usize>,
+    ) -> Result<()> {
         let now = chrono::Utc::now().to_rfc3339();
         let date_str = patch_date.format("%Y-%m-%d").to_string();
 
