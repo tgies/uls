@@ -1,7 +1,11 @@
 # Weekly import performance
 
-This work measures complete imports from fixed FCC weekly archives before
-selecting implementation changes. It does not change the published CLI version.
+This work measures complete imports from fixed FCC weekly archives. The selected
+implementation reuses parser buffers and keeps the existing serial importer.
+The bounded-thread prototypes are retained at the historical checkpoints below
+for reproducibility, rather than adding an unhelpful production option. Final
+full-size qualification remains pending. This does not change the published CLI
+version.
 
 ## Acceptance plan
 
@@ -41,7 +45,7 @@ Keep each variant's binary separately, then run:
 python3 scripts/compare-imports.py --inputs /path/to/fixed/archives \
   --output /path/to/new/results --repetitions 3 \
   --variant baseline /path/to/baseline stream \
-  --variant candidate /path/to/candidate pipeline
+  --variant candidate /path/to/candidate stream
 ```
 
 The driver makes its own archive copies and pre-reads them before every run.
@@ -60,8 +64,10 @@ WAL. `count-first` measures the removed progress-counting pass using the same
 baseline binary. This is a controlled reconstruction, not a timing claim about
 the separately published 0.1.7 binary and its older dependencies.
 
-The current prototype leaves pipelined parsing opt-in while qualifying it.
-It uses one parser, two queued batches of 256 records, and one SQLite writer.
+The historical pipeline prototype uses one parser, two queued batches of 256
+records, and one SQLite writer. To reproduce `pipeline` runs, build the exact
+prototype checkpoint below; the selected example accepts `count-first` and
+`stream`. The Python comparison driver still accepts historical pipeline binaries.
 The public `ParsedLine` representation and continuation semantics stay intact.
 The Rust 1.88 test run also required the existing `unty-next` benchmark
 dependency to move from 0.1.1 (which required Rust 1.90) to compatible 0.1.2.
@@ -81,7 +87,7 @@ afterward. This also checks replacement ordering and SQLite sequence values.
 
 ## Variant isolation and review checkpoint
 
-The tested source checkpoint is `1a478a67bc655667715993fa771d5325c96fdf4a`.
+The first comparison source checkpoint is `1a478a67bc655667715993fa771d5325c96fdf4a`.
 Build each source variant in its own checkout **and its own Cargo target
 directory**. Record each source and executable hash before running. An initial
 shared-target build reused an executable across different source trees; those
@@ -110,8 +116,7 @@ All 703 workspace tests and three doctests passed on Rust 1.88, as did
 current-stable workspace Clippy and formatting. Three independent comparison
 oracle tests and fresh/seeded smoke imports passed. The draft
 [PR #72](https://github.com/tgies/uls/pull/72) passed all 11 hosted checks at this
-checkpoint. Repeated full-size performance qualification and final default
-selection remain pending.
+checkpoint. Repeated full-size performance qualification was pending at that checkpoint.
 
 The [full-size workstation refresh check](benchmark-receipts/2026-09-11-import-wsl-refresh.json)
 also passed: both variants replaced existing data and produced identical full
@@ -143,11 +148,25 @@ seconds. Returning consumed batches to the parser for destruction and reuse
 reduced that to 13.24–13.32 seconds and 13.48–13.56 CPU seconds. This isolates
 handoff/ownership overhead; it does not establish a full-import speedup.
 
-The revised opt-in pipeline returns batches to their producer, consumes records
+The revised prototype at `54cccfbd633cbb709d6d2f9ee1112537ad3e5f85` returns
+batches to their producer, consumes records
 by reference and reuses at most four batch buffers. Both channels are bounded.
 Parser allocation/destruction stays on its thread except the last in-flight
 batches after it finishes or a consumer unwinds. Existing ordering and callback
 panic regressions pass, and the stream-error test now fails after multiple
 reuse cycles with a partial final batch. All 703 workspace tests, three doctests,
-Rust 1.88 formatting and current-stable Clippy passed again. The revised binary
-still needs repeated complete-import qualification before default selection.
+Rust 1.88 formatting and current-stable Clippy passed again. Repeated complete-import qualification is still running. Its first two
+recycled-pipeline samples took 276.11 and 278.22 seconds, versus 259.51 seconds
+for the first serial control, and used substantially more CPU. The earlier
+pipeline completed all three fresh samples with a 262.30-second median versus
+256.28 seconds for serial buffer reuse, also with more CPU work. These results
+support keeping the importer serial; final receipts will include every sample.
+
+The final candidate removes both pipeline prototypes and leaves
+`crates/uls-db/src/importer.rs` identical to the existing serial implementation.
+The parser file is identical to the buffer-reuse variant under measurement.
+Ordering, late stream-failure and callback-panic regressions remain. All 697
+selected workspace tests and three doctests, formatting and current-stable
+Clippy pass. The six duplicate mode cases were removed with the threading
+option. An exact-final-binary fresh and seeded comparison is running locally
+as a data-equivalence check, separately from the isolated performance estimates.

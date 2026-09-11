@@ -1,6 +1,6 @@
 //! Import fixed local archives into a new disposable database, without downloads.
 //!
-//! Usage: benchmark_import OUTPUT_DIR full|minimal count-first|stream|pipeline HA=ZIP ZA=ZIP [SEED=DB]
+//! Usage: benchmark_import OUTPUT_DIR full|minimal count-first|stream HA=ZIP ZA=ZIP [SEED=DB]
 //! The output directory must not exist. Timings exclude subsequent verification.
 
 use std::error::Error;
@@ -21,7 +21,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let args: Vec<_> = std::env::args().skip(1).collect();
     if args.len() < 4 {
         return Err(
-            "usage: benchmark_import OUTPUT_DIR full|minimal count-first|stream|pipeline HA=ZIP [ZA=ZIP] [SEED=DB]"
+            "usage: benchmark_import OUTPUT_DIR full|minimal count-first|stream HA=ZIP [ZA=ZIP] [SEED=DB]"
                 .into(),
         );
     }
@@ -33,8 +33,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     };
     let count_first = match args[2].as_str() {
         "count-first" => true,
-        "stream" | "pipeline" => false,
-        _ => return Err("expected count-first, stream or pipeline".into()),
+        "stream" => false,
+        _ => return Err("expected count-first or stream".into()),
     };
     let seeds: Vec<_> = args[3..]
         .iter()
@@ -90,9 +90,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         };
         let count_seconds = count_start.elapsed().as_secs_f64();
         let import_start = Instant::now();
-        let stats = Importer::new(&db)
-            .with_pipelined_parsing(args[2] == "pipeline")
-            .import_for_service(path, service, mode.clone(), None)?;
+        let stats = Importer::new(&db).import_for_service(path, service, mode.clone(), None)?;
         let import_seconds = import_start.elapsed().as_secs_f64();
         let report = json!({
             "service": service,
@@ -113,7 +111,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let report = json!({
         "mode": args[1],
         "count_first": count_first,
-        "pipelined_parsing": args[2] == "pipeline",
+        "pipelined_parsing": false,
         "seeded": !seeds.is_empty(),
         "seed_copy_seconds": seed_copy_seconds,
         "initialize_seconds": initialize_seconds,

@@ -58,14 +58,12 @@ fn weekly_zip(temp_dir: &TempDir) -> PathBuf {
 // import_for_service
 // =============================================================================
 
-#[rstest::rstest]
-#[case(false)]
-#[case(true)]
-fn test_import_for_service_records_import_status(#[case] pipelined: bool) {
+#[test]
+fn test_import_for_service_records_import_status() {
     let (temp_dir, db) = create_test_db();
     let zip = weekly_zip(&temp_dir);
 
-    let importer = Importer::new(&db).with_pipelined_parsing(pipelined);
+    let importer = Importer::new(&db);
     let stats = importer
         .import_for_service(&zip, "HA", ImportMode::Full, None)
         .unwrap();
@@ -87,14 +85,12 @@ fn test_import_for_service_records_import_status(#[case] pipelined: bool) {
     assert!(db.get_license_by_callsign("W1WEEK").unwrap().is_some());
 }
 
-#[rstest::rstest]
-#[case(false)]
-#[case(true)]
-fn test_import_for_service_minimal_skips_history(#[case] pipelined: bool) {
+#[test]
+fn test_import_for_service_minimal_skips_history() {
     let (temp_dir, db) = create_test_db();
     let zip = weekly_zip(&temp_dir);
 
-    let importer = Importer::new(&db).with_pipelined_parsing(pipelined);
+    let importer = Importer::new(&db);
     let stats = importer
         .import_for_service(&zip, "HA", ImportMode::Minimal, None)
         .unwrap();
@@ -108,10 +104,8 @@ fn test_import_for_service_minimal_skips_history(#[case] pipelined: bool) {
     assert!(!db.has_record_type("HA", "HS").unwrap());
 }
 
-#[rstest::rstest]
-#[case(false)]
-#[case(true)]
-fn test_import_for_service_clears_prior_status(#[case] pipelined: bool) {
+#[test]
+fn test_import_for_service_clears_prior_status() {
     let (temp_dir, db) = create_test_db();
 
     // Pre-seed a stale status entry that a fresh import should clear.
@@ -119,7 +113,7 @@ fn test_import_for_service_clears_prior_status(#[case] pipelined: bool) {
     assert!(db.has_record_type("HA", "LA").unwrap());
 
     let zip = weekly_zip(&temp_dir);
-    let importer = Importer::new(&db).with_pipelined_parsing(pipelined);
+    let importer = Importer::new(&db);
     importer
         .import_for_service(&zip, "HA", ImportMode::Full, None)
         .unwrap();
@@ -301,10 +295,8 @@ fn test_import_patch_insert_error_rolls_back() {
 // Error paths
 // =============================================================================
 
-#[rstest::rstest]
-#[case(false)]
-#[case(true)]
-fn test_weekly_records_remain_ordered_across_batches(#[case] pipelined: bool) {
+#[test]
+fn test_weekly_duplicate_records_preserve_input_and_dependency_order() {
     let (temp_dir, db) = create_test_db();
     let mut headers = String::new();
     for i in 0..1025 {
@@ -323,7 +315,6 @@ fn test_weekly_records_remain_ordered_across_batches(#[case] pipelined: bool) {
         ],
     );
     let stats = Importer::new(&db)
-        .with_pipelined_parsing(pipelined)
         .import_for_service(&zip, "HA", ImportMode::Full, None)
         .unwrap();
     assert_eq!(stats.records, 1026);
@@ -349,9 +340,9 @@ fn test_weekly_records_remain_ordered_across_batches(#[case] pipelined: bool) {
 }
 
 #[test]
-fn test_pipelined_progress_panic_cancels_worker_and_rolls_back() {
+fn test_weekly_progress_panic_rolls_back_and_restores_indexes() {
     let (temp_dir, db) = create_test_db();
-    let importer = Importer::new(&db).with_pipelined_parsing(true);
+    let importer = Importer::new(&db);
     importer
         .import_for_service(&weekly_zip(&temp_dir), "HA", ImportMode::Full, None)
         .unwrap();
@@ -396,19 +387,17 @@ fn test_pipelined_progress_panic_cancels_worker_and_rolls_back() {
         .unwrap();
 }
 
-#[rstest::rstest]
-#[case(false)]
-#[case(true)]
-fn test_import_for_service_stream_error_rolls_back_and_preserves_status(#[case] pipelined: bool) {
+#[test]
+fn test_import_for_service_stream_error_rolls_back_and_preserves_status() {
     let (temp_dir, db) = create_test_db();
-    let importer = Importer::new(&db).with_pipelined_parsing(pipelined);
+    let importer = Importer::new(&db);
     importer
         .import_for_service(&weekly_zip(&temp_dir), "HA", ImportMode::Full, None)
         .unwrap();
     db.mark_imported("HA", "LA", 999).unwrap();
 
     let mut malformed = hd_line("200002", "W2BAD", "A").into_bytes();
-    // Fail after several buffer-reuse cycles, with a final partial batch.
+    // Fail after many valid records have passed through the reused line buffer.
     for i in 0..2048 {
         malformed.extend_from_slice(hd_line(&(300000 + i).to_string(), "K1TEMP", "A").as_bytes());
     }
@@ -427,12 +416,10 @@ fn test_import_for_service_stream_error_rolls_back_and_preserves_status(#[case] 
     assert!(db.has_record_type("HA", "LA").unwrap());
 }
 
-#[rstest::rstest]
-#[case(false)]
-#[case(true)]
-fn test_import_for_service_insert_error_rolls_back_and_preserves_status(#[case] pipelined: bool) {
+#[test]
+fn test_import_for_service_insert_error_rolls_back_and_preserves_status() {
     let (temp_dir, db) = create_test_db();
-    let importer = Importer::new(&db).with_pipelined_parsing(pipelined);
+    let importer = Importer::new(&db);
     importer
         .import_for_service(&weekly_zip(&temp_dir), "HA", ImportMode::Full, None)
         .unwrap();
