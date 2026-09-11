@@ -1,0 +1,74 @@
+{
+  "source_commit": "1a478a67bc655667715993fa771d5325c96fdf4a",
+  "baseline_commit": "a47e55127b837a5bc480bc1fdd4d0ae4ab2c3be1",
+  "variants": {
+    "baseline": {
+      "binary_sha256": "497720100a58f82f568448cd7c8a63e19825d6dbc90ee5130bfa0537b60ba692",
+      "source_files_sha256": {
+        "Cargo.lock": "87577d3ae8c549580f68ff4c6577303c5ecd41ebd72e335d0057f6655b562714",
+        "crates/uls-parser/src/dat.rs": "f8888ea82f6d44947bda8e12f5993fe7011e48f45be90ae32047c6bb90f38c06",
+        "crates/uls-db/src/importer.rs": "fe1bccc940827d089b8faad9e4abdece0e3185e401ae5100ae8d71f9cac6e9cb",
+        "crates/uls-db/examples/benchmark_import.rs": "3a30de3f985e7cd63eb5719bfd5982390f6d892c5a71536a887a8dbeaf36daa3"
+      }
+    },
+    "candidate": {
+      "binary_sha256": "35a1e90f5325f49e30681f3a6690764df05f9cf3d8e6bb2c24c8324f42003ca2",
+      "source_files_sha256": {
+        "Cargo.lock": "87577d3ae8c549580f68ff4c6577303c5ecd41ebd72e335d0057f6655b562714",
+        "crates/uls-parser/src/dat.rs": "60cfeb9930ea6c1e8cfc6f5fe08e02280f50cc79b167d561e9f4988695683e11",
+        "crates/uls-db/src/importer.rs": "fe1bccc940827d089b8faad9e4abdece0e3185e401ae5100ae8d71f9cac6e9cb",
+        "crates/uls-db/examples/benchmark_import.rs": "3a30de3f985e7cd63eb5719bfd5982390f6d892c5a71536a887a8dbeaf36daa3"
+      }
+    },
+    "combined": {
+      "binary_sha256": "21025699c51b4abaa990c1601495d25e485e5f4399c5280c998bbc07540764dc",
+      "source_files_sha256": {
+        "Cargo.lock": "87577d3ae8c549580f68ff4c6577303c5ecd41ebd72e335d0057f6655b562714",
+        "crates/uls-parser/src/dat.rs": "60cfeb9930ea6c1e8cfc6f5fe08e02280f50cc79b167d561e9f4988695683e11",
+        "crates/uls-db/src/importer.rs": "c9482e07ed3111e42b1446a6c2604325993750c374be9c1bf165df08d629cd67",
+        "crates/uls-db/examples/benchmark_import.rs": "c9c35b79313a6daf58add68fe19190f5e8a997cdc29c28125ae9163416919a23"
+      }
+    }
+  },
+  "rustc": "rustc 1.88.0 (6b00bc388 2025-06-23)\nbinary: rustc\ncommit-hash: 6b00bc3880198600130e1cf62b8f8a93494488cc\ncommit-date: 2025-06-23\nhost: x86_64-unknown-linux-gnu\nrelease: 1.88.0\nLLVM version: 20.1.5\n",
+  "combined_index_patch_lines": [
+    "--- a/crates/uls-db/src/importer.rs\n",
+    "+++ b/crates/uls-db/src/importer.rs\n",
+    "@@ -385,7 +385,7 @@\n",
+    "         // Rebuild indexes (this is much faster than maintaining them during insert)\n",
+    "         let index_start = Instant::now();\n",
+    "         debug!(\"Rebuilding indexes after bulk import\");\n",
+    "-        Schema::create_indexes(&conn)?;\n",
+    "+        // Benchmark-only: the example rebuilds indexes after both services.\n",
+    "         guard.mark_indexes_restored();\n",
+    "         let index_duration = index_start.elapsed();\n",
+    "         debug!(\n",
+    "--- a/crates/uls-db/examples/benchmark_import.rs\n",
+    "+++ b/crates/uls-db/examples/benchmark_import.rs\n",
+    "@@ -108,6 +108,15 @@\n",
+    "         eprintln!(\"{report}\");\n",
+    "         reports.push(report);\n",
+    "     }\n",
+    "+    let index_start = Instant::now();\n",
+    "+    {\n",
+    "+        let conn = db.conn()?;\n",
+    "+        conn.execute_batch(\"PRAGMA synchronous=OFF; PRAGMA journal_mode=MEMORY; PRAGMA temp_store=MEMORY; PRAGMA cache_size=-64000;\")?;\n",
+    "+        uls_db::Schema::create_indexes(&conn)?;\n",
+    "+        conn.execute_batch(\"PRAGMA synchronous=NORMAL; PRAGMA journal_mode=WAL;\")?;\n",
+    "+    }\n",
+    "+    let combined_index_seconds = index_start.elapsed().as_secs_f64();\n",
+    "+    eprintln!(\"Combined index rebuild: {combined_index_seconds}\");\n",
+    "     drop(db);\n",
+    "     let elapsed_seconds = start.elapsed().as_secs_f64();\n",
+    "     let report = json!({\n",
+    "@@ -117,6 +126,7 @@\n",
+    "         \"seeded\": !seeds.is_empty(),\n",
+    "         \"seed_copy_seconds\": seed_copy_seconds,\n",
+    "         \"initialize_seconds\": initialize_seconds,\n",
+    "+        \"combined_index_seconds\": combined_index_seconds,\n",
+    "         \"elapsed_seconds\": elapsed_seconds,\n",
+    "         \"archives\": reports,\n",
+    "     });\n"
+  ],
+  "scope": "benchmark-only patch, not a production index restoration implementation"
+}

@@ -15,7 +15,7 @@ selecting implementation changes. It does not change the published CLI version.
       identify the orchestration changes required to use it safely.
 - [ ] Compare complete database contents, schema/indexes, and import reports;
       record time, CPU, peak memory, and cache conditions separately.
-- [ ] Run relevant regressions, workspace tests, formatting, and Clippy.
+- [x] Run relevant regressions, workspace tests, formatting, and Clippy.
 - [ ] Commit and merge selected changes; leave release-plz excluded.
 
 Run comparisons in disposable directories, using private copies of fixed
@@ -78,3 +78,38 @@ existing data as well as a fresh import. Every child copies the fixed seed into
 its new output directory. Its import timer excludes the copy; the outer process
 CPU/RSS and wall-time measurements include it. Source hashes are checked again
 afterward. This also checks replacement ordering and SQLite sequence values.
+
+
+## Variant isolation and review checkpoint
+
+The tested source checkpoint is `1a478a67bc655667715993fa771d5325c96fdf4a`.
+Build each source variant in its own checkout **and its own Cargo target
+directory**. Record each source and executable hash before running. An initial
+shared-target build reused an executable across different source trees; those
+artifacts were rejected before qualification. The rebuilt baseline, candidate
+and combined-index binaries have different verified hashes.
+
+The instrumented baseline restores only `crates/uls-parser/src/dat.rs` from
+`a47e55127b837a5bc480bc1fdd4d0ae4ab2c3be1`, using the same locked dependencies,
+benchmark example and serial importer as the candidate. Compare its
+`count-first` and `stream` modes to isolate the removed counting pass; compare
+baseline `stream` with candidate `stream` to isolate buffer reuse; compare
+candidate `stream` with `pipeline` to isolate the worker.
+
+The [source and binary receipt](benchmark-receipts/2026-09-11-import-provenance.json)
+includes the exact combined-index experiment as `combined_index_patch_lines`.
+Join those lines to recover a patch against the tested source checkpoint.
+Apply it only in a separate benchmark checkout. It defers successful index
+restoration to the example after both archives; the shipping importer does
+not defer indexes. A production implementation needs one owner for the
+complete service batch, including restoration on a later archive failure and
+preservation of per-archive status/source metadata. Independent CLI invocations
+cannot share the current restoration guard. The benchmark does not establish
+that production orchestration contract.
+
+All 703 workspace tests and three doctests passed on Rust 1.88, as did
+current-stable workspace Clippy and formatting. Three independent comparison
+oracle tests and fresh/seeded smoke imports passed. The draft
+[PR #72](https://github.com/tgies/uls/pull/72) passed all 11 hosted checks at this
+checkpoint. Repeated full-size performance qualification and final default
+selection remain pending.
