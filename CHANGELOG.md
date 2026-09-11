@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Reuse the DAT line buffer and inspect record prefixes without allocating
+  every field a second time.
 - Start weekly imports without decompressing every DAT file to count records
   first; progress now shows elapsed time and records processed.
 

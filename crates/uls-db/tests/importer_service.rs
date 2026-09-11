@@ -296,6 +296,98 @@ fn test_import_patch_insert_error_rolls_back() {
 // =============================================================================
 
 #[test]
+fn test_weekly_duplicate_records_preserve_input_and_dependency_order() {
+    let (temp_dir, db) = create_test_db();
+    let mut headers = String::new();
+    for i in 0..1025 {
+        headers.push_str(&hd_line(
+            &(100000 + i % 17).to_string(),
+            &format!("K{i}A"),
+            "A",
+        ));
+    }
+    let zip = write_zip(
+        &temp_dir,
+        "ordered.zip",
+        &[
+            ("EN.dat", b"EN|100000|||KFINAL|L||Final name\n"),
+            ("HD.dat", headers.as_bytes()),
+        ],
+    );
+    let stats = Importer::new(&db)
+        .import_for_service(&zip, "HA", ImportMode::Full, None)
+        .unwrap();
+    assert_eq!(stats.records, 1026);
+    assert_eq!(db.get_stats().unwrap().total_licenses, 17);
+    let conn = db.conn().unwrap();
+    for key in 0..17 {
+        let last = (0..1025).rev().find(|i| i % 17 == key).unwrap();
+        let callsign: String = conn
+            .query_row(
+                "SELECT call_sign FROM licenses WHERE unique_system_identifier = ?",
+                [100000 + key],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(callsign, format!("K{last}A"));
+    }
+    assert_eq!(
+        conn.query_row("SELECT COUNT(*) FROM entities", [], |row| row
+            .get::<_, i64>(0))
+            .unwrap(),
+        1
+    );
+}
+
+#[test]
+fn test_weekly_progress_panic_rolls_back_and_restores_indexes() {
+    let (temp_dir, db) = create_test_db();
+    let importer = Importer::new(&db);
+    importer
+        .import_for_service(&weekly_zip(&temp_dir), "HA", ImportMode::Full, None)
+        .unwrap();
+    let mut headers = String::new();
+    for i in 0..12000 {
+        headers.push_str(&hd_line(&(200000 + i).to_string(), "K1TEMP", "A"));
+    }
+    let zip = write_zip(
+        &temp_dir,
+        "cancelled.zip",
+        &[("HD.dat", headers.as_bytes())],
+    );
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        importer.import_for_service(
+            &zip,
+            "HA",
+            ImportMode::Full,
+            Some(Box::new(|_| panic!("progress callback failed"))),
+        )
+    }));
+    assert!(result.is_err());
+    assert!(db.get_license_by_callsign("K1TEMP").unwrap().is_none());
+    assert_eq!(db.get_stats().unwrap().total_licenses, 1);
+    assert!(db.has_record_type("HA", "AM").unwrap());
+    {
+        let conn = db.conn().unwrap();
+        let journal: String = conn
+            .query_row("PRAGMA journal_mode", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(journal, "wal");
+        let indexed: bool = conn
+            .query_row(
+                "SELECT EXISTS(SELECT 1 FROM sqlite_schema WHERE name = 'idx_licenses_call_sign')",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert!(indexed);
+    }
+    importer
+        .import_for_service(&weekly_zip(&temp_dir), "HA", ImportMode::Full, None)
+        .unwrap();
+}
+
+#[test]
 fn test_import_for_service_stream_error_rolls_back_and_preserves_status() {
     let (temp_dir, db) = create_test_db();
     let importer = Importer::new(&db);
@@ -305,6 +397,10 @@ fn test_import_for_service_stream_error_rolls_back_and_preserves_status() {
     db.mark_imported("HA", "LA", 999).unwrap();
 
     let mut malformed = hd_line("200002", "W2BAD", "A").into_bytes();
+    // Fail after many valid records have passed through the reused line buffer.
+    for i in 0..2048 {
+        malformed.extend_from_slice(hd_line(&(300000 + i).to_string(), "K1TEMP", "A").as_bytes());
+    }
     malformed.extend_from_slice(hd_line("200003", "W3TEMP", "A").as_bytes());
     malformed.extend_from_slice(&[0xff, b'\n']);
     let bad_weekly = write_zip(&temp_dir, "bad_weekly.zip", &[("HD.dat", &malformed)]);
@@ -316,6 +412,7 @@ fn test_import_for_service_stream_error_rolls_back_and_preserves_status() {
     assert!(db.get_license_by_callsign("W2BAD").unwrap().is_none());
     assert!(db.get_license_by_callsign("W3TEMP").unwrap().is_none());
     assert!(db.get_license_by_callsign("W1WEEK").unwrap().is_some());
+    assert_eq!(db.get_stats().unwrap().total_licenses, 1);
     assert!(db.has_record_type("HA", "LA").unwrap());
 }
 

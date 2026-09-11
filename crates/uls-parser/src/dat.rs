@@ -154,24 +154,9 @@ impl ParsedLine {
     }
 }
 
-/// Parse a raw line string for fields, without requiring it to be a valid record.
-fn parse_raw_fields(line: &str) -> Vec<String> {
-    line.split('|').map(|s| s.to_string()).collect()
-}
-
 /// Check if a line is a continuation (doesn't start with a valid record type).
 fn is_continuation_line(line: &str) -> bool {
-    if line.is_empty() {
-        return true;
-    }
-
-    let fields = parse_raw_fields(line);
-    if fields.is_empty() {
-        return true;
-    }
-
-    let first_field = &fields[0];
-    !is_valid_record_type(first_field)
+    !is_valid_record_type(line.split('|').next().unwrap_or(""))
 }
 
 /// Reader for DAT files that yields parsed lines.
@@ -196,19 +181,20 @@ impl<R: Read> DatReader<R> {
     }
 
     /// Read a raw line from the file.
-    fn read_raw_line(&mut self) -> Result<Option<String>> {
+    fn read_raw_line(&mut self) -> Result<bool> {
         self.buffer.clear();
         let bytes_read = self.reader.read_line(&mut self.buffer)?;
 
         if bytes_read == 0 {
-            return Ok(None);
+            return Ok(false);
         }
 
         self.line_number += 1;
 
         // Trim trailing newlines/carriage returns
-        let line = self.buffer.trim_end_matches(&['\r', '\n'][..]).to_string();
-        Ok(Some(line))
+        let length = self.buffer.trim_end_matches(&['\r', '\n'][..]).len();
+        self.buffer.truncate(length);
+        Ok(true)
     }
 
     /// Read the next complete record from the file.
@@ -216,27 +202,27 @@ impl<R: Read> DatReader<R> {
     pub fn next_line(&mut self) -> Result<Option<ParsedLine>> {
         loop {
             match self.read_raw_line()? {
-                None => {
+                false => {
                     // EOF - return any pending record
                     return Ok(self.pending_record.take());
                 }
-                Some(line) => {
-                    if line.is_empty() {
+                true => {
+                    if self.buffer.is_empty() {
                         // Skip truly empty lines
                         continue;
                     }
 
-                    if is_continuation_line(&line) {
+                    if is_continuation_line(&self.buffer) {
                         // This is a continuation - append to pending record if we have one
                         if let Some(ref mut pending) = self.pending_record {
-                            pending.append_continuation(&line);
+                            pending.append_continuation(&self.buffer);
                         }
                         // If no pending record, we just skip orphan continuation lines
                         continue;
                     }
 
                     // This is a new record
-                    let new_record = ParsedLine::from_line(&line, self.line_number)?;
+                    let new_record = ParsedLine::from_line(&self.buffer, self.line_number)?;
 
                     // Return the previous pending record (if any) and buffer this new one
                     let to_return = self.pending_record.replace(new_record);
@@ -561,6 +547,22 @@ mod tests {
         let second = reader.next_line().unwrap().unwrap();
         assert_eq!(second.field(3), "W2AW");
         assert!(reader.next_line().unwrap().is_none());
+    }
+
+    #[test]
+    fn test_reader_prefixes_unicode_and_reused_buffer() {
+        let data = "orphan\r\nCO|1||W1AW|01/01/2024|Résumé||\r\n\r\nHDextended| café ||\r\nHD\r\nEN|2|||W2AW|L||Later record";
+        let records: Vec<_> = DatReader::new(data.as_bytes())
+            .map(|r| r.unwrap())
+            .collect();
+        assert_eq!(records.len(), 3);
+        assert_eq!(records[0].line_number, 2);
+        assert_eq!(records[0].field(5), "Résumé HDextended| café");
+        assert_eq!(records[0].field(6), "");
+        assert_eq!(records[1].line_number, 5);
+        assert_eq!(records[1].fields, ["HD"]);
+        assert_eq!(records[2].line_number, 6);
+        assert_eq!(records[2].field(7), "Later record");
     }
 
     #[test]

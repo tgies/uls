@@ -1,0 +1,190 @@
+{
+  "scope": "exploratory parse/record-handoff diagnostic; no SQLite insertion or index rebuilding",
+  "source_dependencies_commit": "1a478a67bc655667715993fa771d5325c96fdf4a",
+  "rustc": "1.88.0, -O -C lto=fat -C codegen-units=1; linked matching candidate release rlibs",
+  "kernel": "6.18.40.1-microsoft-standard-WSL2",
+  "cpu_affinity": [
+    0,
+    1
+  ],
+  "input_archives": {
+    "l_amat.zip": {
+      "source": "/home/tgies/.cache/uls/l_amat.zip",
+      "sha256": "82fcd37ecdf3f82b68382c2c0d831cc7ea83c313ecd17f0566335d94018eaf8c",
+      "bytes": 198102897,
+      "source_mtime_ns": 1786326088031585098
+    },
+    "l_gmrs.zip": {
+      "source": "/home/tgies/.cache/uls/l_gmrs.zip",
+      "sha256": "efa2c1489c04f6a17468eef29e20215cd69995fddecfaadec44cdbb50ef0a87c",
+      "bytes": 53697810,
+      "source_mtime_ns": 1786326497807578240
+    }
+  },
+  "binary_sha256": "aaf0a069dc4bd00b00ead50dcd84ee263b96495ead2d3e479345b3fcf34af2da",
+  "source_lines": [
+    "use std::{error::Error,path::Path,sync::mpsc::sync_channel,time::Instant};\n",
+    "use uls_parser::archive::ZipExtractor;\n",
+    "use uls_core::records::UlsRecord;\n",
+    "fn consume(record: uls_parser::Result<UlsRecord>) -> Result<(),Box<dyn Error>> {\n",
+    "    let record=record?;\n",
+    "    std::hint::black_box(&record);\n",
+    "    Ok(())\n",
+    "}\n",
+    "fn main()->Result<(),Box<dyn Error>> {\n",
+    "    let args:Vec<_>=std::env::args().skip(1).collect();\n",
+    "    let mode=args.first().ok_or(\"expected serial, records or counts\")?;\n",
+    "    if ![\"serial\",\"records\",\"counts\",\"recycle\"].contains(&mode.as_str()) {return Err(\"invalid mode\".into())}\n",
+    "    let start=Instant::now();\n",
+    "    let mut records=0usize;\n",
+    "    for path in &args[1..] {\n",
+    "        let mut zip=ZipExtractor::open(Path::new(path))?;\n",
+    "        for file in zip.list_dat_files() {\n",
+    "            if mode==\"serial\" {\n",
+    "                zip.process_dat_streaming(&file,|line|{consume(line.to_record()).unwrap(); records+=1;true})?;\n",
+    "            } else if mode==\"recycle\" {\n",
+    "                let count=std::thread::scope(|scope|->Result<usize,uls_parser::ParseError>{\n",
+    "                    let (sender,receiver)=sync_channel(2);\n",
+    "                    let (recycle,returned)=sync_channel::<Vec<uls_parser::Result<UlsRecord>>>(3);\n",
+    "                    let source=&mut zip;\n",
+    "                    let worker=scope.spawn(move ||{\n",
+    "                        let mut batch=Vec::with_capacity(256);\n",
+    "                        let result=source.process_dat_streaming(&file,|line|{\n",
+    "                            batch.push(line.to_record());\n",
+    "                            if batch.len()==256 {\n",
+    "                                sender.send(std::mem::take(&mut batch)).unwrap();\n",
+    "                                batch=returned.try_recv().unwrap_or_else(|_|Vec::with_capacity(256));\n",
+    "                                batch.clear();\n",
+    "                            }\n",
+    "                            true\n",
+    "                        });\n",
+    "                        if !batch.is_empty() {sender.send(batch).unwrap();}\n",
+    "                        result\n",
+    "                    });\n",
+    "                    let mut count=0;\n",
+    "                    for batch in receiver {\n",
+    "                        for record in &batch {\n",
+    "                            std::hint::black_box(record.as_ref().unwrap());count+=1;\n",
+    "                        }\n",
+    "                        let _=recycle.send(batch);\n",
+    "                    }\n",
+    "                    assert_eq!(worker.join().unwrap()?,count);\n",
+    "                    Ok(count)\n",
+    "                })?;\n",
+    "                records+=count;\n",
+    "            } else if mode==\"records\" {\n",
+    "                let count=std::thread::scope(|scope|->Result<usize,uls_parser::ParseError>{\n",
+    "                    let (sender,receiver)=sync_channel(2);\n",
+    "                    let source=&mut zip;\n",
+    "                    let worker=scope.spawn(move ||{\n",
+    "                        let mut batch=Vec::with_capacity(256);\n",
+    "                        let result=source.process_dat_streaming(&file,|line|{\n",
+    "                            batch.push(line.to_record());\n",
+    "                            if batch.len()==256 { sender.send(std::mem::replace(&mut batch,Vec::with_capacity(256))).unwrap(); }\n",
+    "                            true\n",
+    "                        });\n",
+    "                        if !batch.is_empty() {sender.send(batch).unwrap();}\n",
+    "                        result\n",
+    "                    });\n",
+    "                    let mut count=0;\n",
+    "                    for batch in receiver {for record in batch {consume(record).unwrap();count+=1;}}\n",
+    "                    assert_eq!(worker.join().unwrap()?,count);\n",
+    "                    Ok(count)\n",
+    "                })?;\n",
+    "                records+=count;\n",
+    "            } else {\n",
+    "                let count=std::thread::scope(|scope|->Result<usize,uls_parser::ParseError>{\n",
+    "                    let (sender,receiver)=sync_channel(2);\n",
+    "                    let source=&mut zip;\n",
+    "                    let worker=scope.spawn(move ||{\n",
+    "                        let mut batch=0;\n",
+    "                        let result=source.process_dat_streaming(&file,|line|{\n",
+    "                            consume(line.to_record()).unwrap();batch+=1;\n",
+    "                            if batch==256 {sender.send(batch).unwrap();batch=0;}\n",
+    "                            true\n",
+    "                        });\n",
+    "                        if batch!=0 {sender.send(batch).unwrap();}\n",
+    "                        result\n",
+    "                    });\n",
+    "                    let count:usize=receiver.into_iter().sum();\n",
+    "                    assert_eq!(worker.join().unwrap()?,count);\n",
+    "                    Ok(count)\n",
+    "                })?;\n",
+    "                records+=count;\n",
+    "            }\n",
+    "        }\n",
+    "    }\n",
+    "    assert_eq!(records,12_918_713);\n",
+    "    println!(\"mode={mode} records={records} seconds={}\",start.elapsed().as_secs_f64());\n",
+    "    Ok(())\n",
+    "}\n"
+  ],
+  "runs": [
+    {
+      "mode": "serial",
+      "repetition": 1,
+      "output": "mode=serial records=12918713 seconds=10.398917523",
+      "resources": {
+        "wall": 10.39,
+        "user": 10.31,
+        "sys": 0.07,
+        "rss_kib": 2564
+      }
+    },
+    {
+      "mode": "serial",
+      "repetition": 2,
+      "output": "mode=serial records=12918713 seconds=10.618844655",
+      "resources": {
+        "wall": 10.61,
+        "user": 10.58,
+        "sys": 0.03,
+        "rss_kib": 2532
+      }
+    },
+    {
+      "mode": "records",
+      "repetition": 1,
+      "output": "mode=records records=12918713 seconds=16.833697787",
+      "resources": {
+        "wall": 16.83,
+        "user": 18.79,
+        "sys": 1.25,
+        "rss_kib": 3944
+      }
+    },
+    {
+      "mode": "records",
+      "repetition": 2,
+      "output": "mode=records records=12918713 seconds=17.147019406",
+      "resources": {
+        "wall": 17.14,
+        "user": 18.93,
+        "sys": 1.42,
+        "rss_kib": 3908
+      }
+    },
+    {
+      "mode": "recycle",
+      "repetition": 1,
+      "output": "mode=recycle records=12918713 seconds=13.248241311",
+      "resources": {
+        "wall": 13.24,
+        "user": 12.8,
+        "sys": 0.68,
+        "rss_kib": 3808
+      }
+    },
+    {
+      "mode": "recycle",
+      "repetition": 2,
+      "output": "mode=recycle records=12918713 seconds=13.329986171",
+      "resources": {
+        "wall": 13.32,
+        "user": 12.92,
+        "sys": 0.64,
+        "rss_kib": 4012
+      }
+    }
+  ]
+}

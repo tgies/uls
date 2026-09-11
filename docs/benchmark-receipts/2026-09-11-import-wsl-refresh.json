@@ -1,0 +1,125 @@
+{
+  "format": "uls.import_benchmark.v1",
+  "cpu_affinity": [
+    0,
+    1
+  ],
+  "sqlite_verifier": "3.53.2 2026-06-03 19:12:13 d6e03d8c777cfa2d35e3b60d8ec3e0187f3e9f99d8e2ee9cac695fd6fcdf1a24 (64-bit)",
+  "inputs_sha256": {
+    "l_amat.zip": "82fcd37ecdf3f82b68382c2c0d831cc7ea83c313ecd17f0566335d94018eaf8c",
+    "l_gmrs.zip": "efa2c1489c04f6a17468eef29e20215cd69995fddecfaadec44cdbb50ef0a87c",
+    "import.db": "f6e39eaec10586b421b1d2c675cdf990126244ab2b4075c832ec2bf46a5dd08f"
+  },
+  "binaries_sha256": {
+    "baseline-import": "497720100a58f82f568448cd7c8a63e19825d6dbc90ee5130bfa0537b60ba692",
+    "candidate-import": "35a1e90f5325f49e30681f3a6690764df05f9cf3d8e6bb2c24c8324f42003ca2"
+  },
+  "cache_condition": "archive files sequentially pre-read before every run; fresh output database",
+  "seeded_refresh": true,
+  "resource_scope": "complete child process, including seed copy when requested; report.elapsed_seconds excludes seed copy",
+  "database_comparison": "all rows including primary keys and sequence state; imported_at timestamps checked but excluded from digest",
+  "runs": [
+    {
+      "variant": "baseline_stream",
+      "mode": "stream",
+      "repetition": 1,
+      "resources": {
+        "wall_seconds": 390.41,
+        "user_seconds": 253.32,
+        "system_seconds": 22.85,
+        "max_rss_kib": 1323164
+      },
+      "report": {
+        "archives": [
+          {
+            "archive": "l_amat.zip",
+            "count_seconds": 1e-07,
+            "counts": null,
+            "files": 8,
+            "import_seconds": 268.4760986,
+            "insert_errors": 0,
+            "parse_errors": 0,
+            "records": 10514698,
+            "service": "HA"
+          },
+          {
+            "archive": "l_gmrs.zip",
+            "count_seconds": 1e-07,
+            "counts": null,
+            "files": 6,
+            "import_seconds": 73.522866882,
+            "insert_errors": 0,
+            "parse_errors": 0,
+            "records": 2404015,
+            "service": "ZA"
+          }
+        ],
+        "count_first": false,
+        "elapsed_seconds": 343.458391935,
+        "initialize_seconds": 1.44784173,
+        "mode": "full",
+        "pipelined_parsing": false,
+        "seed_copy_seconds": 46.947837312,
+        "seeded": true
+      },
+      "database_bytes": 1903443968,
+      "database_equal": true,
+      "stats_equal": true
+    },
+    {
+      "variant": "pipeline",
+      "mode": "pipeline",
+      "repetition": 1,
+      "resources": {
+        "wall_seconds": 280.72,
+        "user_seconds": 218.17,
+        "system_seconds": 17.73,
+        "max_rss_kib": 1325472
+      },
+      "report": {
+        "archives": [
+          {
+            "archive": "l_amat.zip",
+            "count_seconds": 1e-07,
+            "counts": null,
+            "files": 8,
+            "import_seconds": 221.352590985,
+            "insert_errors": 0,
+            "parse_errors": 0,
+            "records": 10514698,
+            "service": "HA"
+          },
+          {
+            "archive": "l_gmrs.zip",
+            "count_seconds": 1e-07,
+            "counts": null,
+            "files": 6,
+            "import_seconds": 50.76182872,
+            "insert_errors": 0,
+            "parse_errors": 0,
+            "records": 2404015,
+            "service": "ZA"
+          }
+        ],
+        "count_first": false,
+        "elapsed_seconds": 275.280689259,
+        "initialize_seconds": 3.150411275,
+        "mode": "full",
+        "pipelined_parsing": true,
+        "seed_copy_seconds": 5.44052214,
+        "seeded": true
+      },
+      "database_bytes": 1903443968,
+      "database_equal": true,
+      "stats_equal": true
+    }
+  ],
+  "inputs_unchanged": true,
+  "all_databases_equal": true,
+  "environment": {
+    "kind": "shared WSL workstation",
+    "kernel": "6.18.40.1-microsoft-standard-WSL2",
+    "logical_cpus_available_to_benchmark": 2,
+    "scope": "exploratory, one sample per variant"
+  }
+}
