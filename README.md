@@ -77,6 +77,12 @@ An unreachable target is rejected before database initialization or migration.
 Each imported archive is transactional. If a later archive fails, the command
 returns an error while retaining only the earlier, valid contiguous prefix.
 
+To apply both services in one process, use `--service all --through DATE`.
+Both routes are planned before any archive is imported; weekly imports share
+index rebuilding. The command returns one `uls.update_batch_result` document
+containing the two service results. See [coordinated imports](docs/coordinated-import.md)
+for the result format, transactional metadata and retry behavior.
+
 ## Configuration
 
 Environment variables:

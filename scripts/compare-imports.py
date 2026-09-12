@@ -90,6 +90,7 @@ def main():
                         metavar=("NAME", "BINARY", "MODE"))
     parser.add_argument("--repetitions", type=int, default=3)
     parser.add_argument("--keep-databases", action="store_true")
+    parser.add_argument("--daily-inputs", type=Path, help="fixed HA/ZA daily ZIPs inserted after each service weekly")
     parser.add_argument("--seed", type=Path, help="completed benchmark database to copy before each refresh")
     args = parser.parse_args()
     if args.repetitions < 1:
@@ -101,10 +102,15 @@ def main():
     for _, binary, mode in binaries:
         if not binary.is_file() or not os.access(binary, os.X_OK):
             parser.error(f"not an executable: {binary}")
-        if mode not in ["count-first", "stream", "pipeline"]:
+        if mode not in ["count-first", "stream", "pipeline", "batch"]:
             parser.error(f"unknown mode: {mode}")
     sources = [(service, (args.inputs / name).resolve(strict=True))
                for service, name in [("HA", "l_amat.zip"), ("ZA", "l_gmrs.zip")]]
+    if args.daily_inputs:
+        sources = [item for service, source in sources for item in [
+            (service, source),
+            (service + "_DAILY", (args.daily_inputs / ("l_amat_daily.zip" if service == "HA" else "l_gmrs_daily.zip")).resolve(strict=True))
+        ]]
     args.output.mkdir(mode=0o700)
     output = args.output.resolve()
     private_inputs = output / "inputs"

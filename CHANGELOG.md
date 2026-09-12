@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Update Amateur and GMRS to one exact date with `update --service all --through`,
+  sharing index restoration across weekly imports and returning a versioned batch result.
+
+### Fixed
+
+- Commit archive data and its update metadata together, preserving earlier
+  committed archives and restoring indexes/settings when a later import fails.
+
 ### Changed
 
 - Reuse the DAT line buffer and inspect record prefixes without allocating

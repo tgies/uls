@@ -1,0 +1,1821 @@
+{
+  "format": "uls.coordinated_import_qualification.v1",
+  "comparison_source": {
+    "source_sha256": {
+      "crates/uls-db/src/importer.rs": "76ed5e490369b65fb6add353589a607be20659c000fabec82f8a4bac4d755f77",
+      "crates/uls-db/src/importer/batch.rs": "9dbbef807afe5ad8ab11d596dea3fada133dd3c320fed9fd11fa9c9a3bdb6f2e",
+      "crates/uls-db/src/repository.rs": "d828cb21078ec706d30b6c22f2226dc1bac13507ba1831b87866fc529c9161ff",
+      "crates/uls-db/src/lib.rs": "112920493f2eb683f42c48614396f1243fabdadd494cb2e7ef89785a44ee3a33",
+      "crates/uls-parser/src/dat.rs": "60cfeb9930ea6c1e8cfc6f5fe08e02280f50cc79b167d561e9f4988695683e11",
+      "crates/uls-cli/src/commands/update.rs": "54ebc52e028b39107aed21222f0e8130dfe172ba26d1bf8056ab1bf6d7b9aa78",
+      "crates/uls-cli/src/commands/update/batch.rs": "950cc289b4bc9cccdb85f0cb22174da79f0b700368681b5e97931ecba7531a91",
+      "crates/uls-db/examples/benchmark_import.rs": "4ed853a327a02eba553c2bd301f524d11c856a082550427ad2a8f977f7eec760",
+      "scripts/compare-imports.py": "fb8c37a9f39f91c0e6ef0cfbbd91ea95e30197b20223b63c3dccc154d1a14c96",
+      "Cargo.lock": "87577d3ae8c549580f68ff4c6577303c5ecd41ebd72e335d0057f6655b562714"
+    },
+    "binary_sha256": "dff44ecafd9be9e38424c9d2b3718204d471ce84eb52a3d47ccd65e7f59097b6",
+    "compiler": "rustc 1.88.0 (6b00bc388 2025-06-23)\nbinary: rustc\ncommit-hash: 6b00bc3880198600130e1cf62b8f8a93494488cc\ncommit-date: 2025-06-23\nhost: x86_64-unknown-linux-gnu\nrelease: 1.88.0\nLLVM version: 20.1.5\n",
+    "hardware": {
+      "lscpu": [
+        {
+          "field": "Architecture:",
+          "data": "x86_64"
+        },
+        {
+          "field": "CPU op-mode(s):",
+          "data": "32-bit, 64-bit"
+        },
+        {
+          "field": "Address sizes:",
+          "data": "46 bits physical, 48 bits virtual"
+        },
+        {
+          "field": "Byte Order:",
+          "data": "Little Endian"
+        },
+        {
+          "field": "CPU(s):",
+          "data": "20"
+        },
+        {
+          "field": "On-line CPU(s) list:",
+          "data": "0-19"
+        },
+        {
+          "field": "Vendor ID:",
+          "data": "GenuineIntel"
+        },
+        {
+          "field": "Model name:",
+          "data": "12th Gen Intel(R) Core(TM) i7-12800H"
+        },
+        {
+          "field": "CPU family:",
+          "data": "6"
+        },
+        {
+          "field": "Model:",
+          "data": "154"
+        },
+        {
+          "field": "Thread(s) per core:",
+          "data": "2"
+        },
+        {
+          "field": "Core(s) per socket:",
+          "data": "10"
+        },
+        {
+          "field": "Socket(s):",
+          "data": "1"
+        },
+        {
+          "field": "Stepping:",
+          "data": "3"
+        },
+        {
+          "field": "Microcode version:",
+          "data": "0xffffffff"
+        },
+        {
+          "field": "BogoMIPS:",
+          "data": "5606.41"
+        },
+        {
+          "field": "Flags:",
+          "data": "fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ss ht syscall nx pdpe1gb rdtscp lm constant_tsc rep_good nopl xtopology tsc_reliable nonstop_tsc cpuid tsc_known_freq pni pclmulqdq vmx ssse3 fma cx16 pcid sse4_1 sse4_2 x2apic movbe popcnt tsc_deadline_timer aes xsave avx f16c rdrand hypervisor lahf_lm abm 3dnowprefetch ssbd ibrs ibpb stibp ibrs_enhanced tpr_shadow ept vpid ept_ad fsgsbase tsc_adjust bmi1 avx2 smep bmi2 erms invpcid rdseed adx smap clflushopt clwb sha_ni xsaveopt xsavec xgetbv1 xsaves avx_vnni vnmi umip waitpkg gfni vaes vpclmulqdq rdpid movdiri movdir64b fsrm md_clear serialize ibt flush_l1d arch_capabilities"
+        },
+        {
+          "field": "Virtualization:",
+          "data": "VT-x"
+        },
+        {
+          "field": "Hypervisor vendor:",
+          "data": "Microsoft"
+        },
+        {
+          "field": "Virtualization type:",
+          "data": "full"
+        },
+        {
+          "field": "L1d cache:",
+          "data": "480 KiB (10 instances)"
+        },
+        {
+          "field": "L1i cache:",
+          "data": "320 KiB (10 instances)"
+        },
+        {
+          "field": "L2 cache:",
+          "data": "12.5 MiB (10 instances)"
+        },
+        {
+          "field": "L3 cache:",
+          "data": "24 MiB (1 instance)"
+        },
+        {
+          "field": "NUMA node(s):",
+          "data": "1"
+        },
+        {
+          "field": "NUMA node0 CPU(s):",
+          "data": "0-19"
+        },
+        {
+          "field": "Vulnerability Gather data sampling:",
+          "data": "Not affected"
+        },
+        {
+          "field": "Vulnerability Ghostwrite:",
+          "data": "Not affected"
+        },
+        {
+          "field": "Vulnerability Indirect target selection:",
+          "data": "Not affected"
+        },
+        {
+          "field": "Vulnerability Itlb multihit:",
+          "data": "Not affected"
+        },
+        {
+          "field": "Vulnerability L1tf:",
+          "data": "Not affected"
+        },
+        {
+          "field": "Vulnerability Mds:",
+          "data": "Not affected"
+        },
+        {
+          "field": "Vulnerability Meltdown:",
+          "data": "Not affected"
+        },
+        {
+          "field": "Vulnerability Mmio stale data:",
+          "data": "Not affected"
+        },
+        {
+          "field": "Vulnerability Old microcode:",
+          "data": "Not affected"
+        },
+        {
+          "field": "Vulnerability Reg file data sampling:",
+          "data": "Mitigation; Clear Register File"
+        },
+        {
+          "field": "Vulnerability Retbleed:",
+          "data": "Mitigation; Enhanced IBRS"
+        },
+        {
+          "field": "Vulnerability Spec rstack overflow:",
+          "data": "Not affected"
+        },
+        {
+          "field": "Vulnerability Spec store bypass:",
+          "data": "Mitigation; Speculative Store Bypass disabled via prctl"
+        },
+        {
+          "field": "Vulnerability Spectre v1:",
+          "data": "Mitigation; usercopy/swapgs barriers and __user pointer sanitization"
+        },
+        {
+          "field": "Vulnerability Spectre v2:",
+          "data": "Mitigation; Enhanced / Automatic IBRS; IBPB conditional; PBRSB-eIBRS SW sequence; BHI BHI_DIS_S"
+        },
+        {
+          "field": "Vulnerability Srbds:",
+          "data": "Not affected"
+        },
+        {
+          "field": "Vulnerability Tsa:",
+          "data": "Not affected"
+        },
+        {
+          "field": "Vulnerability Tsx async abort:",
+          "data": "Not affected"
+        },
+        {
+          "field": "Vulnerability Vmscape:",
+          "data": "Not affected"
+        }
+      ]
+    },
+    "affinity": [
+      18,
+      19
+    ],
+    "network": "private unshare user/network namespace; no interfaces configured",
+    "deadline_seconds": 7200,
+    "scope": "WSL controlled comparison; fixed preread archives, fresh private DB per run, copies of fixed seed; timing excludes verification; not production hardware or production latency",
+    "source_commit": "7a8f2cfcc549b566a99731278fabdb3de35d25fe",
+    "source_tree": "b9b7c0be7a53fb85c063c68cfac21cc2bd215fdd"
+  },
+  "final_source": {
+    "base_commit": "7a8f2cfcc549b566a99731278fabdb3de35d25fe",
+    "index_tree": "d2051277d0eaffaed33b35818df3376d74353b5d",
+    "source_sha256": {
+      "crates/uls-db/src/importer.rs": "5502342d9da7c0761678eec47cdc5d0f68789cf6d561f251177d1d46bd9521c7",
+      "crates/uls-db/src/importer/batch.rs": "9c0d61d735630209cf279702a365e903de14a725be71bd47984b40d7c4cc9082",
+      "crates/uls-db/src/repository.rs": "d828cb21078ec706d30b6c22f2226dc1bac13507ba1831b87866fc529c9161ff",
+      "crates/uls-db/src/lib.rs": "112920493f2eb683f42c48614396f1243fabdadd494cb2e7ef89785a44ee3a33",
+      "crates/uls-parser/src/dat.rs": "60cfeb9930ea6c1e8cfc6f5fe08e02280f50cc79b167d561e9f4988695683e11",
+      "crates/uls-cli/src/commands/update.rs": "54ebc52e028b39107aed21222f0e8130dfe172ba26d1bf8056ab1bf6d7b9aa78",
+      "crates/uls-cli/src/commands/update/batch.rs": "2993f2fa1651cbfe89ab5cd2c288ab5a43542d82eb8a45d5f75cdb9b650841c1",
+      "crates/uls-db/examples/benchmark_import.rs": "4ed853a327a02eba553c2bd301f524d11c856a082550427ad2a8f977f7eec760",
+      "scripts/compare-imports.py": "fb8c37a9f39f91c0e6ef0cfbbd91ea95e30197b20223b63c3dccc154d1a14c96",
+      "Cargo.lock": "87577d3ae8c549580f68ff4c6577303c5ecd41ebd72e335d0057f6655b562714"
+    },
+    "binary_sha256": "025d8d3cddbd55c3d49748dd9f73da5c52f667b6dbe0fee0ebdcb987532faba0",
+    "scope": "Binary built from the listed source hashes and index tree, including the setup-retry fix."
+  },
+  "scope": "WSL comparison with fixed pre-read archives, one fresh private output per run, and rotated variant order. Logical CPU affinity 18/19 and imports in a private network namespace. Other workstation activity was not globally stopped. Not production latency or a cold-cache comparison.",
+  "timing_scope": "Import timing includes DB initialization, all archives and final index/PRAGMA restoration, excluding seed copy and verification. Whole-process wall/CPU includes seed copy. Final-binary samples verify equivalence, not repeated performance.",
+  "fresh_batch_2_wall_outlier": {
+    "process_seconds": 161.05,
+    "import_seconds": 92.869990962,
+    "status": "Retained without adjustment; cause unproven. No matching Windows sleep/resume events in the checked interval."
+  },
+  "daily_fixture_scope": "Synthetic replay workload selected deterministically from the fixed weekly archives, preserving record order and related records. Not observed production daily inputs. Daily source-metadata behavior is covered by CLI/library regression tests.",
+  "daily_fixtures": {
+    "l_amat": {
+      "source_sha256": "82fcd37ecdf3f82b68382c2c0d831cc7ea83c313ecd17f0566335d94018eaf8c",
+      "zip_sha256": "17f3a6ef1992e5bfeb0f32032fb9b0e892a57b736f02e4c37ff3b9527ce7c343",
+      "selected_licenses": 1000,
+      "stride": 1690,
+      "selection": "first 1000 HD rows at every stride, and all related DAT records, original byte order and values",
+      "records": {
+        "AM.dat": 999,
+        "CO.dat": 144,
+        "EN.dat": 1000,
+        "HD.dat": 1000,
+        "HS.dat": 3020,
+        "LA.dat": 0,
+        "SC.dat": 32,
+        "SF.dat": 0
+      }
+    },
+    "l_gmrs": {
+      "source_sha256": "efa2c1489c04f6a17468eef29e20215cd69995fddecfaadec44cdbb50ef0a87c",
+      "zip_sha256": "2cfc3e49ff24b618ba105b6ed970e2dc97ef015531671961cc85e257946cd4fd",
+      "selected_licenses": 993,
+      "stride": 609,
+      "selection": "first 1000 HD rows at every stride, and all related DAT records, original byte order and values",
+      "records": {
+        "CO.dat": 0,
+        "EN.dat": 993,
+        "HD.dat": 993,
+        "HS.dat": 1758,
+        "LA.dat": 0,
+        "SC.dat": 257
+      }
+    }
+  },
+  "comparisons": {
+    "fresh": {
+      "medians": {
+        "baseline": {
+          "import_seconds": 117.592491672,
+          "process_wall_seconds": 117.6,
+          "process_cpu_seconds": 110.47,
+          "max_rss_kib": 620856
+        },
+        "batch": {
+          "import_seconds": 94.397647666,
+          "process_wall_seconds": 99.03,
+          "process_cpu_seconds": 94.17,
+          "max_rss_kib": 620860
+        }
+      },
+      "metrics": {
+        "format": "uls.import_benchmark.v1",
+        "cpu_affinity": [
+          18,
+          19
+        ],
+        "sqlite_verifier": "3.53.2 2026-06-03 19:12:13 d6e03d8c777cfa2d35e3b60d8ec3e0187f3e9f99d8e2ee9cac695fd6fcdf1a24 (64-bit)",
+        "inputs_sha256": {
+          "l_amat.zip": "82fcd37ecdf3f82b68382c2c0d831cc7ea83c313ecd17f0566335d94018eaf8c",
+          "l_gmrs.zip": "efa2c1489c04f6a17468eef29e20215cd69995fddecfaadec44cdbb50ef0a87c"
+        },
+        "binaries_sha256": {
+          "final-import": "0e120928a96a1ea26a499d0d5b26a2d511d13b909e24f0860522a4981402939e",
+          "benchmark_import": "dff44ecafd9be9e38424c9d2b3718204d471ce84eb52a3d47ccd65e7f59097b6"
+        },
+        "cache_condition": "archive files sequentially pre-read before every run; fresh output database",
+        "seeded_refresh": false,
+        "resource_scope": "complete child process, including seed copy when requested; report.elapsed_seconds excludes seed copy",
+        "database_comparison": "all rows including primary keys and sequence state; imported_at timestamps checked but excluded from digest",
+        "runs": [
+          {
+            "variant": "baseline",
+            "mode": "stream",
+            "repetition": 1,
+            "resources": {
+              "wall_seconds": 117.6,
+              "user_seconds": 106.42,
+              "system_seconds": 3.83,
+              "max_rss_kib": 620856
+            },
+            "report": {
+              "archives": [
+                {
+                  "archive": "l_amat.zip",
+                  "count_seconds": 0.0,
+                  "counts": null,
+                  "files": 8,
+                  "import_seconds": 70.500401799,
+                  "insert_errors": 0,
+                  "parse_errors": 0,
+                  "records": 10514698,
+                  "service": "HA"
+                },
+                {
+                  "archive": "l_gmrs.zip",
+                  "count_seconds": 0.0,
+                  "counts": null,
+                  "files": 6,
+                  "import_seconds": 46.699486261,
+                  "insert_errors": 0,
+                  "parse_errors": 0,
+                  "records": 2404015,
+                  "service": "ZA"
+                }
+              ],
+              "count_first": false,
+              "elapsed_seconds": 117.592491672,
+              "initialize_seconds": 0.378134611,
+              "mode": "full",
+              "pipelined_parsing": false,
+              "seed_copy_seconds": 4e-07,
+              "seeded": false
+            },
+            "database_bytes": 1887571968,
+            "database_equal": true,
+            "stats_equal": true
+          },
+          {
+            "variant": "batch",
+            "mode": "batch",
+            "repetition": 1,
+            "resources": {
+              "wall_seconds": 94.4,
+              "user_seconds": 90.79,
+              "system_seconds": 3.38,
+              "max_rss_kib": 621076
+            },
+            "report": {
+              "archive_timing_scope": "per-archive processing; batch restoration included in elapsed_seconds",
+              "archives": [
+                {
+                  "archive": "l_amat.zip",
+                  "count_seconds": 1e-07,
+                  "counts": null,
+                  "files": 8,
+                  "import_seconds": 51.714646643,
+                  "insert_errors": 0,
+                  "parse_errors": 0,
+                  "records": 10514698,
+                  "service": "HA"
+                },
+                {
+                  "archive": "l_gmrs.zip",
+                  "count_seconds": 0.0,
+                  "counts": null,
+                  "files": 6,
+                  "import_seconds": 12.262015752,
+                  "insert_errors": 0,
+                  "parse_errors": 0,
+                  "records": 2404015,
+                  "service": "ZA"
+                }
+              ],
+              "combined_indexes": true,
+              "count_first": false,
+              "elapsed_seconds": 94.397647666,
+              "initialize_seconds": 0.019773604,
+              "mode": "full",
+              "pipelined_parsing": false,
+              "seed_copy_seconds": 2e-07,
+              "seeded": false
+            },
+            "database_bytes": 1887571968,
+            "database_equal": true,
+            "stats_equal": true
+          },
+          {
+            "variant": "batch",
+            "mode": "batch",
+            "repetition": 2,
+            "resources": {
+              "wall_seconds": 161.05,
+              "user_seconds": 88.28,
+              "system_seconds": 3.44,
+              "max_rss_kib": 620844
+            },
+            "report": {
+              "archive_timing_scope": "per-archive processing; batch restoration included in elapsed_seconds",
+              "archives": [
+                {
+                  "archive": "l_amat.zip",
+                  "count_seconds": 0.0,
+                  "counts": null,
+                  "files": 8,
+                  "import_seconds": 53.10937055,
+                  "insert_errors": 0,
+                  "parse_errors": 0,
+                  "records": 10514698,
+                  "service": "HA"
+                },
+                {
+                  "archive": "l_gmrs.zip",
+                  "count_seconds": 0.0,
+                  "counts": null,
+                  "files": 6,
+                  "import_seconds": 11.205452505,
+                  "insert_errors": 0,
+                  "parse_errors": 0,
+                  "records": 2404015,
+                  "service": "ZA"
+                }
+              ],
+              "combined_indexes": true,
+              "count_first": false,
+              "elapsed_seconds": 92.869990962,
+              "initialize_seconds": 0.032093101,
+              "mode": "full",
+              "pipelined_parsing": false,
+              "seed_copy_seconds": 2e-07,
+              "seeded": false
+            },
+            "database_bytes": 1887571968,
+            "database_equal": true,
+            "stats_equal": true
+          },
+          {
+            "variant": "baseline",
+            "mode": "stream",
+            "repetition": 2,
+            "resources": {
+              "wall_seconds": 123.63,
+              "user_seconds": 114.62,
+              "system_seconds": 4.23,
+              "max_rss_kib": 620808
+            },
+            "report": {
+              "archives": [
+                {
+                  "archive": "l_amat.zip",
+                  "count_seconds": 0.0,
+                  "counts": null,
+                  "files": 8,
+                  "import_seconds": 77.855013121,
+                  "insert_errors": 0,
+                  "parse_errors": 0,
+                  "records": 10514698,
+                  "service": "HA"
+                },
+                {
+                  "archive": "l_gmrs.zip",
+                  "count_seconds": 0.0,
+                  "counts": null,
+                  "files": 6,
+                  "import_seconds": 45.729438438,
+                  "insert_errors": 0,
+                  "parse_errors": 0,
+                  "records": 2404015,
+                  "service": "ZA"
+                }
+              ],
+              "count_first": false,
+              "elapsed_seconds": 123.621954554,
+              "initialize_seconds": 0.027009994,
+              "mode": "full",
+              "pipelined_parsing": false,
+              "seed_copy_seconds": 4e-07,
+              "seeded": false
+            },
+            "database_bytes": 1887571968,
+            "database_equal": true,
+            "stats_equal": true
+          },
+          {
+            "variant": "baseline",
+            "mode": "stream",
+            "repetition": 3,
+            "resources": {
+              "wall_seconds": 115.24,
+              "user_seconds": 106.61,
+              "system_seconds": 3.86,
+              "max_rss_kib": 620856
+            },
+            "report": {
+              "archives": [
+                {
+                  "archive": "l_amat.zip",
+                  "count_seconds": 0.0,
+                  "counts": null,
+                  "files": 8,
+                  "import_seconds": 72.046952873,
+                  "insert_errors": 0,
+                  "parse_errors": 0,
+                  "records": 10514698,
+                  "service": "HA"
+                },
+                {
+                  "archive": "l_gmrs.zip",
+                  "count_seconds": 0.0,
+                  "counts": null,
+                  "files": 6,
+                  "import_seconds": 43.16361636,
+                  "insert_errors": 0,
+                  "parse_errors": 0,
+                  "records": 2404015,
+                  "service": "ZA"
+                }
+              ],
+              "count_first": false,
+              "elapsed_seconds": 115.239189733,
+              "initialize_seconds": 0.018465,
+              "mode": "full",
+              "pipelined_parsing": false,
+              "seed_copy_seconds": 4e-07,
+              "seeded": false
+            },
+            "database_bytes": 1887571968,
+            "database_equal": true,
+            "stats_equal": true
+          },
+          {
+            "variant": "batch",
+            "mode": "batch",
+            "repetition": 3,
+            "resources": {
+              "wall_seconds": 99.03,
+              "user_seconds": 93.29,
+              "system_seconds": 3.77,
+              "max_rss_kib": 620860
+            },
+            "report": {
+              "archive_timing_scope": "per-archive processing; batch restoration included in elapsed_seconds",
+              "archives": [
+                {
+                  "archive": "l_amat.zip",
+                  "count_seconds": 0.0,
+                  "counts": null,
+                  "files": 8,
+                  "import_seconds": 50.816256685,
+                  "insert_errors": 0,
+                  "parse_errors": 0,
+                  "records": 10514698,
+                  "service": "HA"
+                },
+                {
+                  "archive": "l_gmrs.zip",
+                  "count_seconds": 0.0,
+                  "counts": null,
+                  "files": 6,
+                  "import_seconds": 14.893373052,
+                  "insert_errors": 0,
+                  "parse_errors": 0,
+                  "records": 2404015,
+                  "service": "ZA"
+                }
+              ],
+              "combined_indexes": true,
+              "count_first": false,
+              "elapsed_seconds": 99.029813726,
+              "initialize_seconds": 0.021405899,
+              "mode": "full",
+              "pipelined_parsing": false,
+              "seed_copy_seconds": 5e-07,
+              "seeded": false
+            },
+            "database_bytes": 1887571968,
+            "database_equal": true,
+            "stats_equal": true
+          }
+        ],
+        "inputs_unchanged": true,
+        "all_databases_equal": true
+      },
+      "final_qualification": {
+        "format": "uls.import_benchmark.v1",
+        "cpu_affinity": [
+          18,
+          19
+        ],
+        "sqlite_verifier": "3.53.2 2026-06-03 19:12:13 d6e03d8c777cfa2d35e3b60d8ec3e0187f3e9f99d8e2ee9cac695fd6fcdf1a24 (64-bit)",
+        "inputs_sha256": {
+          "l_amat.zip": "82fcd37ecdf3f82b68382c2c0d831cc7ea83c313ecd17f0566335d94018eaf8c",
+          "l_gmrs.zip": "efa2c1489c04f6a17468eef29e20215cd69995fddecfaadec44cdbb50ef0a87c"
+        },
+        "binaries_sha256": {
+          "benchmark_import-final": "025d8d3cddbd55c3d49748dd9f73da5c52f667b6dbe0fee0ebdcb987532faba0"
+        },
+        "cache_condition": "archive files sequentially pre-read before every run; fresh output database",
+        "seeded_refresh": false,
+        "resource_scope": "complete child process, including seed copy when requested; report.elapsed_seconds excludes seed copy",
+        "database_comparison": "all rows including primary keys and sequence state; imported_at timestamps checked but excluded from digest",
+        "runs": [
+          {
+            "variant": "final",
+            "mode": "batch",
+            "repetition": 1,
+            "resources": {
+              "wall_seconds": 123.44,
+              "user_seconds": 113.42,
+              "system_seconds": 3.91,
+              "max_rss_kib": 620828
+            },
+            "report": {
+              "archive_timing_scope": "per-archive processing; batch restoration included in elapsed_seconds",
+              "archives": [
+                {
+                  "archive": "l_amat.zip",
+                  "count_seconds": 0.0,
+                  "counts": null,
+                  "files": 8,
+                  "import_seconds": 65.306328121,
+                  "insert_errors": 0,
+                  "parse_errors": 0,
+                  "records": 10514698,
+                  "service": "HA"
+                },
+                {
+                  "archive": "l_gmrs.zip",
+                  "count_seconds": 1e-07,
+                  "counts": null,
+                  "files": 6,
+                  "import_seconds": 20.245242897,
+                  "insert_errors": 0,
+                  "parse_errors": 0,
+                  "records": 2404015,
+                  "service": "ZA"
+                }
+              ],
+              "combined_indexes": true,
+              "count_first": false,
+              "elapsed_seconds": 123.429922996,
+              "initialize_seconds": 0.022582501,
+              "mode": "full",
+              "pipelined_parsing": false,
+              "seed_copy_seconds": 2e-07,
+              "seeded": false
+            },
+            "database_bytes": 1887571968,
+            "database_equal": true,
+            "stats_equal": true
+          }
+        ],
+        "inputs_unchanged": true,
+        "all_databases_equal": true
+      }
+    },
+    "seeded": {
+      "medians": {
+        "baseline": {
+          "import_seconds": 186.262481025,
+          "process_wall_seconds": 193.55,
+          "process_cpu_seconds": 167.35,
+          "max_rss_kib": 1322860
+        },
+        "batch": {
+          "import_seconds": 146.999874569,
+          "process_wall_seconds": 148.05,
+          "process_cpu_seconds": 130.4,
+          "max_rss_kib": 1322840
+        }
+      },
+      "metrics": {
+        "format": "uls.import_benchmark.v1",
+        "cpu_affinity": [
+          18,
+          19
+        ],
+        "sqlite_verifier": "3.53.2 2026-06-03 19:12:13 d6e03d8c777cfa2d35e3b60d8ec3e0187f3e9f99d8e2ee9cac695fd6fcdf1a24 (64-bit)",
+        "inputs_sha256": {
+          "l_amat.zip": "82fcd37ecdf3f82b68382c2c0d831cc7ea83c313ecd17f0566335d94018eaf8c",
+          "l_gmrs.zip": "efa2c1489c04f6a17468eef29e20215cd69995fddecfaadec44cdbb50ef0a87c",
+          "import.db": "48b47d66a69a3fa3b5b031f4488b4d7c39829e9da2918a318080781336e0349a"
+        },
+        "binaries_sha256": {
+          "final-import": "0e120928a96a1ea26a499d0d5b26a2d511d13b909e24f0860522a4981402939e",
+          "benchmark_import": "dff44ecafd9be9e38424c9d2b3718204d471ce84eb52a3d47ccd65e7f59097b6"
+        },
+        "cache_condition": "archive files sequentially pre-read before every run; fresh output database",
+        "seeded_refresh": true,
+        "resource_scope": "complete child process, including seed copy when requested; report.elapsed_seconds excludes seed copy",
+        "database_comparison": "all rows including primary keys and sequence state; imported_at timestamps checked but excluded from digest",
+        "runs": [
+          {
+            "variant": "baseline",
+            "mode": "stream",
+            "repetition": 1,
+            "resources": {
+              "wall_seconds": 193.55,
+              "user_seconds": 154.6,
+              "system_seconds": 12.75,
+              "max_rss_kib": 1322788
+            },
+            "report": {
+              "archives": [
+                {
+                  "archive": "l_amat.zip",
+                  "count_seconds": 1e-07,
+                  "counts": null,
+                  "files": 8,
+                  "import_seconds": 131.760937857,
+                  "insert_errors": 0,
+                  "parse_errors": 0,
+                  "records": 10514698,
+                  "service": "HA"
+                },
+                {
+                  "archive": "l_gmrs.zip",
+                  "count_seconds": 0.0,
+                  "counts": null,
+                  "files": 6,
+                  "import_seconds": 54.479146668,
+                  "insert_errors": 0,
+                  "parse_errors": 0,
+                  "records": 2404015,
+                  "service": "ZA"
+                }
+              ],
+              "count_first": false,
+              "elapsed_seconds": 186.262481025,
+              "initialize_seconds": 0.001159,
+              "mode": "full",
+              "pipelined_parsing": false,
+              "seed_copy_seconds": 7.273510731,
+              "seeded": true
+            },
+            "database_bytes": 1903443968,
+            "database_equal": true,
+            "stats_equal": true
+          },
+          {
+            "variant": "batch",
+            "mode": "batch",
+            "repetition": 1,
+            "resources": {
+              "wall_seconds": 129.72,
+              "user_seconds": 119.32,
+              "system_seconds": 9.15,
+              "max_rss_kib": 1322840
+            },
+            "report": {
+              "archive_timing_scope": "per-archive processing; batch restoration included in elapsed_seconds",
+              "archives": [
+                {
+                  "archive": "l_amat.zip",
+                  "count_seconds": 0.0,
+                  "counts": null,
+                  "files": 8,
+                  "import_seconds": 79.26943992,
+                  "insert_errors": 0,
+                  "parse_errors": 0,
+                  "records": 10514698,
+                  "service": "HA"
+                },
+                {
+                  "archive": "l_gmrs.zip",
+                  "count_seconds": 0.0,
+                  "counts": null,
+                  "files": 6,
+                  "import_seconds": 16.561466473,
+                  "insert_errors": 0,
+                  "parse_errors": 0,
+                  "records": 2404015,
+                  "service": "ZA"
+                }
+              ],
+              "combined_indexes": true,
+              "count_first": false,
+              "elapsed_seconds": 128.397917319,
+              "initialize_seconds": 0.0010384,
+              "mode": "full",
+              "pipelined_parsing": false,
+              "seed_copy_seconds": 1.294165239,
+              "seeded": true
+            },
+            "database_bytes": 1903443968,
+            "database_equal": true,
+            "stats_equal": true
+          },
+          {
+            "variant": "batch",
+            "mode": "batch",
+            "repetition": 2,
+            "resources": {
+              "wall_seconds": 148.05,
+              "user_seconds": 120.81,
+              "system_seconds": 9.59,
+              "max_rss_kib": 1322932
+            },
+            "report": {
+              "archive_timing_scope": "per-archive processing; batch restoration included in elapsed_seconds",
+              "archives": [
+                {
+                  "archive": "l_amat.zip",
+                  "count_seconds": 1e-07,
+                  "counts": null,
+                  "files": 8,
+                  "import_seconds": 91.541614978,
+                  "insert_errors": 0,
+                  "parse_errors": 0,
+                  "records": 10514698,
+                  "service": "HA"
+                },
+                {
+                  "archive": "l_gmrs.zip",
+                  "count_seconds": 1e-07,
+                  "counts": null,
+                  "files": 6,
+                  "import_seconds": 23.134247633,
+                  "insert_errors": 0,
+                  "parse_errors": 0,
+                  "records": 2404015,
+                  "service": "ZA"
+                }
+              ],
+              "combined_indexes": true,
+              "count_first": false,
+              "elapsed_seconds": 146.999874569,
+              "initialize_seconds": 0.0010287,
+              "mode": "full",
+              "pipelined_parsing": false,
+              "seed_copy_seconds": 1.027162407,
+              "seeded": true
+            },
+            "database_bytes": 1903443968,
+            "database_equal": true,
+            "stats_equal": true
+          },
+          {
+            "variant": "baseline",
+            "mode": "stream",
+            "repetition": 2,
+            "resources": {
+              "wall_seconds": 172.05,
+              "user_seconds": 157.1,
+              "system_seconds": 10.11,
+              "max_rss_kib": 1322860
+            },
+            "report": {
+              "archives": [
+                {
+                  "archive": "l_amat.zip",
+                  "count_seconds": 0.0,
+                  "counts": null,
+                  "files": 8,
+                  "import_seconds": 113.320298982,
+                  "insert_errors": 0,
+                  "parse_errors": 0,
+                  "records": 10514698,
+                  "service": "HA"
+                },
+                {
+                  "archive": "l_gmrs.zip",
+                  "count_seconds": 0.0,
+                  "counts": null,
+                  "files": 6,
+                  "import_seconds": 56.793681967,
+                  "insert_errors": 0,
+                  "parse_errors": 0,
+                  "records": 2404015,
+                  "service": "ZA"
+                }
+              ],
+              "count_first": false,
+              "elapsed_seconds": 170.159033054,
+              "initialize_seconds": 0.0010622,
+              "mode": "full",
+              "pipelined_parsing": false,
+              "seed_copy_seconds": 1.872519622,
+              "seeded": true
+            },
+            "database_bytes": 1903443968,
+            "database_equal": true,
+            "stats_equal": true
+          },
+          {
+            "variant": "baseline",
+            "mode": "stream",
+            "repetition": 3,
+            "resources": {
+              "wall_seconds": 215.73,
+              "user_seconds": 160.3,
+              "system_seconds": 11.03,
+              "max_rss_kib": 1323052
+            },
+            "report": {
+              "archives": [
+                {
+                  "archive": "l_amat.zip",
+                  "count_seconds": 0.0,
+                  "counts": null,
+                  "files": 8,
+                  "import_seconds": 150.396063429,
+                  "insert_errors": 0,
+                  "parse_errors": 0,
+                  "records": 10514698,
+                  "service": "HA"
+                },
+                {
+                  "archive": "l_gmrs.zip",
+                  "count_seconds": 0.0,
+                  "counts": null,
+                  "files": 6,
+                  "import_seconds": 58.69140056,
+                  "insert_errors": 0,
+                  "parse_errors": 0,
+                  "records": 2404015,
+                  "service": "ZA"
+                }
+              ],
+              "count_first": false,
+              "elapsed_seconds": 209.107711089,
+              "initialize_seconds": 0.0010816,
+              "mode": "full",
+              "pipelined_parsing": false,
+              "seed_copy_seconds": 6.594872451,
+              "seeded": true
+            },
+            "database_bytes": 1903443968,
+            "database_equal": true,
+            "stats_equal": true
+          },
+          {
+            "variant": "batch",
+            "mode": "batch",
+            "repetition": 3,
+            "resources": {
+              "wall_seconds": 159.44,
+              "user_seconds": 122.03,
+              "system_seconds": 9.98,
+              "max_rss_kib": 1322588
+            },
+            "report": {
+              "archive_timing_scope": "per-archive processing; batch restoration included in elapsed_seconds",
+              "archives": [
+                {
+                  "archive": "l_amat.zip",
+                  "count_seconds": 1e-07,
+                  "counts": null,
+                  "files": 8,
+                  "import_seconds": 90.035342057,
+                  "insert_errors": 0,
+                  "parse_errors": 0,
+                  "records": 10514698,
+                  "service": "HA"
+                },
+                {
+                  "archive": "l_gmrs.zip",
+                  "count_seconds": 1e-07,
+                  "counts": null,
+                  "files": 6,
+                  "import_seconds": 26.414430914,
+                  "insert_errors": 0,
+                  "parse_errors": 0,
+                  "records": 2404015,
+                  "service": "ZA"
+                }
+              ],
+              "combined_indexes": true,
+              "count_first": false,
+              "elapsed_seconds": 153.147124473,
+              "initialize_seconds": 0.0029217,
+              "mode": "full",
+              "pipelined_parsing": false,
+              "seed_copy_seconds": 6.268620911,
+              "seeded": true
+            },
+            "database_bytes": 1903443968,
+            "database_equal": true,
+            "stats_equal": true
+          }
+        ],
+        "inputs_unchanged": true,
+        "all_databases_equal": true
+      },
+      "final_qualification": {
+        "format": "uls.import_benchmark.v1",
+        "cpu_affinity": [
+          18,
+          19
+        ],
+        "sqlite_verifier": "3.53.2 2026-06-03 19:12:13 d6e03d8c777cfa2d35e3b60d8ec3e0187f3e9f99d8e2ee9cac695fd6fcdf1a24 (64-bit)",
+        "inputs_sha256": {
+          "l_amat.zip": "82fcd37ecdf3f82b68382c2c0d831cc7ea83c313ecd17f0566335d94018eaf8c",
+          "l_gmrs.zip": "efa2c1489c04f6a17468eef29e20215cd69995fddecfaadec44cdbb50ef0a87c",
+          "import.db": "48b47d66a69a3fa3b5b031f4488b4d7c39829e9da2918a318080781336e0349a"
+        },
+        "binaries_sha256": {
+          "benchmark_import-final": "025d8d3cddbd55c3d49748dd9f73da5c52f667b6dbe0fee0ebdcb987532faba0"
+        },
+        "cache_condition": "archive files sequentially pre-read before every run; fresh output database",
+        "seeded_refresh": true,
+        "resource_scope": "complete child process, including seed copy when requested; report.elapsed_seconds excludes seed copy",
+        "database_comparison": "all rows including primary keys and sequence state; imported_at timestamps checked but excluded from digest",
+        "runs": [
+          {
+            "variant": "final",
+            "mode": "batch",
+            "repetition": 1,
+            "resources": {
+              "wall_seconds": 180.18,
+              "user_seconds": 113.96,
+              "system_seconds": 10.36,
+              "max_rss_kib": 1323012
+            },
+            "report": {
+              "archive_timing_scope": "per-archive processing; batch restoration included in elapsed_seconds",
+              "archives": [
+                {
+                  "archive": "l_amat.zip",
+                  "count_seconds": 0.0,
+                  "counts": null,
+                  "files": 8,
+                  "import_seconds": 109.157150889,
+                  "insert_errors": 0,
+                  "parse_errors": 0,
+                  "records": 10514698,
+                  "service": "HA"
+                },
+                {
+                  "archive": "l_gmrs.zip",
+                  "count_seconds": 0.0,
+                  "counts": null,
+                  "files": 6,
+                  "import_seconds": 18.56846984,
+                  "insert_errors": 0,
+                  "parse_errors": 0,
+                  "records": 2404015,
+                  "service": "ZA"
+                }
+              ],
+              "combined_indexes": true,
+              "count_first": false,
+              "elapsed_seconds": 157.074189343,
+              "initialize_seconds": 0.211954602,
+              "mode": "full",
+              "pipelined_parsing": false,
+              "seed_copy_seconds": 23.088776973,
+              "seeded": true
+            },
+            "database_bytes": 1903443968,
+            "database_equal": true,
+            "stats_equal": true
+          }
+        ],
+        "inputs_unchanged": true,
+        "all_databases_equal": true
+      }
+    },
+    "mixed": {
+      "medians": {
+        "separate": {
+          "import_seconds": 181.67415019,
+          "process_wall_seconds": 182.63,
+          "process_cpu_seconds": 167.41,
+          "max_rss_kib": 1322888
+        },
+        "batch": {
+          "import_seconds": 135.59596216,
+          "process_wall_seconds": 141.45,
+          "process_cpu_seconds": 132.79,
+          "max_rss_kib": 1322832
+        }
+      },
+      "metrics": {
+        "format": "uls.import_benchmark.v1",
+        "cpu_affinity": [
+          18,
+          19
+        ],
+        "sqlite_verifier": "3.53.2 2026-06-03 19:12:13 d6e03d8c777cfa2d35e3b60d8ec3e0187f3e9f99d8e2ee9cac695fd6fcdf1a24 (64-bit)",
+        "inputs_sha256": {
+          "l_amat.zip": "82fcd37ecdf3f82b68382c2c0d831cc7ea83c313ecd17f0566335d94018eaf8c",
+          "l_amat_daily.zip": "17f3a6ef1992e5bfeb0f32032fb9b0e892a57b736f02e4c37ff3b9527ce7c343",
+          "l_gmrs.zip": "efa2c1489c04f6a17468eef29e20215cd69995fddecfaadec44cdbb50ef0a87c",
+          "l_gmrs_daily.zip": "2cfc3e49ff24b618ba105b6ed970e2dc97ef015531671961cc85e257946cd4fd",
+          "import.db": "48b47d66a69a3fa3b5b031f4488b4d7c39829e9da2918a318080781336e0349a"
+        },
+        "binaries_sha256": {
+          "benchmark_import": "dff44ecafd9be9e38424c9d2b3718204d471ce84eb52a3d47ccd65e7f59097b6"
+        },
+        "cache_condition": "archive files sequentially pre-read before every run; fresh output database",
+        "seeded_refresh": true,
+        "resource_scope": "complete child process, including seed copy when requested; report.elapsed_seconds excludes seed copy",
+        "database_comparison": "all rows including primary keys and sequence state; imported_at timestamps checked but excluded from digest",
+        "runs": [
+          {
+            "variant": "separate",
+            "mode": "stream",
+            "repetition": 1,
+            "resources": {
+              "wall_seconds": 243.76,
+              "user_seconds": 164.92,
+              "system_seconds": 12.98,
+              "max_rss_kib": 1322888
+            },
+            "report": {
+              "archive_timing_scope": "per-archive processing; batch restoration included in elapsed_seconds",
+              "archives": [
+                {
+                  "archive": "l_amat.zip",
+                  "count_seconds": 0.0,
+                  "counts": null,
+                  "files": 8,
+                  "import_seconds": 122.194936861,
+                  "insert_errors": 0,
+                  "parse_errors": 0,
+                  "records": 10514698,
+                  "service": "HA"
+                },
+                {
+                  "archive": "l_amat_daily.zip",
+                  "count_seconds": 0.0,
+                  "counts": null,
+                  "files": 8,
+                  "import_seconds": 6.132787404,
+                  "insert_errors": 0,
+                  "parse_errors": 0,
+                  "records": 6195,
+                  "service": "HA_DAILY"
+                },
+                {
+                  "archive": "l_gmrs.zip",
+                  "count_seconds": 1e-07,
+                  "counts": null,
+                  "files": 6,
+                  "import_seconds": 16.794260242,
+                  "insert_errors": 0,
+                  "parse_errors": 0,
+                  "records": 2404015,
+                  "service": "ZA"
+                },
+                {
+                  "archive": "l_gmrs_daily.zip",
+                  "count_seconds": 1e-07,
+                  "counts": null,
+                  "files": 6,
+                  "import_seconds": 3.11123203,
+                  "insert_errors": 0,
+                  "parse_errors": 0,
+                  "records": 4001,
+                  "service": "ZA_DAILY"
+                }
+              ],
+              "combined_indexes": false,
+              "count_first": false,
+              "elapsed_seconds": 219.827269237,
+              "initialize_seconds": 0.272593803,
+              "mode": "full",
+              "pipelined_parsing": false,
+              "seed_copy_seconds": 23.900656569,
+              "seeded": true
+            },
+            "database_bytes": 1904758784,
+            "database_equal": true,
+            "stats_equal": true
+          },
+          {
+            "variant": "batch",
+            "mode": "batch",
+            "repetition": 1,
+            "resources": {
+              "wall_seconds": 144.27,
+              "user_seconds": 123.01,
+              "system_seconds": 8.85,
+              "max_rss_kib": 1323004
+            },
+            "report": {
+              "archive_timing_scope": "per-archive processing; batch restoration included in elapsed_seconds",
+              "archives": [
+                {
+                  "archive": "l_amat.zip",
+                  "count_seconds": 0.0,
+                  "counts": null,
+                  "files": 8,
+                  "import_seconds": 84.128566842,
+                  "insert_errors": 0,
+                  "parse_errors": 0,
+                  "records": 10514698,
+                  "service": "HA"
+                },
+                {
+                  "archive": "l_amat_daily.zip",
+                  "count_seconds": 0.0,
+                  "counts": null,
+                  "files": 8,
+                  "import_seconds": 0.100895032,
+                  "insert_errors": 0,
+                  "parse_errors": 0,
+                  "records": 6195,
+                  "service": "HA_DAILY"
+                },
+                {
+                  "archive": "l_gmrs.zip",
+                  "count_seconds": 1e-07,
+                  "counts": null,
+                  "files": 6,
+                  "import_seconds": 17.124153061,
+                  "insert_errors": 0,
+                  "parse_errors": 0,
+                  "records": 2404015,
+                  "service": "ZA"
+                },
+                {
+                  "archive": "l_gmrs_daily.zip",
+                  "count_seconds": 0.0,
+                  "counts": null,
+                  "files": 6,
+                  "import_seconds": 0.06781836,
+                  "insert_errors": 0,
+                  "parse_errors": 0,
+                  "records": 4001,
+                  "service": "ZA_DAILY"
+                }
+              ],
+              "combined_indexes": true,
+              "count_first": false,
+              "elapsed_seconds": 135.59596216,
+              "initialize_seconds": 0.0008481,
+              "mode": "full",
+              "pipelined_parsing": false,
+              "seed_copy_seconds": 8.650677059,
+              "seeded": true
+            },
+            "database_bytes": 1903976448,
+            "database_equal": true,
+            "stats_equal": true
+          },
+          {
+            "variant": "batch",
+            "mode": "batch",
+            "repetition": 2,
+            "resources": {
+              "wall_seconds": 136.99,
+              "user_seconds": 123.33,
+              "system_seconds": 9.46,
+              "max_rss_kib": 1322716
+            },
+            "report": {
+              "archive_timing_scope": "per-archive processing; batch restoration included in elapsed_seconds",
+              "archives": [
+                {
+                  "archive": "l_amat.zip",
+                  "count_seconds": 0.0,
+                  "counts": null,
+                  "files": 8,
+                  "import_seconds": 82.102037755,
+                  "insert_errors": 0,
+                  "parse_errors": 0,
+                  "records": 10514698,
+                  "service": "HA"
+                },
+                {
+                  "archive": "l_amat_daily.zip",
+                  "count_seconds": 0.0,
+                  "counts": null,
+                  "files": 8,
+                  "import_seconds": 0.113548779,
+                  "insert_errors": 0,
+                  "parse_errors": 0,
+                  "records": 6195,
+                  "service": "HA_DAILY"
+                },
+                {
+                  "archive": "l_gmrs.zip",
+                  "count_seconds": 0.0,
+                  "counts": null,
+                  "files": 6,
+                  "import_seconds": 16.885151503,
+                  "insert_errors": 0,
+                  "parse_errors": 0,
+                  "records": 2404015,
+                  "service": "ZA"
+                },
+                {
+                  "archive": "l_gmrs_daily.zip",
+                  "count_seconds": 1e-07,
+                  "counts": null,
+                  "files": 6,
+                  "import_seconds": 0.066234321,
+                  "insert_errors": 0,
+                  "parse_errors": 0,
+                  "records": 4001,
+                  "service": "ZA_DAILY"
+                }
+              ],
+              "combined_indexes": true,
+              "count_first": false,
+              "elapsed_seconds": 132.585952176,
+              "initialize_seconds": 0.415225208,
+              "mode": "full",
+              "pipelined_parsing": false,
+              "seed_copy_seconds": 4.369677726,
+              "seeded": true
+            },
+            "database_bytes": 1903976448,
+            "database_equal": true,
+            "stats_equal": true
+          },
+          {
+            "variant": "separate",
+            "mode": "stream",
+            "repetition": 2,
+            "resources": {
+              "wall_seconds": 182.63,
+              "user_seconds": 157.37,
+              "system_seconds": 10.04,
+              "max_rss_kib": 1323036
+            },
+            "report": {
+              "archive_timing_scope": "per-archive processing; batch restoration included in elapsed_seconds",
+              "archives": [
+                {
+                  "archive": "l_amat.zip",
+                  "count_seconds": 0.0,
+                  "counts": null,
+                  "files": 8,
+                  "import_seconds": 88.094510609,
+                  "insert_errors": 0,
+                  "parse_errors": 0,
+                  "records": 10514698,
+                  "service": "HA"
+                },
+                {
+                  "archive": "l_amat_daily.zip",
+                  "count_seconds": 0.0,
+                  "counts": null,
+                  "files": 8,
+                  "import_seconds": 8.818034962,
+                  "insert_errors": 0,
+                  "parse_errors": 0,
+                  "records": 6195,
+                  "service": "HA_DAILY"
+                },
+                {
+                  "archive": "l_gmrs.zip",
+                  "count_seconds": 1e-07,
+                  "counts": null,
+                  "files": 6,
+                  "import_seconds": 15.608128477,
+                  "insert_errors": 0,
+                  "parse_errors": 0,
+                  "records": 2404015,
+                  "service": "ZA"
+                },
+                {
+                  "archive": "l_gmrs_daily.zip",
+                  "count_seconds": 0.0,
+                  "counts": null,
+                  "files": 6,
+                  "import_seconds": 5.513156057,
+                  "insert_errors": 0,
+                  "parse_errors": 0,
+                  "records": 4001,
+                  "service": "ZA_DAILY"
+                }
+              ],
+              "combined_indexes": false,
+              "count_first": false,
+              "elapsed_seconds": 181.67415019,
+              "initialize_seconds": 0.0010158,
+              "mode": "full",
+              "pipelined_parsing": false,
+              "seed_copy_seconds": 0.916115139,
+              "seeded": true
+            },
+            "database_bytes": 1904758784,
+            "database_equal": true,
+            "stats_equal": true
+          },
+          {
+            "variant": "separate",
+            "mode": "stream",
+            "repetition": 3,
+            "resources": {
+              "wall_seconds": 172.1,
+              "user_seconds": 148.31,
+              "system_seconds": 10.45,
+              "max_rss_kib": 1322808
+            },
+            "report": {
+              "archive_timing_scope": "per-archive processing; batch restoration included in elapsed_seconds",
+              "archives": [
+                {
+                  "archive": "l_amat.zip",
+                  "count_seconds": 0.0,
+                  "counts": null,
+                  "files": 8,
+                  "import_seconds": 80.934697225,
+                  "insert_errors": 0,
+                  "parse_errors": 0,
+                  "records": 10514698,
+                  "service": "HA"
+                },
+                {
+                  "archive": "l_amat_daily.zip",
+                  "count_seconds": 0.0,
+                  "counts": null,
+                  "files": 8,
+                  "import_seconds": 5.330279388,
+                  "insert_errors": 0,
+                  "parse_errors": 0,
+                  "records": 6195,
+                  "service": "HA_DAILY"
+                },
+                {
+                  "archive": "l_gmrs.zip",
+                  "count_seconds": 0.0,
+                  "counts": null,
+                  "files": 6,
+                  "import_seconds": 15.292259041,
+                  "insert_errors": 0,
+                  "parse_errors": 0,
+                  "records": 2404015,
+                  "service": "ZA"
+                },
+                {
+                  "archive": "l_gmrs_daily.zip",
+                  "count_seconds": 0.0,
+                  "counts": null,
+                  "files": 6,
+                  "import_seconds": 7.163095893,
+                  "insert_errors": 0,
+                  "parse_errors": 0,
+                  "records": 4001,
+                  "service": "ZA_DAILY"
+                }
+              ],
+              "combined_indexes": false,
+              "count_first": false,
+              "elapsed_seconds": 170.744450918,
+              "initialize_seconds": 0.0009451,
+              "mode": "full",
+              "pipelined_parsing": false,
+              "seed_copy_seconds": 1.3170529069999999,
+              "seeded": true
+            },
+            "database_bytes": 1904758784,
+            "database_equal": true,
+            "stats_equal": true
+          },
+          {
+            "variant": "batch",
+            "mode": "batch",
+            "repetition": 3,
+            "resources": {
+              "wall_seconds": 141.45,
+              "user_seconds": 127.96,
+              "system_seconds": 9.32,
+              "max_rss_kib": 1322832
+            },
+            "report": {
+              "archive_timing_scope": "per-archive processing; batch restoration included in elapsed_seconds",
+              "archives": [
+                {
+                  "archive": "l_amat.zip",
+                  "count_seconds": 0.0,
+                  "counts": null,
+                  "files": 8,
+                  "import_seconds": 86.819993797,
+                  "insert_errors": 0,
+                  "parse_errors": 0,
+                  "records": 10514698,
+                  "service": "HA"
+                },
+                {
+                  "archive": "l_amat_daily.zip",
+                  "count_seconds": 0.0,
+                  "counts": null,
+                  "files": 8,
+                  "import_seconds": 0.098443701,
+                  "insert_errors": 0,
+                  "parse_errors": 0,
+                  "records": 6195,
+                  "service": "HA_DAILY"
+                },
+                {
+                  "archive": "l_gmrs.zip",
+                  "count_seconds": 0.0,
+                  "counts": null,
+                  "files": 6,
+                  "import_seconds": 16.637857154,
+                  "insert_errors": 0,
+                  "parse_errors": 0,
+                  "records": 2404015,
+                  "service": "ZA"
+                },
+                {
+                  "archive": "l_gmrs_daily.zip",
+                  "count_seconds": 0.0,
+                  "counts": null,
+                  "files": 6,
+                  "import_seconds": 0.062177801,
+                  "insert_errors": 0,
+                  "parse_errors": 0,
+                  "records": 4001,
+                  "service": "ZA_DAILY"
+                }
+              ],
+              "combined_indexes": true,
+              "count_first": false,
+              "elapsed_seconds": 138.817721947,
+              "initialize_seconds": 0.0012929,
+              "mode": "full",
+              "pipelined_parsing": false,
+              "seed_copy_seconds": 2.602674351,
+              "seeded": true
+            },
+            "database_bytes": 1903976448,
+            "database_equal": true,
+            "stats_equal": true
+          }
+        ],
+        "inputs_unchanged": true,
+        "all_databases_equal": true
+      },
+      "final_qualification": {
+        "format": "uls.import_benchmark.v1",
+        "cpu_affinity": [
+          18,
+          19
+        ],
+        "sqlite_verifier": "3.53.2 2026-06-03 19:12:13 d6e03d8c777cfa2d35e3b60d8ec3e0187f3e9f99d8e2ee9cac695fd6fcdf1a24 (64-bit)",
+        "inputs_sha256": {
+          "l_amat.zip": "82fcd37ecdf3f82b68382c2c0d831cc7ea83c313ecd17f0566335d94018eaf8c",
+          "l_amat_daily.zip": "17f3a6ef1992e5bfeb0f32032fb9b0e892a57b736f02e4c37ff3b9527ce7c343",
+          "l_gmrs.zip": "efa2c1489c04f6a17468eef29e20215cd69995fddecfaadec44cdbb50ef0a87c",
+          "l_gmrs_daily.zip": "2cfc3e49ff24b618ba105b6ed970e2dc97ef015531671961cc85e257946cd4fd",
+          "import.db": "48b47d66a69a3fa3b5b031f4488b4d7c39829e9da2918a318080781336e0349a"
+        },
+        "binaries_sha256": {
+          "benchmark_import-final": "025d8d3cddbd55c3d49748dd9f73da5c52f667b6dbe0fee0ebdcb987532faba0"
+        },
+        "cache_condition": "archive files sequentially pre-read before every run; fresh output database",
+        "seeded_refresh": true,
+        "resource_scope": "complete child process, including seed copy when requested; report.elapsed_seconds excludes seed copy",
+        "database_comparison": "all rows including primary keys and sequence state; imported_at timestamps checked but excluded from digest",
+        "runs": [
+          {
+            "variant": "final",
+            "mode": "batch",
+            "repetition": 1,
+            "resources": {
+              "wall_seconds": 153.89,
+              "user_seconds": 108.7,
+              "system_seconds": 9.23,
+              "max_rss_kib": 1322688
+            },
+            "report": {
+              "archive_timing_scope": "per-archive processing; batch restoration included in elapsed_seconds",
+              "archives": [
+                {
+                  "archive": "l_amat.zip",
+                  "count_seconds": 0.0,
+                  "counts": null,
+                  "files": 8,
+                  "import_seconds": 78.910953882,
+                  "insert_errors": 0,
+                  "parse_errors": 0,
+                  "records": 10514698,
+                  "service": "HA"
+                },
+                {
+                  "archive": "l_amat_daily.zip",
+                  "count_seconds": 1e-07,
+                  "counts": null,
+                  "files": 8,
+                  "import_seconds": 0.1144913,
+                  "insert_errors": 0,
+                  "parse_errors": 0,
+                  "records": 6195,
+                  "service": "HA_DAILY"
+                },
+                {
+                  "archive": "l_gmrs.zip",
+                  "count_seconds": 0.0,
+                  "counts": null,
+                  "files": 6,
+                  "import_seconds": 23.449394235,
+                  "insert_errors": 0,
+                  "parse_errors": 0,
+                  "records": 2404015,
+                  "service": "ZA"
+                },
+                {
+                  "archive": "l_gmrs_daily.zip",
+                  "count_seconds": 1e-07,
+                  "counts": null,
+                  "files": 6,
+                  "import_seconds": 0.0703998,
+                  "insert_errors": 0,
+                  "parse_errors": 0,
+                  "records": 4001,
+                  "service": "ZA_DAILY"
+                }
+              ],
+              "combined_indexes": true,
+              "count_first": false,
+              "elapsed_seconds": 136.715612241,
+              "initialize_seconds": 0.304841389,
+              "mode": "full",
+              "pipelined_parsing": false,
+              "seed_copy_seconds": 17.162631698,
+              "seeded": true
+            },
+            "database_bytes": 1903976448,
+            "database_equal": true,
+            "stats_equal": true
+          }
+        ],
+        "inputs_unchanged": true,
+        "all_databases_equal": true
+      }
+    }
+  },
+  "final_checks": {
+    "fresh": {
+      "equal_to_independent_baseline": true,
+      "all_sources_unchanged": true
+    },
+    "seeded": {
+      "equal_to_independent_baseline": true,
+      "all_sources_unchanged": true
+    },
+    "mixed": {
+      "equal_to_independent_baseline": true,
+      "all_sources_unchanged": true
+    }
+  },
+  "final_same_binary_confirmation": {
+    "format": "uls.import_benchmark.v1",
+    "cpu_affinity": [
+      18,
+      19
+    ],
+    "sqlite_verifier": "3.53.2 2026-06-03 19:12:13 d6e03d8c777cfa2d35e3b60d8ec3e0187f3e9f99d8e2ee9cac695fd6fcdf1a24 (64-bit)",
+    "inputs_sha256": {
+      "l_amat.zip": "82fcd37ecdf3f82b68382c2c0d831cc7ea83c313ecd17f0566335d94018eaf8c",
+      "l_gmrs.zip": "efa2c1489c04f6a17468eef29e20215cd69995fddecfaadec44cdbb50ef0a87c"
+    },
+    "binaries_sha256": {
+      "benchmark_import-final": "025d8d3cddbd55c3d49748dd9f73da5c52f667b6dbe0fee0ebdcb987532faba0"
+    },
+    "cache_condition": "archive files sequentially pre-read before every run; fresh output database",
+    "seeded_refresh": false,
+    "resource_scope": "complete child process, including seed copy when requested; report.elapsed_seconds excludes seed copy",
+    "database_comparison": "all rows including primary keys and sequence state; imported_at timestamps checked but excluded from digest",
+    "runs": [
+      {
+        "variant": "separate-final",
+        "mode": "stream",
+        "repetition": 1,
+        "resources": {
+          "wall_seconds": 112.37,
+          "user_seconds": 106.83,
+          "system_seconds": 3.95,
+          "max_rss_kib": 620916
+        },
+        "report": {
+          "archive_timing_scope": "per-archive processing; batch restoration included in elapsed_seconds",
+          "archives": [
+            {
+              "archive": "l_amat.zip",
+              "count_seconds": 1e-07,
+              "counts": null,
+              "files": 8,
+              "import_seconds": 50.529395518,
+              "insert_errors": 0,
+              "parse_errors": 0,
+              "records": 10514698,
+              "service": "HA"
+            },
+            {
+              "archive": "l_gmrs.zip",
+              "count_seconds": 1e-07,
+              "counts": null,
+              "files": 6,
+              "import_seconds": 11.940124976,
+              "insert_errors": 0,
+              "parse_errors": 0,
+              "records": 2404015,
+              "service": "ZA"
+            }
+          ],
+          "combined_indexes": false,
+          "count_first": false,
+          "elapsed_seconds": 112.363505249,
+          "initialize_seconds": 0.0353096,
+          "mode": "full",
+          "pipelined_parsing": false,
+          "seed_copy_seconds": 2e-07,
+          "seeded": false
+        },
+        "database_bytes": 1887571968,
+        "database_equal": true,
+        "stats_equal": true
+      },
+      {
+        "variant": "batch-final",
+        "mode": "batch",
+        "repetition": 1,
+        "resources": {
+          "wall_seconds": 88.46,
+          "user_seconds": 84.34,
+          "system_seconds": 3.03,
+          "max_rss_kib": 620884
+        },
+        "report": {
+          "archive_timing_scope": "per-archive processing; batch restoration included in elapsed_seconds",
+          "archives": [
+            {
+              "archive": "l_amat.zip",
+              "count_seconds": 0.0,
+              "counts": null,
+              "files": 8,
+              "import_seconds": 48.634979104,
+              "insert_errors": 0,
+              "parse_errors": 0,
+              "records": 10514698,
+              "service": "HA"
+            },
+            {
+              "archive": "l_gmrs.zip",
+              "count_seconds": 0.0,
+              "counts": null,
+              "files": 6,
+              "import_seconds": 11.18064479,
+              "insert_errors": 0,
+              "parse_errors": 0,
+              "records": 2404015,
+              "service": "ZA"
+            }
+          ],
+          "combined_indexes": true,
+          "count_first": false,
+          "elapsed_seconds": 88.45475065,
+          "initialize_seconds": 0.0270131,
+          "mode": "full",
+          "pipelined_parsing": false,
+          "seed_copy_seconds": 5e-07,
+          "seeded": false
+        },
+        "database_bytes": 1887571968,
+        "database_equal": true,
+        "stats_equal": true
+      }
+    ],
+    "inputs_unchanged": true,
+    "all_databases_equal": true
+  },
+  "local_validation": {
+    "workspace_tests_passed": 716,
+    "doctests_passed": 3,
+    "coverage": {
+      "project": {
+        "covered": 13995,
+        "lines": 14340,
+        "percent": 97.59414225941423
+      },
+      "patch": {
+        "covered": 1040,
+        "lines": 1057,
+        "percent": 98.39167455061495
+      },
+      "uncovered_patch": {
+        "crates/uls-cli/src/commands/update.rs": [],
+        "crates/uls-cli/src/commands/update/batch.rs": [
+          74,
+          80,
+          84,
+          85,
+          388
+        ],
+        "crates/uls-db/examples/benchmark_import.rs": [],
+        "crates/uls-db/src/importer.rs": [],
+        "crates/uls-db/src/importer/batch.rs": [
+          108,
+          117,
+          183,
+          256,
+          257,
+          258,
+          262,
+          378,
+          414,
+          450,
+          494,
+          604
+        ],
+        "crates/uls-db/src/lib.rs": [],
+        "crates/uls-db/src/repository.rs": []
+      }
+    },
+    "lcov_sha256": "afbb23a1c68fc6fcd72dad3f6f7361a41f6ade912fc4a0b6ef6c9ff78a9363b4"
+  }
+}

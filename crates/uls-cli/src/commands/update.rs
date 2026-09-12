@@ -5,11 +5,11 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use anyhow::{bail, Result};
-use chrono::{Datelike, NaiveDate, Utc};
+use chrono::{NaiveDate, Utc};
 use indicatif::{ProgressBar, ProgressStyle};
 use serde::Serialize;
 
-use uls_db::{Database, DatabaseConfig, ImportMode, Importer};
+use uls_db::{Database, DatabaseConfig, ImportBatch, ImportMode, ImportSource, Importer};
 use uls_download::{
     DownloadConfig, DownloadError, DownloadProgress, FccClient, ProgressCallback, ServiceCatalog,
 };
@@ -17,6 +17,7 @@ use uls_parser::archive::ZipExtractor;
 
 use crate::config::{default_cache_path, default_db_path};
 
+mod batch;
 mod planner;
 
 /// Type alias for import progress callback to reduce type complexity.
@@ -60,6 +61,9 @@ async fn execute_with_context(
     download_config: DownloadConfig,
     today: NaiveDate,
 ) -> Result<()> {
+    if options.service.eq_ignore_ascii_case("all") {
+        return batch::execute(options, db_path, download_config, today).await;
+    }
     let UpdateOptions {
         service,
         force,
@@ -74,7 +78,6 @@ async fn execute_with_context(
     let service_code = match service.to_lowercase().as_str() {
         "amateur" | "ham" => "HA",
         "gmrs" => "ZA",
-        "all" => bail!("'all' services not yet implemented"),
         _ => bail!("Unknown service: {}", service),
     };
 
@@ -863,6 +866,29 @@ fn import_weekly_archive(
     archive: &WeeklyArchive,
     structured: bool,
 ) -> Result<()> {
+    Importer::new(db).batch(|batch| {
+        import_weekly_in_batch(
+            batch,
+            client,
+            service_code,
+            import_mode,
+            archive,
+            structured,
+        )
+    })
+}
+
+fn import_weekly_in_batch(
+    batch: &mut ImportBatch<'_>,
+    client: &FccClient,
+    service_code: &str,
+    import_mode: &ImportMode,
+    archive: &WeeklyArchive,
+    structured: bool,
+) -> Result<()> {
+    let timestamp = validated_archive_timestamp(&archive.path, archive.date)?;
+    let data_file = ServiceCatalog::complete_license(service_code)?;
+    let etag = client.get_cached_etag(&data_file);
     status_message(structured, "\nImporting weekly data...");
 
     // Counting first would decompress every DAT file before import can start.
@@ -878,10 +904,14 @@ fn import_weekly_archive(
         progress_display.set_position(p.records as u64);
     }));
 
-    let importer = Importer::new(db);
-    let result = importer.import_for_service(
+    let result = batch.import_weekly(
         &archive.path,
-        service_code,
+        &ImportSource {
+            service: service_code,
+            date: archive.date,
+            timestamp: Some(&timestamp),
+            etag: etag.as_deref(),
+        },
         import_mode.clone(),
         import_progress,
     );
@@ -896,19 +926,6 @@ fn import_weekly_archive(
         ),
     );
 
-    // Update metadata
-    let data_file = ServiceCatalog::complete_license(service_code)?;
-    let etag = client.get_cached_etag(&data_file);
-    if let Some(e) = etag {
-        db.set_imported_etag(service_code, &e)?;
-    }
-    db.set_last_weekly_date(service_code, archive.date)?;
-    db.clear_applied_patches(service_code)?;
-
-    if let Some(date_str) = ZipExtractor::open(&archive.path)?.get_file_creation_date() {
-        db.set_last_updated(&date_str)?;
-    }
-
     Ok(())
 }
 
@@ -919,46 +936,53 @@ fn apply_dailies(
     dailies: &[DailyArchive],
     structured: bool,
 ) -> Result<usize> {
-    let importer = Importer::new(db);
+    Importer::new(db).batch(|batch| {
+        apply_dailies_in_batch(batch, service_code, import_mode, dailies, structured)
+    })
+}
+
+fn apply_dailies_in_batch(
+    batch: &mut ImportBatch<'_>,
+    service_code: &str,
+    import_mode: &ImportMode,
+    dailies: &[DailyArchive],
+    structured: bool,
+) -> Result<usize> {
     let mut count = 0;
-
     for archive in dailies {
-        if !structured {
-            print!("  Applying {}... ", archive.date);
-        }
-        let stats = importer.import_patch(&archive.path, import_mode.clone(), None)?;
-        if structured {
-            eprintln!("Applying {}: {} records", archive.date, stats.records);
-        } else {
-            println!("{} records", stats.records);
-        }
-
-        // Update tracking
-        if let Some(date_str) = ZipExtractor::open(&archive.path)?.get_file_creation_date() {
-            db.set_last_updated(&date_str)?;
-        }
-
-        let weekday = match archive.date.weekday() {
-            chrono::Weekday::Mon => "mon",
-            chrono::Weekday::Tue => "tue",
-            chrono::Weekday::Wed => "wed",
-            chrono::Weekday::Thu => "thu",
-            chrono::Weekday::Fri => "fri",
-            chrono::Weekday::Sat => "sat",
-            chrono::Weekday::Sun => "sun",
-        };
-
-        db.record_applied_patch(
-            service_code,
-            archive.date,
-            weekday,
+        let timestamp = validated_archive_timestamp(&archive.path, archive.date)?;
+        let stats = batch.import_daily(
+            &archive.path,
+            &ImportSource {
+                service: service_code,
+                date: archive.date,
+                timestamp: Some(&timestamp),
+                etag: None,
+            },
+            import_mode.clone(),
             None,
-            Some(stats.records),
         )?;
+        status_message(
+            structured,
+            format!("Applying {}: {} records", archive.date, stats.records),
+        );
         count += 1;
     }
-
     Ok(count)
+}
+
+fn validated_archive_timestamp(path: &Path, expected: NaiveDate) -> Result<String> {
+    let timestamp = ZipExtractor::open(path)?
+        .get_file_creation_date()
+        .ok_or_else(|| anyhow::anyhow!("{} has no FCC creation timestamp", path.display()))?;
+    if parse_fcc_date(&timestamp) != Some(expected) {
+        bail!(
+            "{} FCC creation date changed after planning (expected {})",
+            path.display(),
+            expected
+        );
+    }
+    Ok(timestamp)
 }
 
 #[cfg(test)]
@@ -1141,7 +1165,7 @@ mod tests {
     /// Build a ULS ZIP from the fixture DAT files plus a `counts` file carrying
     /// the given FCC creation date string. The creation date is what
     /// `extract_canonical_date` reads to order/gate weekly and daily files.
-    fn build_fixture_zip(service: &str, creation_date: &str) -> Vec<u8> {
+    pub(super) fn build_fixture_zip(service: &str, creation_date: &str) -> Vec<u8> {
         let mut buf = Vec::new();
         {
             let cursor = std::io::Cursor::new(&mut buf);
@@ -1181,7 +1205,7 @@ mod tests {
         buf
     }
 
-    fn write_malformed_patch(path: &Path) {
+    pub(super) fn write_malformed_patch(path: &Path) {
         let file = std::fs::File::create(path).unwrap();
         let mut zip = ZipWriter::new(file);
         let opts = SimpleFileOptions::default().compression_method(zip::CompressionMethod::Stored);
@@ -1197,7 +1221,7 @@ mod tests {
     }
 
     /// Mount a ZIP body at the given URL path on the mock server.
-    async fn mount_zip(server: &MockServer, url_path: &str, body: Vec<u8>) {
+    pub(super) async fn mount_zip(server: &MockServer, url_path: &str, body: Vec<u8>) {
         Mock::given(method("GET"))
             .and(wm_path(url_path.to_string()))
             .respond_with(
@@ -1211,14 +1235,14 @@ mod tests {
     }
 
     /// Open a fresh initialized database in a temp directory.
-    fn fresh_db(dir: &Path) -> Database {
+    pub(super) fn fresh_db(dir: &Path) -> Database {
         let config = DatabaseConfig::with_path(dir.join("test.db"));
         let db = Database::with_config(config).unwrap();
         db.initialize().unwrap();
         db
     }
 
-    fn test_download_config(server: &MockServer, cache: &Path) -> DownloadConfig {
+    pub(super) fn test_download_config(server: &MockServer, cache: &Path) -> DownloadConfig {
         let mut config = DownloadConfig::with_cache_dir(cache.to_path_buf())
             .with_base_url(server.uri())
             .with_timeout(std::time::Duration::from_secs(10));
@@ -1226,11 +1250,11 @@ mod tests {
         config
     }
 
-    fn test_client(server: &MockServer, cache: &Path) -> FccClient {
+    pub(super) fn test_client(server: &MockServer, cache: &Path) -> FccClient {
         FccClient::new(test_download_config(server, cache)).unwrap()
     }
 
-    fn default_update_options(service: &str) -> UpdateOptions {
+    pub(super) fn default_update_options(service: &str) -> UpdateOptions {
         UpdateOptions {
             service: service.to_owned(),
             force: false,
@@ -1244,9 +1268,12 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_execute_compatibility_wrapper_rejects_unimplemented_service() {
+    async fn test_execute_compatibility_wrapper_requires_target_for_all_services() {
         let error = execute("all", false, false).await.unwrap_err();
-        assert_eq!(error.to_string(), "'all' services not yet implemented");
+        assert_eq!(
+            error.to_string(),
+            "--service all requires --through YYYY-MM-DD"
+        );
     }
 
     #[tokio::test]

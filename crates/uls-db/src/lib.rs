@@ -35,7 +35,7 @@ pub use bulk_inserter::BulkInserter;
 pub use config::DatabaseConfig;
 pub use error::{DbError, Result};
 pub use freshness::{AppliedPatch, DataFreshness, StalenessConfig, DEFAULT_STALE_THRESHOLD_DAYS};
-pub use importer::{ImportMode, ImportProgress, ImportStats, Importer};
+pub use importer::{ImportBatch, ImportMode, ImportProgress, ImportSource, ImportStats, Importer};
 pub use models::{License, LicenseStats, Operator};
 pub use repository::{Database, Transaction};
 pub use schema::Schema;
