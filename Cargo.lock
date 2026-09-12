@@ -3083,7 +3083,7 @@ checksum = "b6f5e870be6c3b371b77fe0ee0bafb859fa4964b4404c27de1d380043c4dda20"
 
 [[package]]
 name = "uls-api"
-version = "0.1.6"
+version = "0.1.7"
 dependencies = [
  "axum",
  "chrono",
@@ -3104,7 +3104,7 @@ dependencies = [
 
 [[package]]
 name = "uls-cli"
-version = "0.1.7"
+version = "0.1.8"
 dependencies = [
  "anyhow",
  "assert_cmd",
@@ -3135,7 +3135,7 @@ dependencies = [
 
 [[package]]
 name = "uls-core"
-version = "0.1.4"
+version = "0.1.5"
 dependencies = [
  "chrono",
  "proptest",
@@ -3147,7 +3147,7 @@ dependencies = [
 
 [[package]]
 name = "uls-db"
-version = "0.2.2"
+version = "0.2.3"
 dependencies = [
  "chrono",
  "criterion",
@@ -3169,7 +3169,7 @@ dependencies = [
 
 [[package]]
 name = "uls-download"
-version = "0.2.3"
+version = "0.2.4"
 dependencies = [
  "chrono",
  "dirs",
@@ -3189,7 +3189,7 @@ dependencies = [
 
 [[package]]
 name = "uls-parser"
-version = "0.1.4"
+version = "0.1.5"
 dependencies = [
  "chrono",
  "criterion",
@@ -3206,7 +3206,7 @@ dependencies = [
 
 [[package]]
 name = "uls-query"
-version = "0.1.5"
+version = "0.1.6"
 dependencies = [
  "chrono",
  "criterion",

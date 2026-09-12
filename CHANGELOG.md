@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.8](https://github.com/tgies/uls/compare/v0.1.7...v0.1.8) - 2026-09-12
+
+### Added
+
+- *(update)* coordinate service imports in one scoped batch
+
+### Fixed
+
+- *(db)* retain original settings across batch setup retries
+
+### Other
+
+- *(cli)* start weekly imports without a counting pass ([#71](https://github.com/tgies/uls/pull/71))
+- *(parser)* reuse DAT line buffers and avoid duplicate prefix allocations ([#72](https://github.com/tgies/uls/pull/72))
+- *(deps)* bump phf from 0.13.1 to 0.14.0
+- *(db)* index entity states
+- *(db)* index entity ZIP codes
+
 ### Added
 
 - Update Amateur and GMRS to one exact date with `update --service all --through`,
