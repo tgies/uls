@@ -33,14 +33,22 @@ including when one service succeeds and a later archive or metadata write fails.
 - [x] Fixed-input fresh, seeded and mixed-route comparisons, with full database
       value/schema verification and explicit measurement scope.
 - [x] Workspace tests, doctests, formatting, Clippy and affected shell checks.
-- [ ] Signed source checkpoints, CI, updated handoffs and deployment packaging.
+- [x] Signed source checkpoints, CI, updated handoffs and deployment packaging.
 
-All 18 repeated comparisons and three final binary checks match their
-independent database references. The final retry guard passes all 716 workspace
-tests; local coverage is 98.39% for the patch and 97.59% overall. See
+All 23 comparisons, including repeated workloads, three final binary checks
+and the final confirmation pair, match their independent database references.
+The final retry guard passes all 716 workspace tests; hosted coverage is
+98.39% for the patch and 97.59% overall. See
 [the qualification report](coordinated-import-performance.md) for scopes,
-timing limits and raw receipts. Hosted final checks and packaging remain
-separate gates.
+timing limits and raw receipts.
+
+PR #73 merged as `451466e2e1f9d4dae8ab91cfea277f7373e7bd71`, with the exact
+tree from signed final commit `948497ac4cb6eeab28abd6eb9d77922840aef025`.
+Final PR and main CI passed. No mutation survived; one timed-out scenario had
+already failed its expected regression assertion. The downstream integration
+was packaged from this pinned revision and deployed on September 12, with
+its bundled batch command and public readiness verified. Production import
+timings await normal scheduled updates.
 
 Release-plz remains excluded. Source integration and measured candidate results
 must remain distinct from release and deployment receipts.
