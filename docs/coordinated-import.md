@@ -59,6 +59,7 @@ are reported alongside an original operation error. Panic cleanup also attempts
 restoration and logs any failure. Abrupt process termination retains the same
 disposable-staging requirement as existing full imports.
 
-Full-size and mixed-route qualification is tracked in
-[the implementation record](coordinated-import-work.md). Merging source does
-not release a new CLI version or update a downstream service image.
+Full-size and mixed-route results are in
+[the qualification report](coordinated-import-performance.md), with integration
+gates in [the implementation record](coordinated-import-work.md). Merging source
+does not release a new CLI version or update a downstream service image.

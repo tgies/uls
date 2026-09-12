@@ -30,10 +30,17 @@ including when one service succeeds and a later archive or metadata write fails.
 - [x] Scoped library batch and atomic archive metadata.
 - [x] Exact-target CLI batch and failure/retry regressions.
 - [x] Private wrapper integration and rejection tests.
-- [ ] Fixed-input fresh, seeded and mixed-route comparisons, with full database
+- [x] Fixed-input fresh, seeded and mixed-route comparisons, with full database
       value/schema verification and explicit measurement scope.
 - [x] Workspace tests, doctests, formatting, Clippy and affected shell checks.
 - [ ] Signed source checkpoints, CI, updated handoffs and deployment packaging.
+
+All 18 repeated comparisons and three final binary checks match their
+independent database references. The final retry guard passes all 716 workspace
+tests; local coverage is 98.39% for the patch and 97.59% overall. See
+[the qualification report](coordinated-import-performance.md) for scopes,
+timing limits and raw receipts. Hosted final checks and packaging remain
+separate gates.
 
 Release-plz remains excluded. Source integration and measured candidate results
 must remain distinct from release and deployment receipts.

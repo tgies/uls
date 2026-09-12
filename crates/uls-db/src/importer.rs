@@ -374,9 +374,9 @@ impl<'a> Importer<'a> {
             dat_files
         );
 
-        // Daily patches are small enough to keep the database's normal WAL and
-        // synchronous durability settings. Unlike full imports, do not drop
-        // indexes or weaken durability while applying a patch.
+        // Daily-only calls retain normal indexes and durability. Mixed imports
+        // inherit their enclosing batch's temporary bulk settings; this method
+        // changes neither. The batch owner restores settings after all archives.
         let transaction = conn.unchecked_transaction()?;
 
         // Create bulk inserter

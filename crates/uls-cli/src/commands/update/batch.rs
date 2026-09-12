@@ -214,6 +214,121 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn combined_entrypoint_commits_both_services_in_each_output_mode() {
+        for (minimal, format) in [(true, "json"), (false, "table")] {
+            let server = MockServer::start().await;
+            let dir = TempDir::new().unwrap();
+            weeklies(&server, "Fri Jul 17 08:00:00 EDT 2026").await;
+            let path = dir.path().join("new.db");
+            let mut options = default_update_options("ALL");
+            options.through = Some(date(17));
+            options.minimal = minimal;
+            options.format = format.into();
+            execute_with_context(
+                options,
+                &path,
+                test_download_config(&server, &dir.path().join("cache")),
+                date(23),
+            )
+            .await
+            .unwrap();
+            let db = Database::with_config(DatabaseConfig::with_path(&path)).unwrap();
+            for code in ["HA", "ZA"] {
+                assert_eq!(database_source_date(&db, code).unwrap(), Some(date(17)));
+                assert!(db.count_by_service(&[code]).unwrap() > 0);
+            }
+            assert_eq!(
+                db.get_last_updated().unwrap().as_deref(),
+                Some("Fri Jul 17 08:00:00 EDT 2026")
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn single_gmrs_entrypoint_remains_supported() {
+        let server = MockServer::start().await;
+        let dir = TempDir::new().unwrap();
+        mount_zip(
+            &server,
+            "/complete/l_gmrs.zip",
+            build_fixture_zip("l_gmrs", "Fri Jul 17 08:00:00 EDT 2026"),
+        )
+        .await;
+        let path = dir.path().join("gmrs.db");
+        let mut options = default_update_options("gmrs");
+        options.through = Some(date(17));
+        execute_with_context(
+            options,
+            &path,
+            test_download_config(&server, &dir.path().join("cache")),
+            date(23),
+        )
+        .await
+        .unwrap();
+        let db = Database::with_config(DatabaseConfig::with_path(&path)).unwrap();
+        assert_eq!(database_source_date(&db, "ZA").unwrap(), Some(date(17)));
+        assert_eq!(database_source_date(&db, "HA").unwrap(), None);
+        assert!(db.count_by_service(&["ZA"]).unwrap() > 0);
+        assert_eq!(db.count_by_service(&["HA"]).unwrap(), 0);
+    }
+
+    #[tokio::test]
+    async fn unsupported_combined_options_fail_before_network_or_database_access() {
+        let server = MockServer::start().await;
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("absent.db");
+        for flag in ["missing-target", "plan", "check", "daily-only", "force"] {
+            let mut options = default_update_options("all");
+            options.through = Some(date(17));
+            match flag {
+                "missing-target" => options.through = None,
+                "plan" => options.plan = true,
+                "check" => options.check_only = true,
+                "daily-only" => options.daily_only = true,
+                "force" => options.force = true,
+                _ => unreachable!(),
+            }
+            let error = execute_with_context(
+                options,
+                &path,
+                test_download_config(&server, &dir.path().join("cache")),
+                date(23),
+            )
+            .await
+            .unwrap_err();
+            let expected = if flag == "missing-target" {
+                "requires --through"
+            } else {
+                "conflicts with"
+            };
+            assert!(error.to_string().contains(expected), "{flag}: {error}");
+            assert!(!path.exists());
+        }
+        assert!(server.received_requests().await.unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn archive_timestamp_drift_is_rejected_before_importing_records() {
+        for timestamp in ["Sat Jul 18 08:00:00 EDT 2026", ""] {
+            let server = MockServer::start().await;
+            let dir = TempDir::new().unwrap();
+            let db = fresh_db(dir.path());
+            let client = test_client(&server, &dir.path().join("cache"));
+            weeklies(&server, "Fri Jul 17 08:00:00 EDT 2026").await;
+            let plans = plan(&db, &client, date(23), date(17)).await.unwrap();
+            let planner::ApplyRoute::Weekly(route) = plans[0].route_to(date(17)).unwrap() else {
+                panic!("weekly expected")
+            };
+            std::fs::write(&route.archive.path, build_fixture_zip("l_amat", timestamp)).unwrap();
+            let error =
+                apply(&db, &client, &ImportMode::Minimal, plans, date(17), true).unwrap_err();
+            assert!(error.to_string().contains("FCC creation"), "{error:#}");
+            assert_eq!(db.get_stats().unwrap().total_licenses, 0);
+            assert_eq!(database_source_date(&db, "HA").unwrap(), None);
+        }
+    }
+
+    #[tokio::test]
     async fn later_unreachable_service_does_not_create_database() {
         let server = MockServer::start().await;
         let dir = TempDir::new().unwrap();

@@ -203,12 +203,15 @@ impl<'a> ImportGuard<'a> {
         if self.indexes_dropped {
             return Ok(());
         }
-        let mut saved = Vec::new();
-        for name in ["journal_mode", "synchronous", "temp_store", "cache_size"] {
-            saved.push((name, self.pragma_value(name)?));
+        if self.saved_pragmas.is_empty() {
+            let mut saved = Vec::new();
+            for name in ["journal_mode", "synchronous", "temp_store", "cache_size"] {
+                saved.push((name, self.pragma_value(name)?));
+            }
+            // Keep the original snapshot if the caller retries partial setup.
+            self.saved_pragmas = saved;
         }
         // Save before the first mutation: partial setup failures also restore.
-        self.saved_pragmas = saved;
         self.conn.execute_batch(
             "PRAGMA synchronous = OFF;
              PRAGMA journal_mode = MEMORY;
@@ -493,6 +496,10 @@ mod tests {
             .unwrap_err();
         assert!(error.to_string().contains("injected patch failure"));
         assert_eq!(db.get_applied_patches("HA").unwrap().len(), 1);
+        assert_eq!(
+            db.get_last_updated().unwrap().as_deref(),
+            source("HA").timestamp
+        );
         assert!(db.get_applied_patches("ZA").unwrap().is_empty());
         assert_eq!(db.count_by_service(&["ZA"]).unwrap(), 0);
         Importer::new(&db)
@@ -505,6 +512,77 @@ mod tests {
             schema
         );
         assert_eq!(settings(&conn), pragmas);
+    }
+
+    #[test]
+    fn untracked_patch_imports_records_without_changing_source_or_bulk_settings() {
+        let dir = TempDir::new().unwrap();
+        let db = database(&dir);
+        let ha = archive(&dir, "l_amat", false);
+        let indexes = index_names(&db.conn().unwrap());
+        let pragmas = settings(&db.conn().unwrap());
+        let stats = Importer::new(&db)
+            .batch(|batch| batch.import_patch(&ha, ImportMode::Full, None))
+            .unwrap();
+        assert!(stats.records > 0);
+        assert!(db.count_by_service(&["HA"]).unwrap() > 0);
+        assert_eq!(db.get_last_weekly_date("HA").unwrap(), None);
+        assert!(db.get_applied_patches("HA").unwrap().is_empty());
+        assert_eq!(index_names(&db.conn().unwrap()), indexes);
+        assert_eq!(settings(&db.conn().unwrap()), pragmas);
+    }
+
+    #[test]
+    fn locked_database_restores_settings_after_partial_bulk_setup_failure() {
+        let dir = TempDir::new().unwrap();
+        let db = database(&dir);
+        let ha = archive(&dir, "l_amat", false);
+        let indexes = index_names(&db.conn().unwrap());
+        let pragmas = settings(&db.conn().unwrap());
+        let reader = Connection::open(dir.path().join("test.db")).unwrap();
+        reader
+            .execute_batch("BEGIN; SELECT * FROM licenses;")
+            .unwrap();
+        let error = Importer::new(&db)
+            .batch(|batch| batch.import_weekly(&ha, &source("HA"), ImportMode::Full, None))
+            .unwrap_err();
+        assert!(error.to_string().contains("locked"), "{error}");
+        assert_eq!(db.count_by_service(&["HA"]).unwrap(), 0);
+        assert_eq!(index_names(&db.conn().unwrap()), indexes);
+        assert_eq!(settings(&db.conn().unwrap()), pragmas);
+        reader.execute_batch("ROLLBACK;").unwrap();
+        drop(reader);
+        Importer::new(&db)
+            .batch(|batch| batch.import_weekly(&ha, &source("HA"), ImportMode::Full, None))
+            .unwrap();
+    }
+
+    #[test]
+    fn retry_inside_batch_preserves_settings_from_before_failed_setup() {
+        let dir = TempDir::new().unwrap();
+        let db = database(&dir);
+        let ha = archive(&dir, "l_amat", false);
+        let indexes = index_names(&db.conn().unwrap());
+        let pragmas = settings(&db.conn().unwrap());
+        let reader = Connection::open(dir.path().join("test.db")).unwrap();
+        reader
+            .execute_batch("BEGIN; SELECT * FROM licenses;")
+            .unwrap();
+        Importer::new(&db)
+            .batch(|batch| -> Result<()> {
+                let error = batch
+                    .import_weekly(&ha, &source("HA"), ImportMode::Full, None)
+                    .unwrap_err();
+                assert!(error.to_string().contains("locked"), "{error}");
+                reader.execute_batch("ROLLBACK;")?;
+                drop(reader);
+                batch.import_weekly(&ha, &source("HA"), ImportMode::Full, None)?;
+                Ok(())
+            })
+            .unwrap();
+        assert!(db.count_by_service(&["HA"]).unwrap() > 0);
+        assert_eq!(index_names(&db.conn().unwrap()), indexes);
+        assert_eq!(settings(&db.conn().unwrap()), pragmas);
     }
 
     #[test]

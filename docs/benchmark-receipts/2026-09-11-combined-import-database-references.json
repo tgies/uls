@@ -1,0 +1,1313 @@
+{
+  "fresh": {
+    "schema": [
+      [
+        "index",
+        "idx_amateur_call_sign",
+        "amateur_operators",
+        "CREATE INDEX idx_amateur_call_sign ON amateur_operators(call_sign)"
+      ],
+      [
+        "index",
+        "idx_amateur_class",
+        "amateur_operators",
+        "CREATE INDEX idx_amateur_class ON amateur_operators(operator_class)"
+      ],
+      [
+        "index",
+        "idx_amateur_usi",
+        "amateur_operators",
+        "CREATE INDEX idx_amateur_usi ON amateur_operators(unique_system_identifier)"
+      ],
+      [
+        "index",
+        "idx_comments_callsign",
+        "comments",
+        "CREATE INDEX idx_comments_callsign ON comments(callsign)"
+      ],
+      [
+        "index",
+        "idx_comments_usi",
+        "comments",
+        "CREATE INDEX idx_comments_usi ON comments(unique_system_identifier)"
+      ],
+      [
+        "index",
+        "idx_entities_call_sign",
+        "entities",
+        "CREATE INDEX idx_entities_call_sign ON entities(call_sign)"
+      ],
+      [
+        "index",
+        "idx_entities_city_state",
+        "entities",
+        "CREATE INDEX idx_entities_city_state ON entities(city, state)"
+      ],
+      [
+        "index",
+        "idx_entities_frn",
+        "entities",
+        "CREATE INDEX idx_entities_frn ON entities(frn)"
+      ],
+      [
+        "index",
+        "idx_entities_last_name",
+        "entities",
+        "CREATE INDEX idx_entities_last_name ON entities(last_name)"
+      ],
+      [
+        "index",
+        "idx_entities_name",
+        "entities",
+        "CREATE INDEX idx_entities_name ON entities(entity_name)"
+      ],
+      [
+        "index",
+        "idx_entities_state",
+        "entities",
+        "CREATE INDEX idx_entities_state ON entities(state)"
+      ],
+      [
+        "index",
+        "idx_entities_usi",
+        "entities",
+        "CREATE INDEX idx_entities_usi ON entities(unique_system_identifier)"
+      ],
+      [
+        "index",
+        "idx_entities_zip",
+        "entities",
+        "CREATE INDEX idx_entities_zip ON entities(zip_code)"
+      ],
+      [
+        "index",
+        "idx_history_callsign",
+        "history",
+        "CREATE INDEX idx_history_callsign ON history(callsign)"
+      ],
+      [
+        "index",
+        "idx_history_usi",
+        "history",
+        "CREATE INDEX idx_history_usi ON history(unique_system_identifier)"
+      ],
+      [
+        "index",
+        "idx_licenses_call_sign",
+        "licenses",
+        "CREATE INDEX idx_licenses_call_sign ON licenses(call_sign)"
+      ],
+      [
+        "index",
+        "idx_licenses_expired_date",
+        "licenses",
+        "CREATE INDEX idx_licenses_expired_date ON licenses(expired_date)"
+      ],
+      [
+        "index",
+        "idx_licenses_frn",
+        "licenses",
+        "CREATE INDEX idx_licenses_frn ON licenses(frn)"
+      ],
+      [
+        "index",
+        "idx_licenses_grant_date",
+        "licenses",
+        "CREATE INDEX idx_licenses_grant_date ON licenses(grant_date)"
+      ],
+      [
+        "index",
+        "idx_licenses_name",
+        "licenses",
+        "CREATE INDEX idx_licenses_name ON licenses(licensee_name)"
+      ],
+      [
+        "index",
+        "idx_licenses_service",
+        "licenses",
+        "CREATE INDEX idx_licenses_service ON licenses(radio_service_code)"
+      ],
+      [
+        "index",
+        "idx_licenses_status",
+        "licenses",
+        "CREATE INDEX idx_licenses_status ON licenses(license_status)"
+      ],
+      [
+        "index",
+        "idx_special_cond_usi",
+        "special_conditions",
+        "CREATE INDEX idx_special_cond_usi ON special_conditions(unique_system_identifier)"
+      ],
+      [
+        "index",
+        "sqlite_autoindex_amateur_operators_1",
+        "amateur_operators",
+        null
+      ],
+      [
+        "index",
+        "sqlite_autoindex_applied_patches_1",
+        "applied_patches",
+        null
+      ],
+      [
+        "index",
+        "sqlite_autoindex_comments_1",
+        "comments",
+        null
+      ],
+      [
+        "index",
+        "sqlite_autoindex_entities_1",
+        "entities",
+        null
+      ],
+      [
+        "index",
+        "sqlite_autoindex_history_1",
+        "history",
+        null
+      ],
+      [
+        "index",
+        "sqlite_autoindex_special_conditions_1",
+        "special_conditions",
+        null
+      ],
+      [
+        "table",
+        "amateur_operators",
+        "amateur_operators",
+        "CREATE TABLE amateur_operators (\n                id INTEGER PRIMARY KEY AUTOINCREMENT,\n                unique_system_identifier INTEGER NOT NULL UNIQUE,\n                uls_file_number TEXT,\n                ebf_number TEXT,\n                call_sign TEXT COLLATE NOCASE,\n                operator_class INTEGER,\n                group_code TEXT,\n                region_code INTEGER,\n                trustee_call_sign TEXT COLLATE NOCASE,\n                trustee_indicator TEXT,\n                physician_certification TEXT,\n                ve_signature TEXT,\n                systematic_call_sign_change TEXT,\n                vanity_call_sign_change TEXT,\n                vanity_relationship TEXT,\n                previous_call_sign TEXT COLLATE NOCASE,\n                previous_operator_class INTEGER,\n                trustee_name TEXT COLLATE NOCASE,\n                FOREIGN KEY (unique_system_identifier) REFERENCES licenses(unique_system_identifier)\n            )"
+      ],
+      [
+        "table",
+        "applied_patches",
+        "applied_patches",
+        "CREATE TABLE applied_patches (\n                radio_service_code TEXT NOT NULL,\n                patch_date TEXT NOT NULL,\n                patch_weekday TEXT NOT NULL,\n                applied_at TEXT NOT NULL,\n                etag TEXT,\n                record_count INTEGER,\n                PRIMARY KEY (radio_service_code, patch_date)\n            )"
+      ],
+      [
+        "table",
+        "comments",
+        "comments",
+        "CREATE TABLE comments (\n                id INTEGER PRIMARY KEY AUTOINCREMENT,\n                unique_system_identifier INTEGER NOT NULL,\n                uls_file_number TEXT,\n                callsign TEXT,\n                comment_date TEXT,\n                description TEXT,\n                status_code TEXT,\n                status_date TEXT,\n                UNIQUE(unique_system_identifier, comment_date),\n                FOREIGN KEY (unique_system_identifier) REFERENCES licenses(unique_system_identifier)\n            )"
+      ],
+      [
+        "table",
+        "entities",
+        "entities",
+        "CREATE TABLE entities (\n                id INTEGER PRIMARY KEY AUTOINCREMENT,\n                unique_system_identifier INTEGER NOT NULL,\n                uls_file_number TEXT,\n                ebf_number TEXT,\n                call_sign TEXT COLLATE NOCASE,\n                entity_type INTEGER,\n                licensee_id TEXT,\n                entity_name TEXT COLLATE NOCASE,\n                first_name TEXT COLLATE NOCASE,\n                middle_initial TEXT,\n                last_name TEXT COLLATE NOCASE,\n                suffix TEXT,\n                phone TEXT,\n                fax TEXT,\n                email TEXT,\n                street_address TEXT COLLATE NOCASE,\n                city TEXT COLLATE NOCASE,\n                state TEXT COLLATE NOCASE,\n                zip_code TEXT COLLATE NOCASE,\n                po_box TEXT,\n                attention_line TEXT,\n                sgin TEXT,\n                frn TEXT COLLATE NOCASE,\n                applicant_type_code TEXT,\n                status_code TEXT,\n                status_date TEXT,\n                UNIQUE(unique_system_identifier, entity_type),\n                FOREIGN KEY (unique_system_identifier) REFERENCES licenses(unique_system_identifier)\n            )"
+      ],
+      [
+        "table",
+        "history",
+        "history",
+        "CREATE TABLE history (\n                id INTEGER PRIMARY KEY AUTOINCREMENT,\n                unique_system_identifier INTEGER NOT NULL,\n                uls_file_number TEXT,\n                callsign TEXT,\n                log_date TEXT,\n                code TEXT,\n                UNIQUE(unique_system_identifier, log_date, code),\n                FOREIGN KEY (unique_system_identifier) REFERENCES licenses(unique_system_identifier)\n            )"
+      ],
+      [
+        "table",
+        "import_status",
+        "import_status",
+        "CREATE TABLE import_status (\n                radio_service_code TEXT NOT NULL,\n                record_type TEXT NOT NULL,\n                imported_at TEXT,\n                record_count INTEGER,\n                PRIMARY KEY (radio_service_code, record_type)\n            ) WITHOUT ROWID"
+      ],
+      [
+        "table",
+        "licenses",
+        "licenses",
+        "CREATE TABLE licenses (\n                unique_system_identifier INTEGER PRIMARY KEY,\n                uls_file_number TEXT,\n                ebf_number TEXT,\n                call_sign TEXT COLLATE NOCASE,\n                license_status INTEGER,\n                radio_service_code INTEGER,\n                grant_date TEXT,\n                expired_date TEXT,\n                cancellation_date TEXT,\n                effective_date TEXT,\n                last_action_date TEXT,\n                revoked_certification TEXT,\n                license_revoked TEXT,\n                licensee_name TEXT COLLATE NOCASE,\n                first_name TEXT COLLATE NOCASE,\n                middle_initial TEXT,\n                last_name TEXT COLLATE NOCASE,\n                suffix TEXT,\n                frn TEXT COLLATE NOCASE,\n                previous_call_sign TEXT COLLATE NOCASE,\n                trustee_call_sign TEXT COLLATE NOCASE,\n                trustee_name TEXT COLLATE NOCASE\n            ) WITHOUT ROWID"
+      ],
+      [
+        "table",
+        "metadata",
+        "metadata",
+        "CREATE TABLE metadata (\n                key TEXT PRIMARY KEY,\n                value TEXT NOT NULL\n            ) WITHOUT ROWID"
+      ],
+      [
+        "table",
+        "special_conditions",
+        "special_conditions",
+        "CREATE TABLE special_conditions (\n                id INTEGER PRIMARY KEY AUTOINCREMENT,\n                unique_system_identifier INTEGER NOT NULL,\n                uls_file_number TEXT,\n                ebf_number TEXT,\n                callsign TEXT,\n                special_condition_type TEXT,\n                special_condition_code INTEGER,\n                status_code TEXT,\n                status_date TEXT,\n                UNIQUE(unique_system_identifier, special_condition_code),\n                FOREIGN KEY (unique_system_identifier) REFERENCES licenses(unique_system_identifier)\n            )"
+      ],
+      [
+        "table",
+        "sqlite_sequence",
+        "sqlite_sequence",
+        "CREATE TABLE sqlite_sequence(name,seq)"
+      ]
+    ],
+    "tables": {
+      "amateur_operators": {
+        "rows": 1690602,
+        "columns": [
+          "id",
+          "unique_system_identifier",
+          "uls_file_number",
+          "ebf_number",
+          "call_sign",
+          "operator_class",
+          "group_code",
+          "region_code",
+          "trustee_call_sign",
+          "trustee_indicator",
+          "physician_certification",
+          "ve_signature",
+          "systematic_call_sign_change",
+          "vanity_call_sign_change",
+          "vanity_relationship",
+          "previous_call_sign",
+          "previous_operator_class",
+          "trustee_name"
+        ],
+        "order": [
+          "id"
+        ],
+        "sha3_256": "BD5BC01F6BD06CF9CEEEC3A61BC1EE5B5D596F34EA1DB00E24EDE93D3502E72E"
+      },
+      "applied_patches": {
+        "rows": 0,
+        "columns": [
+          "radio_service_code",
+          "patch_date",
+          "patch_weekday",
+          "applied_at",
+          "etag",
+          "record_count"
+        ],
+        "order": [
+          "radio_service_code",
+          "patch_date"
+        ],
+        "sha3_256": "ACD0934A0AE34ACD7DFFE29D6C7F21D691D927810F16CDFE746E09BB980AC164"
+      },
+      "comments": {
+        "rows": 234904,
+        "columns": [
+          "id",
+          "unique_system_identifier",
+          "uls_file_number",
+          "callsign",
+          "comment_date",
+          "description",
+          "status_code",
+          "status_date"
+        ],
+        "order": [
+          "id"
+        ],
+        "sha3_256": "E0091A969A0215F668CE43A8E4C889951327438321752C5DAA383ADF41A62D92"
+      },
+      "entities": {
+        "rows": 2297038,
+        "columns": [
+          "id",
+          "unique_system_identifier",
+          "uls_file_number",
+          "ebf_number",
+          "call_sign",
+          "entity_type",
+          "licensee_id",
+          "entity_name",
+          "first_name",
+          "middle_initial",
+          "last_name",
+          "suffix",
+          "phone",
+          "fax",
+          "email",
+          "street_address",
+          "city",
+          "state",
+          "zip_code",
+          "po_box",
+          "attention_line",
+          "sgin",
+          "frn",
+          "applicant_type_code",
+          "status_code",
+          "status_date"
+        ],
+        "order": [
+          "id"
+        ],
+        "sha3_256": "043CC71A188D1152D4BB075F87EE047BAE9AEA0ECAA87E44BF3A57AA44109FE5"
+      },
+      "history": {
+        "rows": 6121213,
+        "columns": [
+          "id",
+          "unique_system_identifier",
+          "uls_file_number",
+          "callsign",
+          "log_date",
+          "code"
+        ],
+        "order": [
+          "id"
+        ],
+        "sha3_256": "ABA8274FC01DB02612FCA5027FA273DD6901A2B499608BC0E9144511217E28AF"
+      },
+      "import_status": {
+        "rows": 14,
+        "columns": [
+          "radio_service_code",
+          "record_type",
+          "record_count"
+        ],
+        "order": [
+          "radio_service_code",
+          "record_type"
+        ],
+        "sha3_256": "341FCAD80D0D1AD7F2D4DE14FF28FD2422042DCB2D2F58963F654419A9BC3992"
+      },
+      "licenses": {
+        "rows": 2297038,
+        "columns": [
+          "unique_system_identifier",
+          "uls_file_number",
+          "ebf_number",
+          "call_sign",
+          "license_status",
+          "radio_service_code",
+          "grant_date",
+          "expired_date",
+          "cancellation_date",
+          "effective_date",
+          "last_action_date",
+          "revoked_certification",
+          "license_revoked",
+          "licensee_name",
+          "first_name",
+          "middle_initial",
+          "last_name",
+          "suffix",
+          "frn",
+          "previous_call_sign",
+          "trustee_call_sign",
+          "trustee_name"
+        ],
+        "order": [
+          "unique_system_identifier"
+        ],
+        "sha3_256": "028100A0776D000AFEAAC84138C5347F683C5C58B3F5849FDC847E08C85D1801"
+      },
+      "metadata": {
+        "rows": 1,
+        "columns": [
+          "key",
+          "value"
+        ],
+        "order": [
+          "key"
+        ],
+        "sha3_256": "C4D6F2F188E11FF938497055193C8F0FFF5F4C6BC01EEC37A2CCA577638A8908"
+      },
+      "special_conditions": {
+        "rows": 215987,
+        "columns": [
+          "id",
+          "unique_system_identifier",
+          "uls_file_number",
+          "ebf_number",
+          "callsign",
+          "special_condition_type",
+          "special_condition_code",
+          "status_code",
+          "status_date"
+        ],
+        "order": [
+          "id"
+        ],
+        "sha3_256": "A1D08D548E0C4E34E7E522BFFEB221614C642E684B87D72218BA6D865FFB0BEA"
+      },
+      "sqlite_sequence": {
+        "rows": 5,
+        "columns": [
+          "name",
+          "seq"
+        ],
+        "order": [
+          "name",
+          "seq"
+        ],
+        "sha3_256": "4A363A9D9EB91FA6846395C7D27830B5EAD0D6F4D528348E7AE9D495021E13DA"
+      }
+    },
+    "quick_check": "ok",
+    "foreign_key_check": "ok"
+  },
+  "seeded": {
+    "schema": [
+      [
+        "index",
+        "idx_amateur_call_sign",
+        "amateur_operators",
+        "CREATE INDEX idx_amateur_call_sign ON amateur_operators(call_sign)"
+      ],
+      [
+        "index",
+        "idx_amateur_class",
+        "amateur_operators",
+        "CREATE INDEX idx_amateur_class ON amateur_operators(operator_class)"
+      ],
+      [
+        "index",
+        "idx_amateur_usi",
+        "amateur_operators",
+        "CREATE INDEX idx_amateur_usi ON amateur_operators(unique_system_identifier)"
+      ],
+      [
+        "index",
+        "idx_comments_callsign",
+        "comments",
+        "CREATE INDEX idx_comments_callsign ON comments(callsign)"
+      ],
+      [
+        "index",
+        "idx_comments_usi",
+        "comments",
+        "CREATE INDEX idx_comments_usi ON comments(unique_system_identifier)"
+      ],
+      [
+        "index",
+        "idx_entities_call_sign",
+        "entities",
+        "CREATE INDEX idx_entities_call_sign ON entities(call_sign)"
+      ],
+      [
+        "index",
+        "idx_entities_city_state",
+        "entities",
+        "CREATE INDEX idx_entities_city_state ON entities(city, state)"
+      ],
+      [
+        "index",
+        "idx_entities_frn",
+        "entities",
+        "CREATE INDEX idx_entities_frn ON entities(frn)"
+      ],
+      [
+        "index",
+        "idx_entities_last_name",
+        "entities",
+        "CREATE INDEX idx_entities_last_name ON entities(last_name)"
+      ],
+      [
+        "index",
+        "idx_entities_name",
+        "entities",
+        "CREATE INDEX idx_entities_name ON entities(entity_name)"
+      ],
+      [
+        "index",
+        "idx_entities_state",
+        "entities",
+        "CREATE INDEX idx_entities_state ON entities(state)"
+      ],
+      [
+        "index",
+        "idx_entities_usi",
+        "entities",
+        "CREATE INDEX idx_entities_usi ON entities(unique_system_identifier)"
+      ],
+      [
+        "index",
+        "idx_entities_zip",
+        "entities",
+        "CREATE INDEX idx_entities_zip ON entities(zip_code)"
+      ],
+      [
+        "index",
+        "idx_history_callsign",
+        "history",
+        "CREATE INDEX idx_history_callsign ON history(callsign)"
+      ],
+      [
+        "index",
+        "idx_history_usi",
+        "history",
+        "CREATE INDEX idx_history_usi ON history(unique_system_identifier)"
+      ],
+      [
+        "index",
+        "idx_licenses_call_sign",
+        "licenses",
+        "CREATE INDEX idx_licenses_call_sign ON licenses(call_sign)"
+      ],
+      [
+        "index",
+        "idx_licenses_expired_date",
+        "licenses",
+        "CREATE INDEX idx_licenses_expired_date ON licenses(expired_date)"
+      ],
+      [
+        "index",
+        "idx_licenses_frn",
+        "licenses",
+        "CREATE INDEX idx_licenses_frn ON licenses(frn)"
+      ],
+      [
+        "index",
+        "idx_licenses_grant_date",
+        "licenses",
+        "CREATE INDEX idx_licenses_grant_date ON licenses(grant_date)"
+      ],
+      [
+        "index",
+        "idx_licenses_name",
+        "licenses",
+        "CREATE INDEX idx_licenses_name ON licenses(licensee_name)"
+      ],
+      [
+        "index",
+        "idx_licenses_service",
+        "licenses",
+        "CREATE INDEX idx_licenses_service ON licenses(radio_service_code)"
+      ],
+      [
+        "index",
+        "idx_licenses_status",
+        "licenses",
+        "CREATE INDEX idx_licenses_status ON licenses(license_status)"
+      ],
+      [
+        "index",
+        "idx_special_cond_usi",
+        "special_conditions",
+        "CREATE INDEX idx_special_cond_usi ON special_conditions(unique_system_identifier)"
+      ],
+      [
+        "index",
+        "sqlite_autoindex_amateur_operators_1",
+        "amateur_operators",
+        null
+      ],
+      [
+        "index",
+        "sqlite_autoindex_applied_patches_1",
+        "applied_patches",
+        null
+      ],
+      [
+        "index",
+        "sqlite_autoindex_comments_1",
+        "comments",
+        null
+      ],
+      [
+        "index",
+        "sqlite_autoindex_entities_1",
+        "entities",
+        null
+      ],
+      [
+        "index",
+        "sqlite_autoindex_history_1",
+        "history",
+        null
+      ],
+      [
+        "index",
+        "sqlite_autoindex_special_conditions_1",
+        "special_conditions",
+        null
+      ],
+      [
+        "table",
+        "amateur_operators",
+        "amateur_operators",
+        "CREATE TABLE amateur_operators (\n                id INTEGER PRIMARY KEY AUTOINCREMENT,\n                unique_system_identifier INTEGER NOT NULL UNIQUE,\n                uls_file_number TEXT,\n                ebf_number TEXT,\n                call_sign TEXT COLLATE NOCASE,\n                operator_class INTEGER,\n                group_code TEXT,\n                region_code INTEGER,\n                trustee_call_sign TEXT COLLATE NOCASE,\n                trustee_indicator TEXT,\n                physician_certification TEXT,\n                ve_signature TEXT,\n                systematic_call_sign_change TEXT,\n                vanity_call_sign_change TEXT,\n                vanity_relationship TEXT,\n                previous_call_sign TEXT COLLATE NOCASE,\n                previous_operator_class INTEGER,\n                trustee_name TEXT COLLATE NOCASE,\n                FOREIGN KEY (unique_system_identifier) REFERENCES licenses(unique_system_identifier)\n            )"
+      ],
+      [
+        "table",
+        "applied_patches",
+        "applied_patches",
+        "CREATE TABLE applied_patches (\n                radio_service_code TEXT NOT NULL,\n                patch_date TEXT NOT NULL,\n                patch_weekday TEXT NOT NULL,\n                applied_at TEXT NOT NULL,\n                etag TEXT,\n                record_count INTEGER,\n                PRIMARY KEY (radio_service_code, patch_date)\n            )"
+      ],
+      [
+        "table",
+        "comments",
+        "comments",
+        "CREATE TABLE comments (\n                id INTEGER PRIMARY KEY AUTOINCREMENT,\n                unique_system_identifier INTEGER NOT NULL,\n                uls_file_number TEXT,\n                callsign TEXT,\n                comment_date TEXT,\n                description TEXT,\n                status_code TEXT,\n                status_date TEXT,\n                UNIQUE(unique_system_identifier, comment_date),\n                FOREIGN KEY (unique_system_identifier) REFERENCES licenses(unique_system_identifier)\n            )"
+      ],
+      [
+        "table",
+        "entities",
+        "entities",
+        "CREATE TABLE entities (\n                id INTEGER PRIMARY KEY AUTOINCREMENT,\n                unique_system_identifier INTEGER NOT NULL,\n                uls_file_number TEXT,\n                ebf_number TEXT,\n                call_sign TEXT COLLATE NOCASE,\n                entity_type INTEGER,\n                licensee_id TEXT,\n                entity_name TEXT COLLATE NOCASE,\n                first_name TEXT COLLATE NOCASE,\n                middle_initial TEXT,\n                last_name TEXT COLLATE NOCASE,\n                suffix TEXT,\n                phone TEXT,\n                fax TEXT,\n                email TEXT,\n                street_address TEXT COLLATE NOCASE,\n                city TEXT COLLATE NOCASE,\n                state TEXT COLLATE NOCASE,\n                zip_code TEXT COLLATE NOCASE,\n                po_box TEXT,\n                attention_line TEXT,\n                sgin TEXT,\n                frn TEXT COLLATE NOCASE,\n                applicant_type_code TEXT,\n                status_code TEXT,\n                status_date TEXT,\n                UNIQUE(unique_system_identifier, entity_type),\n                FOREIGN KEY (unique_system_identifier) REFERENCES licenses(unique_system_identifier)\n            )"
+      ],
+      [
+        "table",
+        "history",
+        "history",
+        "CREATE TABLE history (\n                id INTEGER PRIMARY KEY AUTOINCREMENT,\n                unique_system_identifier INTEGER NOT NULL,\n                uls_file_number TEXT,\n                callsign TEXT,\n                log_date TEXT,\n                code TEXT,\n                UNIQUE(unique_system_identifier, log_date, code),\n                FOREIGN KEY (unique_system_identifier) REFERENCES licenses(unique_system_identifier)\n            )"
+      ],
+      [
+        "table",
+        "import_status",
+        "import_status",
+        "CREATE TABLE import_status (\n                radio_service_code TEXT NOT NULL,\n                record_type TEXT NOT NULL,\n                imported_at TEXT,\n                record_count INTEGER,\n                PRIMARY KEY (radio_service_code, record_type)\n            ) WITHOUT ROWID"
+      ],
+      [
+        "table",
+        "licenses",
+        "licenses",
+        "CREATE TABLE licenses (\n                unique_system_identifier INTEGER PRIMARY KEY,\n                uls_file_number TEXT,\n                ebf_number TEXT,\n                call_sign TEXT COLLATE NOCASE,\n                license_status INTEGER,\n                radio_service_code INTEGER,\n                grant_date TEXT,\n                expired_date TEXT,\n                cancellation_date TEXT,\n                effective_date TEXT,\n                last_action_date TEXT,\n                revoked_certification TEXT,\n                license_revoked TEXT,\n                licensee_name TEXT COLLATE NOCASE,\n                first_name TEXT COLLATE NOCASE,\n                middle_initial TEXT,\n                last_name TEXT COLLATE NOCASE,\n                suffix TEXT,\n                frn TEXT COLLATE NOCASE,\n                previous_call_sign TEXT COLLATE NOCASE,\n                trustee_call_sign TEXT COLLATE NOCASE,\n                trustee_name TEXT COLLATE NOCASE\n            ) WITHOUT ROWID"
+      ],
+      [
+        "table",
+        "metadata",
+        "metadata",
+        "CREATE TABLE metadata (\n                key TEXT PRIMARY KEY,\n                value TEXT NOT NULL\n            ) WITHOUT ROWID"
+      ],
+      [
+        "table",
+        "special_conditions",
+        "special_conditions",
+        "CREATE TABLE special_conditions (\n                id INTEGER PRIMARY KEY AUTOINCREMENT,\n                unique_system_identifier INTEGER NOT NULL,\n                uls_file_number TEXT,\n                ebf_number TEXT,\n                callsign TEXT,\n                special_condition_type TEXT,\n                special_condition_code INTEGER,\n                status_code TEXT,\n                status_date TEXT,\n                UNIQUE(unique_system_identifier, special_condition_code),\n                FOREIGN KEY (unique_system_identifier) REFERENCES licenses(unique_system_identifier)\n            )"
+      ],
+      [
+        "table",
+        "sqlite_sequence",
+        "sqlite_sequence",
+        "CREATE TABLE sqlite_sequence(name,seq)"
+      ]
+    ],
+    "tables": {
+      "amateur_operators": {
+        "rows": 1690602,
+        "columns": [
+          "id",
+          "unique_system_identifier",
+          "uls_file_number",
+          "ebf_number",
+          "call_sign",
+          "operator_class",
+          "group_code",
+          "region_code",
+          "trustee_call_sign",
+          "trustee_indicator",
+          "physician_certification",
+          "ve_signature",
+          "systematic_call_sign_change",
+          "vanity_call_sign_change",
+          "vanity_relationship",
+          "previous_call_sign",
+          "previous_operator_class",
+          "trustee_name"
+        ],
+        "order": [
+          "id"
+        ],
+        "sha3_256": "73C4EDFEF78026FCF6ACBD00C8D63E40DC944AF0EF0EDEC38F35CAC0586C3C38"
+      },
+      "applied_patches": {
+        "rows": 0,
+        "columns": [
+          "radio_service_code",
+          "patch_date",
+          "patch_weekday",
+          "applied_at",
+          "etag",
+          "record_count"
+        ],
+        "order": [
+          "radio_service_code",
+          "patch_date"
+        ],
+        "sha3_256": "ACD0934A0AE34ACD7DFFE29D6C7F21D691D927810F16CDFE746E09BB980AC164"
+      },
+      "comments": {
+        "rows": 234904,
+        "columns": [
+          "id",
+          "unique_system_identifier",
+          "uls_file_number",
+          "callsign",
+          "comment_date",
+          "description",
+          "status_code",
+          "status_date"
+        ],
+        "order": [
+          "id"
+        ],
+        "sha3_256": "46990CDC50126EE9C304B87A63BFC11C0B25D2CBE09767FBF7AC33B62BA55374"
+      },
+      "entities": {
+        "rows": 2297038,
+        "columns": [
+          "id",
+          "unique_system_identifier",
+          "uls_file_number",
+          "ebf_number",
+          "call_sign",
+          "entity_type",
+          "licensee_id",
+          "entity_name",
+          "first_name",
+          "middle_initial",
+          "last_name",
+          "suffix",
+          "phone",
+          "fax",
+          "email",
+          "street_address",
+          "city",
+          "state",
+          "zip_code",
+          "po_box",
+          "attention_line",
+          "sgin",
+          "frn",
+          "applicant_type_code",
+          "status_code",
+          "status_date"
+        ],
+        "order": [
+          "id"
+        ],
+        "sha3_256": "011C4A76A1E80567C794AF07A4D7F2EDD84C47D642CFB04D96CCAFD7ED9F63F1"
+      },
+      "history": {
+        "rows": 6121213,
+        "columns": [
+          "id",
+          "unique_system_identifier",
+          "uls_file_number",
+          "callsign",
+          "log_date",
+          "code"
+        ],
+        "order": [
+          "id"
+        ],
+        "sha3_256": "364F784FF9E346D00D69C5A3F28BDE1B6C068E0B7F163FA3FC0D23DAD5FBB9D6"
+      },
+      "import_status": {
+        "rows": 14,
+        "columns": [
+          "radio_service_code",
+          "record_type",
+          "record_count"
+        ],
+        "order": [
+          "radio_service_code",
+          "record_type"
+        ],
+        "sha3_256": "341FCAD80D0D1AD7F2D4DE14FF28FD2422042DCB2D2F58963F654419A9BC3992"
+      },
+      "licenses": {
+        "rows": 2297038,
+        "columns": [
+          "unique_system_identifier",
+          "uls_file_number",
+          "ebf_number",
+          "call_sign",
+          "license_status",
+          "radio_service_code",
+          "grant_date",
+          "expired_date",
+          "cancellation_date",
+          "effective_date",
+          "last_action_date",
+          "revoked_certification",
+          "license_revoked",
+          "licensee_name",
+          "first_name",
+          "middle_initial",
+          "last_name",
+          "suffix",
+          "frn",
+          "previous_call_sign",
+          "trustee_call_sign",
+          "trustee_name"
+        ],
+        "order": [
+          "unique_system_identifier"
+        ],
+        "sha3_256": "028100A0776D000AFEAAC84138C5347F683C5C58B3F5849FDC847E08C85D1801"
+      },
+      "metadata": {
+        "rows": 1,
+        "columns": [
+          "key",
+          "value"
+        ],
+        "order": [
+          "key"
+        ],
+        "sha3_256": "C4D6F2F188E11FF938497055193C8F0FFF5F4C6BC01EEC37A2CCA577638A8908"
+      },
+      "special_conditions": {
+        "rows": 215987,
+        "columns": [
+          "id",
+          "unique_system_identifier",
+          "uls_file_number",
+          "ebf_number",
+          "callsign",
+          "special_condition_type",
+          "special_condition_code",
+          "status_code",
+          "status_date"
+        ],
+        "order": [
+          "id"
+        ],
+        "sha3_256": "CD99C074282B89EFE2E4D44A9793630441BB8CA22B74065739978981EB7CCD2A"
+      },
+      "sqlite_sequence": {
+        "rows": 5,
+        "columns": [
+          "name",
+          "seq"
+        ],
+        "order": [
+          "name",
+          "seq"
+        ],
+        "sha3_256": "BEF9BE55B538F15FB4D1A309DD4796A787E3DC90A8EFE17C3FD6C8CAAE123728"
+      }
+    },
+    "quick_check": "ok",
+    "foreign_key_check": "ok"
+  },
+  "mixed": {
+    "schema": [
+      [
+        "index",
+        "idx_amateur_call_sign",
+        "amateur_operators",
+        "CREATE INDEX idx_amateur_call_sign ON amateur_operators(call_sign)"
+      ],
+      [
+        "index",
+        "idx_amateur_class",
+        "amateur_operators",
+        "CREATE INDEX idx_amateur_class ON amateur_operators(operator_class)"
+      ],
+      [
+        "index",
+        "idx_amateur_usi",
+        "amateur_operators",
+        "CREATE INDEX idx_amateur_usi ON amateur_operators(unique_system_identifier)"
+      ],
+      [
+        "index",
+        "idx_comments_callsign",
+        "comments",
+        "CREATE INDEX idx_comments_callsign ON comments(callsign)"
+      ],
+      [
+        "index",
+        "idx_comments_usi",
+        "comments",
+        "CREATE INDEX idx_comments_usi ON comments(unique_system_identifier)"
+      ],
+      [
+        "index",
+        "idx_entities_call_sign",
+        "entities",
+        "CREATE INDEX idx_entities_call_sign ON entities(call_sign)"
+      ],
+      [
+        "index",
+        "idx_entities_city_state",
+        "entities",
+        "CREATE INDEX idx_entities_city_state ON entities(city, state)"
+      ],
+      [
+        "index",
+        "idx_entities_frn",
+        "entities",
+        "CREATE INDEX idx_entities_frn ON entities(frn)"
+      ],
+      [
+        "index",
+        "idx_entities_last_name",
+        "entities",
+        "CREATE INDEX idx_entities_last_name ON entities(last_name)"
+      ],
+      [
+        "index",
+        "idx_entities_name",
+        "entities",
+        "CREATE INDEX idx_entities_name ON entities(entity_name)"
+      ],
+      [
+        "index",
+        "idx_entities_state",
+        "entities",
+        "CREATE INDEX idx_entities_state ON entities(state)"
+      ],
+      [
+        "index",
+        "idx_entities_usi",
+        "entities",
+        "CREATE INDEX idx_entities_usi ON entities(unique_system_identifier)"
+      ],
+      [
+        "index",
+        "idx_entities_zip",
+        "entities",
+        "CREATE INDEX idx_entities_zip ON entities(zip_code)"
+      ],
+      [
+        "index",
+        "idx_history_callsign",
+        "history",
+        "CREATE INDEX idx_history_callsign ON history(callsign)"
+      ],
+      [
+        "index",
+        "idx_history_usi",
+        "history",
+        "CREATE INDEX idx_history_usi ON history(unique_system_identifier)"
+      ],
+      [
+        "index",
+        "idx_licenses_call_sign",
+        "licenses",
+        "CREATE INDEX idx_licenses_call_sign ON licenses(call_sign)"
+      ],
+      [
+        "index",
+        "idx_licenses_expired_date",
+        "licenses",
+        "CREATE INDEX idx_licenses_expired_date ON licenses(expired_date)"
+      ],
+      [
+        "index",
+        "idx_licenses_frn",
+        "licenses",
+        "CREATE INDEX idx_licenses_frn ON licenses(frn)"
+      ],
+      [
+        "index",
+        "idx_licenses_grant_date",
+        "licenses",
+        "CREATE INDEX idx_licenses_grant_date ON licenses(grant_date)"
+      ],
+      [
+        "index",
+        "idx_licenses_name",
+        "licenses",
+        "CREATE INDEX idx_licenses_name ON licenses(licensee_name)"
+      ],
+      [
+        "index",
+        "idx_licenses_service",
+        "licenses",
+        "CREATE INDEX idx_licenses_service ON licenses(radio_service_code)"
+      ],
+      [
+        "index",
+        "idx_licenses_status",
+        "licenses",
+        "CREATE INDEX idx_licenses_status ON licenses(license_status)"
+      ],
+      [
+        "index",
+        "idx_special_cond_usi",
+        "special_conditions",
+        "CREATE INDEX idx_special_cond_usi ON special_conditions(unique_system_identifier)"
+      ],
+      [
+        "index",
+        "sqlite_autoindex_amateur_operators_1",
+        "amateur_operators",
+        null
+      ],
+      [
+        "index",
+        "sqlite_autoindex_applied_patches_1",
+        "applied_patches",
+        null
+      ],
+      [
+        "index",
+        "sqlite_autoindex_comments_1",
+        "comments",
+        null
+      ],
+      [
+        "index",
+        "sqlite_autoindex_entities_1",
+        "entities",
+        null
+      ],
+      [
+        "index",
+        "sqlite_autoindex_history_1",
+        "history",
+        null
+      ],
+      [
+        "index",
+        "sqlite_autoindex_special_conditions_1",
+        "special_conditions",
+        null
+      ],
+      [
+        "table",
+        "amateur_operators",
+        "amateur_operators",
+        "CREATE TABLE amateur_operators (\n                id INTEGER PRIMARY KEY AUTOINCREMENT,\n                unique_system_identifier INTEGER NOT NULL UNIQUE,\n                uls_file_number TEXT,\n                ebf_number TEXT,\n                call_sign TEXT COLLATE NOCASE,\n                operator_class INTEGER,\n                group_code TEXT,\n                region_code INTEGER,\n                trustee_call_sign TEXT COLLATE NOCASE,\n                trustee_indicator TEXT,\n                physician_certification TEXT,\n                ve_signature TEXT,\n                systematic_call_sign_change TEXT,\n                vanity_call_sign_change TEXT,\n                vanity_relationship TEXT,\n                previous_call_sign TEXT COLLATE NOCASE,\n                previous_operator_class INTEGER,\n                trustee_name TEXT COLLATE NOCASE,\n                FOREIGN KEY (unique_system_identifier) REFERENCES licenses(unique_system_identifier)\n            )"
+      ],
+      [
+        "table",
+        "applied_patches",
+        "applied_patches",
+        "CREATE TABLE applied_patches (\n                radio_service_code TEXT NOT NULL,\n                patch_date TEXT NOT NULL,\n                patch_weekday TEXT NOT NULL,\n                applied_at TEXT NOT NULL,\n                etag TEXT,\n                record_count INTEGER,\n                PRIMARY KEY (radio_service_code, patch_date)\n            )"
+      ],
+      [
+        "table",
+        "comments",
+        "comments",
+        "CREATE TABLE comments (\n                id INTEGER PRIMARY KEY AUTOINCREMENT,\n                unique_system_identifier INTEGER NOT NULL,\n                uls_file_number TEXT,\n                callsign TEXT,\n                comment_date TEXT,\n                description TEXT,\n                status_code TEXT,\n                status_date TEXT,\n                UNIQUE(unique_system_identifier, comment_date),\n                FOREIGN KEY (unique_system_identifier) REFERENCES licenses(unique_system_identifier)\n            )"
+      ],
+      [
+        "table",
+        "entities",
+        "entities",
+        "CREATE TABLE entities (\n                id INTEGER PRIMARY KEY AUTOINCREMENT,\n                unique_system_identifier INTEGER NOT NULL,\n                uls_file_number TEXT,\n                ebf_number TEXT,\n                call_sign TEXT COLLATE NOCASE,\n                entity_type INTEGER,\n                licensee_id TEXT,\n                entity_name TEXT COLLATE NOCASE,\n                first_name TEXT COLLATE NOCASE,\n                middle_initial TEXT,\n                last_name TEXT COLLATE NOCASE,\n                suffix TEXT,\n                phone TEXT,\n                fax TEXT,\n                email TEXT,\n                street_address TEXT COLLATE NOCASE,\n                city TEXT COLLATE NOCASE,\n                state TEXT COLLATE NOCASE,\n                zip_code TEXT COLLATE NOCASE,\n                po_box TEXT,\n                attention_line TEXT,\n                sgin TEXT,\n                frn TEXT COLLATE NOCASE,\n                applicant_type_code TEXT,\n                status_code TEXT,\n                status_date TEXT,\n                UNIQUE(unique_system_identifier, entity_type),\n                FOREIGN KEY (unique_system_identifier) REFERENCES licenses(unique_system_identifier)\n            )"
+      ],
+      [
+        "table",
+        "history",
+        "history",
+        "CREATE TABLE history (\n                id INTEGER PRIMARY KEY AUTOINCREMENT,\n                unique_system_identifier INTEGER NOT NULL,\n                uls_file_number TEXT,\n                callsign TEXT,\n                log_date TEXT,\n                code TEXT,\n                UNIQUE(unique_system_identifier, log_date, code),\n                FOREIGN KEY (unique_system_identifier) REFERENCES licenses(unique_system_identifier)\n            )"
+      ],
+      [
+        "table",
+        "import_status",
+        "import_status",
+        "CREATE TABLE import_status (\n                radio_service_code TEXT NOT NULL,\n                record_type TEXT NOT NULL,\n                imported_at TEXT,\n                record_count INTEGER,\n                PRIMARY KEY (radio_service_code, record_type)\n            ) WITHOUT ROWID"
+      ],
+      [
+        "table",
+        "licenses",
+        "licenses",
+        "CREATE TABLE licenses (\n                unique_system_identifier INTEGER PRIMARY KEY,\n                uls_file_number TEXT,\n                ebf_number TEXT,\n                call_sign TEXT COLLATE NOCASE,\n                license_status INTEGER,\n                radio_service_code INTEGER,\n                grant_date TEXT,\n                expired_date TEXT,\n                cancellation_date TEXT,\n                effective_date TEXT,\n                last_action_date TEXT,\n                revoked_certification TEXT,\n                license_revoked TEXT,\n                licensee_name TEXT COLLATE NOCASE,\n                first_name TEXT COLLATE NOCASE,\n                middle_initial TEXT,\n                last_name TEXT COLLATE NOCASE,\n                suffix TEXT,\n                frn TEXT COLLATE NOCASE,\n                previous_call_sign TEXT COLLATE NOCASE,\n                trustee_call_sign TEXT COLLATE NOCASE,\n                trustee_name TEXT COLLATE NOCASE\n            ) WITHOUT ROWID"
+      ],
+      [
+        "table",
+        "metadata",
+        "metadata",
+        "CREATE TABLE metadata (\n                key TEXT PRIMARY KEY,\n                value TEXT NOT NULL\n            ) WITHOUT ROWID"
+      ],
+      [
+        "table",
+        "special_conditions",
+        "special_conditions",
+        "CREATE TABLE special_conditions (\n                id INTEGER PRIMARY KEY AUTOINCREMENT,\n                unique_system_identifier INTEGER NOT NULL,\n                uls_file_number TEXT,\n                ebf_number TEXT,\n                callsign TEXT,\n                special_condition_type TEXT,\n                special_condition_code INTEGER,\n                status_code TEXT,\n                status_date TEXT,\n                UNIQUE(unique_system_identifier, special_condition_code),\n                FOREIGN KEY (unique_system_identifier) REFERENCES licenses(unique_system_identifier)\n            )"
+      ],
+      [
+        "table",
+        "sqlite_sequence",
+        "sqlite_sequence",
+        "CREATE TABLE sqlite_sequence(name,seq)"
+      ]
+    ],
+    "tables": {
+      "amateur_operators": {
+        "rows": 1690602,
+        "columns": [
+          "id",
+          "unique_system_identifier",
+          "uls_file_number",
+          "ebf_number",
+          "call_sign",
+          "operator_class",
+          "group_code",
+          "region_code",
+          "trustee_call_sign",
+          "trustee_indicator",
+          "physician_certification",
+          "ve_signature",
+          "systematic_call_sign_change",
+          "vanity_call_sign_change",
+          "vanity_relationship",
+          "previous_call_sign",
+          "previous_operator_class",
+          "trustee_name"
+        ],
+        "order": [
+          "id"
+        ],
+        "sha3_256": "88A2F5E41B35A592029F41945C339CE40BF117AE1143E5929FD10DBB73F4074E"
+      },
+      "applied_patches": {
+        "rows": 0,
+        "columns": [
+          "radio_service_code",
+          "patch_date",
+          "patch_weekday",
+          "applied_at",
+          "etag",
+          "record_count"
+        ],
+        "order": [
+          "radio_service_code",
+          "patch_date"
+        ],
+        "sha3_256": "ACD0934A0AE34ACD7DFFE29D6C7F21D691D927810F16CDFE746E09BB980AC164"
+      },
+      "comments": {
+        "rows": 234904,
+        "columns": [
+          "id",
+          "unique_system_identifier",
+          "uls_file_number",
+          "callsign",
+          "comment_date",
+          "description",
+          "status_code",
+          "status_date"
+        ],
+        "order": [
+          "id"
+        ],
+        "sha3_256": "C0E02B5B8DDC745CF15139CCE514FDF1471508C8E50362723905D3C08DFE01FC"
+      },
+      "entities": {
+        "rows": 2297038,
+        "columns": [
+          "id",
+          "unique_system_identifier",
+          "uls_file_number",
+          "ebf_number",
+          "call_sign",
+          "entity_type",
+          "licensee_id",
+          "entity_name",
+          "first_name",
+          "middle_initial",
+          "last_name",
+          "suffix",
+          "phone",
+          "fax",
+          "email",
+          "street_address",
+          "city",
+          "state",
+          "zip_code",
+          "po_box",
+          "attention_line",
+          "sgin",
+          "frn",
+          "applicant_type_code",
+          "status_code",
+          "status_date"
+        ],
+        "order": [
+          "id"
+        ],
+        "sha3_256": "8C6432CB444EB4E4D7CE48FF7A718596C9D71104C47D292AE09444F6CF00B654"
+      },
+      "history": {
+        "rows": 6121213,
+        "columns": [
+          "id",
+          "unique_system_identifier",
+          "uls_file_number",
+          "callsign",
+          "log_date",
+          "code"
+        ],
+        "order": [
+          "id"
+        ],
+        "sha3_256": "D988D43E3C96E4886E4B00EAD2C26E02562888CE6F55484176ACEFD8921D3E10"
+      },
+      "import_status": {
+        "rows": 14,
+        "columns": [
+          "radio_service_code",
+          "record_type",
+          "record_count"
+        ],
+        "order": [
+          "radio_service_code",
+          "record_type"
+        ],
+        "sha3_256": "341FCAD80D0D1AD7F2D4DE14FF28FD2422042DCB2D2F58963F654419A9BC3992"
+      },
+      "licenses": {
+        "rows": 2297038,
+        "columns": [
+          "unique_system_identifier",
+          "uls_file_number",
+          "ebf_number",
+          "call_sign",
+          "license_status",
+          "radio_service_code",
+          "grant_date",
+          "expired_date",
+          "cancellation_date",
+          "effective_date",
+          "last_action_date",
+          "revoked_certification",
+          "license_revoked",
+          "licensee_name",
+          "first_name",
+          "middle_initial",
+          "last_name",
+          "suffix",
+          "frn",
+          "previous_call_sign",
+          "trustee_call_sign",
+          "trustee_name"
+        ],
+        "order": [
+          "unique_system_identifier"
+        ],
+        "sha3_256": "028100A0776D000AFEAAC84138C5347F683C5C58B3F5849FDC847E08C85D1801"
+      },
+      "metadata": {
+        "rows": 1,
+        "columns": [
+          "key",
+          "value"
+        ],
+        "order": [
+          "key"
+        ],
+        "sha3_256": "C4D6F2F188E11FF938497055193C8F0FFF5F4C6BC01EEC37A2CCA577638A8908"
+      },
+      "special_conditions": {
+        "rows": 215987,
+        "columns": [
+          "id",
+          "unique_system_identifier",
+          "uls_file_number",
+          "ebf_number",
+          "callsign",
+          "special_condition_type",
+          "special_condition_code",
+          "status_code",
+          "status_date"
+        ],
+        "order": [
+          "id"
+        ],
+        "sha3_256": "AB0F6662463DCB79D48C2A93CA896C1E54F4F62F5B805DDA0F35B8D614B81C4B"
+      },
+      "sqlite_sequence": {
+        "rows": 5,
+        "columns": [
+          "name",
+          "seq"
+        ],
+        "order": [
+          "name",
+          "seq"
+        ],
+        "sha3_256": "672033DDE1409E4ABBB175B0DEC247A4EB7778E71EE587F3C12F8A594E93A8A4"
+      }
+    },
+    "quick_check": "ok",
+    "foreign_key_check": "ok"
+  }
+}
