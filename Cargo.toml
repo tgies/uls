@@ -72,7 +72,7 @@ tempfile = "3.25"
 mockito = "1.7"
 wiremock = "0.6"
 proptest = "1.8"
-rstest = "0.26"
+rstest = "0.27"
 
 # Benchmarking
 criterion = { version = "0.8", features = ["html_reports"] }
